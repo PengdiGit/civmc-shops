@@ -4,19 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
 <main class="profile-page" id="profile-page">
   <div class="profile-hero" id="hero">
-    <span id="avatar"></span>
-    <div class="grow">
-      <h1 id="name">Loading...</h1>
-      <div class="row" id="tags"></div>
-      <dl class="facts" id="facts"></dl>
+    <div class="profile-hero-main">
+      <span id="avatar"></span>
+      <div class="profile-hero-identity">
+        <h1 id="name">Loading...</h1>
+        <div class="row" id="tags"></div>
+        <dl class="facts" id="facts"></dl>
+        <div class="inline-actions" id="actions"></div>
+      </div>
+    </div>
+    <div class="profile-hero-side">
       <p class="bio" id="bio"></p>
-      <div class="inline-actions" id="actions" style="margin-top:12px"></div>
+      <dl class="facts profile-meta-facts" id="meta-facts"></dl>
     </div>
   </div>
   <div class="msg" id="msg"></div>
@@ -42,7 +47,7 @@
         </div>
         <div style="flex:1;min-width:160px">
           <label for="timezoneedit">Timezone (optional)</label>
-          <input type="text" id="timezoneedit" maxlength="60" placeholder="e.g. EST (UTCÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢5)" style="width:100%">
+          <input type="text" id="timezoneedit" maxlength="60" placeholder="e.g. EST (UTC-5)" style="width:100%">
         </div>
       </div>
       <div class="row" style="margin-top:6px"><button id="saveidentity">Save pronouns / timezone</button></div>
@@ -64,13 +69,7 @@
         <button id="usehead">Use my Minecraft head</button>
       </div>
 
-      <p class="note">Your Minecraft name and Discord name can't be changed here. To change those, or anything else about your account, <span class="pfa"></span>.</p>
-
-      <h2>Change password</h2>
-      <div class="row">
-        <input type="password" id="pw" placeholder="New password (8+ characters)" autocomplete="new-password">
-        <button id="savepw">Change password</button>
-      </div>
+      <p class="note">Your Minecraft name and Discord name can't be changed here. To change those, or anything else about your account, <span class="pfa"></span>. Change your password in <a href="settings.html">Settings</a>.</p>
     </div>
   </div>
 
@@ -234,8 +233,9 @@ async function load() {
     `<dt>Minecraft</dt><dd><b>${esc(p.mc_username)}</b></dd>
      <dt>Discord</dt><dd>${p.discord_username ? `<b>${esc(p.discord_username)}</b> <button class="small" id="copydc">Copy</button>` : '<span class="meta">not set</span>'}</dd>
      ${p.pronouns ? `<dt>Pronouns</dt><dd>${esc(p.pronouns)}</dd>` : ""}
-     ${p.timezone ? `<dt>Timezone</dt><dd>${esc(p.timezone)}</dd>` : ""}
-     <dt>Member since</dt><dd title="${esc(p.created_at ? new Date(p.created_at).toLocaleString() : "")}">${esc(since)}</dd>
+     ${p.timezone ? `<dt>Timezone</dt><dd>${esc(p.timezone)}</dd>` : ""}`;
+  document.getElementById("meta-facts").innerHTML =
+    `<dt>Member since</dt><dd title="${esc(p.created_at ? new Date(p.created_at).toLocaleString() : "")}">${esc(since)}</dd>
      <dt>Last seen</dt><dd>${lastSeenHtml(p.last_seen_at)}</dd>`;
   const cp = document.getElementById("copydc");
   if (cp) cp.onclick = async () => {
@@ -310,7 +310,7 @@ async function load() {
     <div class="stat"><div class="big" style="font-size:1rem">${esc(since)}</div><div class="lbl">Member since</div></div>`;
 
   document.getElementById("shops-sub").textContent = full.length
-    ? full.length + " shop" + (full.length === 1 ? "" : "s") + " · " + totalListings + " listing" + (totalListings === 1 ? "" : "s")
+    ? full.length + " shop" + (full.length === 1 ? "" : "s") + " \u00b7 " + totalListings + " listing" + (totalListings === 1 ? "" : "s")
     : "";
   document.getElementById("tab-shops").textContent = "Shops" + (full.length ? " (" + full.length + ")" : "");
 
@@ -347,7 +347,7 @@ async function load() {
             <span><span class="stars">${starsText(r.rating)}</span>
               <a href="shop.html?id=${r.shop_id}">${r.shops ? shopName(r.shops) : "shop"}</a>
               ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
-              <span class="meta">· ${agoText(r.created_at)}</span></span>
+              <span class="meta">\u00b7 ${agoText(r.created_at)}</span></span>
           </div>
           ${r.body ? `<p class="body">${esc(r.body)}</p>` : ""}
           ${r.owner_reply ? `<div class="owner-reply"><span class="tag owner">owner reply</span>
@@ -429,16 +429,6 @@ document.getElementById("usehead").onclick = async () => {
   if (old) sb.storage.from("uploads").remove([old]);
   setMsg(msg, "Using your Minecraft head again.", "ok");
   load();
-};
-
-document.getElementById("savepw").onclick = async () => {
-  const pw = document.getElementById("pw").value;
-  if (pw.length < 8) { setMsg(msg, "Use at least 8 characters.", "err"); return; }
-  const { error } = await sb.auth.updateUser({ password: pw });
-  if (error) { setMsg(msg, error.message, "err"); return; }
-  await sb.from("profiles").update({ must_change_password: false }).eq("id", shown.id);
-  document.getElementById("pw").value = "";
-  setMsg(msg, "Password changed.", "ok");
 };
 
 load();

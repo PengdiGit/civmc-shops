@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Settings - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body class="settings-page">
 <nav id="nav"></nav>
@@ -13,7 +13,7 @@
     <div class="settings-hero-copy">
       <span class="page-eyebrow">Account</span>
       <h1>Settings</h1>
-      <p class="sub">Theme and owner alerts.</p>
+      <p class="sub">Theme, password, and owner alerts.</p>
     </div>
     <button type="button" class="primary" id="save" hidden>Save settings</button>
   </header>
@@ -27,6 +27,15 @@
     <div class="row theme-picker" style="margin-top:8px;gap:8px;flex-wrap:wrap">
       <button type="button" class="small" data-theme-pick="dark" data-ico="moon" id="theme-dark">Dark</button>
       <button type="button" class="small" data-theme-pick="light" data-ico="sun" id="theme-light">Light</button>
+    </div>
+  </div>
+
+  <div class="panel settings-panel" id="pw-panel" hidden>
+    <h2 style="margin-top:0">Change password</h2>
+    <p class="meta" style="margin-top:0">Use at least 8 characters.</p>
+    <div class="row" style="flex-wrap:wrap">
+      <input type="password" id="pw" placeholder="New password (8+ characters)" autocomplete="new-password">
+      <button id="savepw">Change password</button>
     </div>
   </div>
 
@@ -69,6 +78,7 @@ async function load() {
   const ctx = await requireLogin();
   if (!ctx) return;
   me = ctx.profile;
+  document.getElementById("pw-panel").hidden = false;
   document.getElementById("panel").hidden = false;
   document.getElementById("save").hidden = false;
   const on = alertsEnabled(me);
@@ -91,6 +101,16 @@ document.getElementById("save").onclick = async () => {
   if (error) { setMsg(msg, error.message, "err"); return; }
   me.alerts_enabled = alerts_enabled;
   setMsg(msg, "Alert settings saved.", "ok");
+};
+
+document.getElementById("savepw").onclick = async () => {
+  const pw = document.getElementById("pw").value;
+  if (pw.length < 8) { setMsg(msg, "Use at least 8 characters.", "err"); return; }
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if (error) { setMsg(msg, error.message, "err"); return; }
+  await sb.from("profiles").update({ must_change_password: false }).eq("id", me.id);
+  document.getElementById("pw").value = "";
+  setMsg(msg, "Password changed.", "ok");
 };
 
 load();
