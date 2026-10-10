@@ -11,12 +11,13 @@
 <main>
   <header class="page-hero shop-storefront">
     <a class="back" href="index.html">&larr; Back to search</a>
+    <div class="action-cluster shop-hero-actions" id="shop-actions">
+      <button type="button" id="favbtn" data-act="fav" hidden></button>
+      <button type="button" id="sharebtn" data-act="share" data-ico="share" title="Copy link to this shop" aria-label="Share shop"></button>
+      <span id="shop-mod-actions"></span>
+    </div>
     <div class="top">
       <div class="shophead"><span id="shopicon"></span><div><h1 id="name">Loading...</h1><div id="rating"></div></div></div>
-      <div class="action-cluster">
-        <button type="button" id="favbtn" data-act="fav" hidden></button>
-        <button type="button" id="sharebtn" data-act="share" data-ico="share" title="Copy link to this shop" aria-label="Share shop"></button>
-      </div>
     </div>
     <div class="glance" id="glance"></div>
     <div class="shopdesc" id="desc" hidden></div>
@@ -29,7 +30,7 @@
     <div class="shop-catalog-main">
       <div class="shop-filter" id="listingfilter" hidden>
         <div class="row">
-          <input type="search" id="lq" placeholder="Filter listings in this shopÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦" style="flex:1;min-width:160px">
+          <input type="search" id="lq" placeholder="Filter listings in this shop..." style="flex:1;min-width:160px">
           <select id="lstock">
             <option value="all" selected>All listings</option>
             <option value="in">In stock only</option>
@@ -222,7 +223,7 @@ function paintListings(staff, isOwner) {
       id: "listing-" + l.id,
       cls: (listingIsOut(l) || l.timed_out ? "out" : "") + (hl ? " find-hl" : ""),
       tags,
-      meta: updatedHtml(l.updated_at) + (g ? ` · <span class="meta">${esc(g)}</span>` : ""),
+      meta: updatedHtml(l.updated_at) + (g ? ` \u00b7 <span class="meta">${esc(g)}</span>` : ""),
       btns: tipVotesHtml(l.id, tip.votes, tip.myVote),
       btnsEnd: end
     });
@@ -276,7 +277,7 @@ async function load() {
   const hidden = s && (s.timed_out || s.archived || s.is_open === false || (s.profiles && s.profiles.timed_out));
   if (error || !s || (hidden && !staff && !isOwner)) {
     document.getElementById("name").textContent = "Shop not found";
-    ["glance", "banner", "offers", "reviews", "rform", "comments", "cform", "rating", "shopicon", "desc"].forEach(id => document.getElementById(id).innerHTML = "");
+    ["glance", "banner", "shop-mod-actions", "offers", "reviews", "rform", "comments", "cform", "rating", "shopicon", "desc"].forEach(id => document.getElementById(id).innerHTML = "");
     setMsg(msg, "That shop doesn't exist or isn't available.", "err");
     return;
   }
@@ -297,17 +298,17 @@ async function load() {
   }
   const newest = allListings.reduce((m, l) => (!m || l.updated_at > m ? l.updated_at : m), null);
   const parts = [];
+  parts.push(ownerChip(s.profiles, s.owner_id));
   const place = placeHtml(s);
   if (place) parts.push(place);
   parts.push(coordsHtml(s.x, s.z) + (s.x != null && s.z != null
     ? " " + iconBtn("copy", { title: "Copy coordinates", attrs: `data-act="copy-coords" data-x="${esc(s.x)}" data-z="${esc(s.z)}"` }) : ""));
   if (s.find_note) parts.push('<span title="How to find the shop">' + esc(s.find_note) + "</span>");
-  parts.push(ownerChip(s.profiles, s.owner_id));
   parts.push(allListings.length + " listing" + (allListings.length === 1 ? "" : "s"));
   if (newest) parts.push(updatedHtml(newest));
   const quiet = shopFreshnessHtml(allListings);
   if (quiet) parts.push(quiet);
-  document.getElementById("glance").innerHTML = parts.join('<span class="sep">·</span>');
+  document.getElementById("glance").innerHTML = parts.join('<span class="sep">\u00b7</span>');
 
   if (me) {
     const { data: f } = await sb.from("favorites").select("id").eq("user_id", me.id).eq("shop_id", shopId);
@@ -330,7 +331,8 @@ async function load() {
   let btns = "";
   if (staff) btns += iconBtn("clock", { cls: "btn-timeout", title: s.timed_out ? "Remove shop timeout" : "Timeout shop", attrs: `data-act="shop-timeout" data-to="${s.timed_out ? 0 : 1}"` });
   if (!isOwner) btns += iconBtn("flag", { cls: "btn-report", title: "Report shop", attrs: `data-act="report" data-type="shop" data-id="${s.id}"` });
-  document.getElementById("banner").innerHTML = banner + (btns ? `<div class="action-cluster" style="margin-bottom:10px">${btns}</div>` : "");
+  document.getElementById("shop-mod-actions").innerHTML = btns;
+  document.getElementById("banner").innerHTML = banner;
 
   setMsg(msg, "");
   await loadTips();
@@ -408,7 +410,7 @@ function paintReviewList(staff, isOwner) {
           <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${r.author_id}">${esc(pr ? pr.mc_username : "?")}</a>
             <span class="stars">${starsText(r.rating)}</span>
             ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
-            <span class="meta">· ${agoText(r.created_at)}</span> ${r.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
+            <span class="meta">\u00b7 ${agoText(r.created_at)}</span> ${r.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
           <span class="action-cluster">${b}</span>
         </div>
         ${r.body ? `<p class="body">${linkMentions(r.body)}</p>` : ""}
@@ -441,8 +443,8 @@ async function loadReviews(staff, isOwner) {
       <div class="composer">
         <div class="row" style="margin-bottom:6px"><span class="meta">Your rating</span>
           <select class="rating" id="rrating">
-            <option value="5">ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ (5)</option><option value="4">ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â  (4)</option><option value="3">ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â  (3)</option>
-            <option value="2">ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â  (2)</option><option value="1">ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â  (1)</option>
+            <option value="5">\u2605\u2605\u2605\u2605\u2605 (5)</option><option value="4">\u2605\u2605\u2605\u2605\u2606 (4)</option><option value="3">\u2605\u2605\u2605\u2606\u2606 (3)</option>
+            <option value="2">\u2605\u2605\u2606\u2606\u2606 (2)</option><option value="1">\u2605\u2606\u2606\u2606\u2606 (1)</option>
           </select></div>
         <label class="meta" style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
           <input type="checkbox" id="rtraded"> I traded here
@@ -481,7 +483,7 @@ function commentHtml(c, rootId, staff) {
       <div class="head">
         <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${c.author_id}">${esc(pr ? pr.mc_username : "?")}</a>
           ${isOwnerAuthor ? '<span class="tag owner">owner</span>' : ""}
-          <span class="meta">· ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
+          <span class="meta">\u00b7 ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
         <span class="action-cluster">${b}</span>
       </div>
       ${c.body ? `<p class="body">${linkMentions(c.body)}</p>` : ""}${img}

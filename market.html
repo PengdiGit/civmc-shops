@@ -81,7 +81,7 @@ const cityEl = document.getElementById("m-city");
 const SELL = "#7fb35a", BUY = "#d9a441";
 const DAYMS = 86400000;
 let byItem = {};          // item -> { sell: row|null, buy: row|null }
-let sparkByItem = {};     // item -> [median...] oldestÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢newest (sell side)
+let sparkByItem = {};     // item -> [median...] oldest\u2192newest (sell side)
 let selected = null;
 let history = { sell: [], buy: [] };
 let rangeDays = 30;
@@ -96,14 +96,14 @@ function fmtD(v) {
   return v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : String(+v.toPrecision(2));
 }
 const priceCell = (m) => m
-  ? `<b>${fmtD(m.median * k())}</b> d<small>${fmtD(m.low * k())} - ${fmtD(m.high * k())} · ${m.n} shop${m.n === 1 ? "" : "s"}</small>`
+  ? `<b>${fmtD(m.median * k())}</b> d<small>${fmtD(m.low * k())} - ${fmtD(m.high * k())} \u00b7 ${m.n} shop${m.n === 1 ? "" : "s"}</small>`
   : '<span class="meta">-</span>';
 function spreadCell(e) {
   const sp = marketSpread(e.sell, e.buy);
   if (sp == null) return '<span class="meta">-</span>';
   const v = sp * k();
   const cls = v > 0 ? "spread-pos" : v < 0 ? "spread-neg" : "";
-  return `<span class="${cls}" title="Sell median ÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢ buy median">${v >= 0 ? "+" : ""}${fmtD(v)} d</span>`;
+  return `<span class="${cls}" title="Sell median - buy median">${v >= 0 ? "+" : ""}${fmtD(v)} d</span>`;
 }
 
 function applyMarketRows(rows) {
@@ -251,7 +251,7 @@ async function renderIntel() {
         <span class="delta ${m.pct >= 0 ? "up" : "down"}">${m.pct >= 0 ? "+" : ""}${m.pct.toFixed(0)}%</span></div>`) +
     line("Wide spreads", spreads, s =>
       `<div class="rowline"><a href="#" data-open="${esc(s.i)}">${esc(s.i)}</a>
-        <span class="meta">${fmtD(s.ratio)}ÃƒÆ’Ã¢â‚¬â€ range · ${s.m.n} shops</span></div>`) +
+        <span class="meta">\u00d7 range \u00b7 ${s.m.n} shops</span></div>`) +
     line("Thin markets", thin, t =>
       `<div class="rowline"><a href="#" data-open="${esc(t.i)}">${esc(t.i)}</a>
         <span class="tag warn">${t.m.n} shop${t.m.n === 1 ? "" : "s"}</span></div>`);
@@ -307,10 +307,10 @@ async function openItem(item) {
 function stat(label, m, color) {
   if (!m) return `<div class="stat"><div class="lbl"><i style="background:${color}"></i> ${label}</div><div class="big">-</div><div class="meta">nobody lists this right now</div></div>`;
   return `<div class="stat">
-    <div class="lbl"><span style="color:${color}">ÃƒÂ¢Ã¢â‚¬â€Ã‚Â</span> ${label}</div>
+    <div class="lbl"><span style="color:">\u25cf</span> ${label}</div>
     <div class="big">${fmtD(m.median * k())} <span class="meta">d / ${unitWord()}</span></div>
-    <div class="meta">usual range ${fmtD(m.low * k())} - ${fmtD(m.high * k())} · ${m.n} shop${m.n === 1 ? "" : "s"}
-      ${m.outliers ? ` · ${m.outliers} odd price${m.outliers === 1 ? "" : "s"} ignored` : ""}
+    <div class="meta">usual range ${fmtD(m.low * k())} - ${fmtD(m.high * k())} \u00b7 ${m.n} shop${m.n === 1 ? "" : "s"}
+      ${m.outliers ? ` \u00b7 ${m.outliers} odd price${m.outliers === 1 ? "" : "s"} ignored` : ""}
       ${m.n < 3 ? ' <span class="tag warn">few shops</span>' : ""}</div></div>`;
 }
 
@@ -329,7 +329,7 @@ function renderDetail() {
   const { nation, city } = marketPlaceFilter();
   const scopeBits = [city, nation].filter(Boolean);
   const scopeNote = scopeBits.length
-    ? ` Live rates above are for ${scopeBits.join(" · ")} only; history chart is still server-wide.`
+    ? ` Live rates above are for ${scopeBits.join(" \u00b7 ")} only; history chart is still server-wide.`
     : "";
   document.getElementById("d-note").textContent = (days < 7
     ? `Only ${days} day${days === 1 ? "" : "s"} of history so far. The graph fills in as days pass.`
@@ -378,7 +378,7 @@ function drawChart(el, series) {
     const px = (ev.clientX - r.left) / r.width * W;
     const d = days.reduce((best, x) => Math.abs(xOf(x) - px) < Math.abs(xOf(best) - px) ? x : best, days[0]);
     guide.setAttribute("x1", xOf(d)); guide.setAttribute("x2", xOf(d)); guide.setAttribute("visibility", "visible");
-    const rows = series.map(s => { const p = s.pts.find(q => q.d === d); return p ? `<div><span style="color:${s.color}">ÃƒÂ¢Ã¢â‚¬â€Ã‚Â</span> ${s.name}: <b>${fmtD(p.m * kk)}</b> (${fmtD(p.lo * kk)} - ${fmtD(p.hi * kk)}, ${p.n} shop${p.n === 1 ? "" : "s"})</div>` : ""; }).join("");
+    const rows = series.map(s => { const p = s.pts.find(q => q.d === d); return p ? `<div><span style="color:">\u25cf</span> ${s.name}: <b>${fmtD(p.m * kk)}</b> (${fmtD(p.lo * kk)} - ${fmtD(p.hi * kk)}, ${p.n} shop${p.n === 1 ? "" : "s"})</div>` : ""; }).join("");
     tip.innerHTML = `<b>${new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}</b>${rows}`;
     tip.hidden = false;
     const pct = xOf(d) / W * 100;

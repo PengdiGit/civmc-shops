@@ -19,3 +19,4 @@ make_items.py
 setup.sql
 market-snapshot.sql
 purge-unverified.sql
+_places_scrape.json

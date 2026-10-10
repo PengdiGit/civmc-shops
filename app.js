@@ -393,7 +393,7 @@ function ownerChip(p, ownerId) {
   if (!p || !ownerId) return '<span class="meta">owner: ?</span>';
   return `<a class="owner-chip" href="profile.html?id=${esc(ownerId)}">${avatarImg(p, 22)} ${esc(p.mc_username)}</a>`;
 }
-// "Mount Augusta · Commonwealth" style place line for cards / meta
+// "Mount Augusta \u00b7 Commonwealth" style place line for cards / meta
 // Soft city/nation aliases (display + filter matching without rewriting DB rows)
 const PLACE_ALIASES = {
   "mt augusta": "Mount Augusta", "mount augusta": "Mount Augusta", "ma": "Mount Augusta",
@@ -422,7 +422,7 @@ function placeHtml(s) {
   if (city) bits.push(esc(city));
   if (nation && nation !== city) bits.push(esc(nation));
   else if (nation && !city) bits.push(esc(nation));
-  return bits.join(" · ");
+  return bits.join(" \u00b7 ");
 }
 function placeFilterMatch(s, city, nation) {
   if (city && !placeEquals(s.city, city)) return false;
@@ -549,11 +549,11 @@ function paintCompareTray(pins, opts) {
     const r = dealRate(l, p.buying);
     const place = placeHtml(s);
     const dist = here && s.x != null && s.z != null
-      ? " · ~" + Math.round(distBlocks(here, s)) + " blocks away" : "";
+      ? " \u00b7 ~" + Math.round(distBlocks(here, s)) + " blocks away" : "";
     return `<div class="compare-card">
       <div class="meta">${shopIcon(s, "sm")} ${shopName(s)}</div>
       <div class="trade" style="margin:6px 0">${itemText(l.want_amount, l.want_item, l.want_unit)} <span class="arrow">&rarr;</span> ${itemText(l.sell_amount, l.sell_item, l.sell_unit)}</div>
-      <div class="meta">${r != null ? fmtRate(r) : "barter"} · ${stockHtml(l)} · ${updatedHtml(l.updated_at, { prefix: false })}</div>
+      <div class="meta">${r != null ? fmtRate(r) : "barter"} \u00b7 ${stockHtml(l)} \u00b7 ${updatedHtml(l.updated_at, { prefix: false })}</div>
       <div class="meta">${place || "-"}${dist}</div>
       <div class="action-cluster" style="margin-top:8px">
         ${iconBtn("external", { tag: "a", title: "Open shop", attrs: `href="shop.html?id=${l.shop_id}&listing=${l.id}"` })}
@@ -659,7 +659,7 @@ function honestyInfo(listings) {
   if (score >= 80) { label = "honest stock"; cls = "ok"; }
   else if (score < 45) { label = "stale stock?"; cls = "bad"; }
   else if (score < 65) { label = "mixed stock"; cls = "warn"; }
-  const tip = `${withCount.length}/${Math.max(1, inStock.length)} counted · ${quietClaim.length} quiet+in-stock · ${fresh.length} fresh`;
+  const tip = `${withCount.length}/${Math.max(1, inStock.length)} counted \u00b7 ${quietClaim.length} quiet+in-stock \u00b7 ${fresh.length} fresh`;
   return { score, label, cls, tip };
 }
 function honestySparkline(scores) {
@@ -680,7 +680,7 @@ function honestyBadge(listings, historyScores) {
   const h = honestyInfo(listings);
   if (!h) return "";
   const spark = honestySparkline(historyScores);
-  return `<span class="honesty-wrap" title="${esc(h.tip + " · score " + h.score)}"><span class="tag ${h.cls} honesty">${esc(h.label)}</span>${spark}</span>`;
+  return `<span class="honesty-wrap" title="${esc(h.tip + " \u00b7 score " + h.score)}"><span class="tag ${h.cls} honesty">${esc(h.label)}</span>${spark}</span>`;
 }
 async function loadHonestyHistory(shopIds) {
   const ids = (shopIds || []).map(Number).filter(n => !isNaN(n));
@@ -780,11 +780,11 @@ function compareMarkdown(pins) {
   (pins || []).forEach((p, i) => {
     const l = p.listing, s = p.shop || {};
     const r = dealRate(l, p.buying);
-    const place = [s.city, s.nation && s.nation !== s.city ? s.nation : null].filter(Boolean).join(" · ");
+    const place = [s.city, s.nation && s.nation !== s.city ? s.nation : null].filter(Boolean).join(" \u00b7 ");
     lines.push(`${i + 1}. **${shopPlainName(s)}**${place ? ` (${place})` : ""}`);
     lines.push(`   - ${l.want_amount}${l.want_unit ? " " + l.want_unit.toUpperCase() : ""} ${l.want_item} → ${l.sell_amount}${l.sell_unit ? " " + l.sell_unit.toUpperCase() : ""} ${l.sell_item}`);
     if (r != null) lines.push(`   - ${fmtRate(r)}`);
-    if (s.x != null && s.z != null) lines.push(`   - coords \`${s.x}, ${s.z}\` · ${mapUrl(s.x, s.z)}`);
+    if (s.x != null && s.z != null) lines.push(`   - coords \`${s.x}, ${s.z}\` \u00b7 ${mapUrl(s.x, s.z)}`);
     lines.push(`   - shop: shop.html?id=${l.shop_id}&listing=${l.id}`);
     lines.push("");
   });
@@ -806,7 +806,7 @@ function shopCardHtml(s, opts) {
   return `<div class="card shop-card" data-href="shop.html?id=${s.id}">
     <div class="cardrow">${shopIcon(s, "card")}<div class="grow">
       <div class="title">${shopName(s)}${sale ? " " + sale : ""}</div>
-      <div class="meta meta-line">${ratingHtml(s.reviews)} · ${n} listing${n === 1 ? "" : "s"}${honesty ? " · " + honesty : ""}</div>
+      <div class="meta meta-line">${ratingHtml(s.reviews)} \u00b7 ${n} listing${n === 1 ? "" : "s"}${honesty ? " \u00b7 " + honesty : ""}</div>
       <div class="meta meta-line loc-line">${where}</div>
       <div class="meta meta-line owner-line">${owner}</div>
       ${actions ? `<div class="inline-actions shop-card-actions">${actions}</div>` : ""}
@@ -839,7 +839,7 @@ function tradedHereCount(reviews) {
 function trustedBadge(reviews) {
   if (!isTrustedTrader(reviews)) return "";
   const n = tradedHereCount(reviews);
-  const tip = "3+ reviews averaging 4★ or better" + (n ? " · " + n + " marked traded here" : "");
+  const tip = "3+ reviews averaging 4★ or better" + (n ? " \u00b7 " + n + " marked traded here" : "");
   return `<span class="tag ok trusted" title="${esc(tip)}">trusted trader</span>`;
 }
 // Stock: null = in stock (no count), 0 = out, N = exchanges left. Keeps in_stock in sync.
@@ -1442,11 +1442,11 @@ function setMsg(el, text, kind) {
   el.className = "msg" + (kind ? " " + kind : "");
 }
 
-// "Owner: <profile link> · Discord: name" (plain meta line)
+// "Owner: <profile link> \u00b7 Discord: name" (plain meta line)
 function ownerHtml(p, ownerId) {
   if (!p) return "owner: ?";
   const link = ownerId ? `<a href="profile.html?id=${esc(ownerId)}">${esc(p.mc_username)}</a>` : esc(p.mc_username);
-  return "owner: " + link + (p.discord_username ? " · Discord: " + esc(p.discord_username) : "");
+  return "owner: " + link + (p.discord_username ? " \u00b7 Discord: " + esc(p.discord_username) : "");
 }
 
 // timeout / untimeout a shop, listing, comment or review (mods + admins). returns error text or null

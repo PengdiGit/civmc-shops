@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>My shops - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body class="dash-page">
 <nav id="nav"></nav>
@@ -26,8 +26,8 @@
   <div class="panel" id="newshop" data-icon-item="">
     <div class="row">
       <div style="flex:2;min-width:180px"><label for="s-name">Shop name (what people search)</label><input type="text" id="s-name" maxlength="60" style="width:100%"></div>
-      <div style="flex:1;min-width:100px"><label for="s-city">City</label><input type="text" id="s-city" maxlength="60" placeholder="Mount Augusta" style="width:100%"></div>
-      <div style="flex:1;min-width:100px"><label for="s-nation">Nation</label><input type="text" id="s-nation" maxlength="60" placeholder="Commonwealth" style="width:100%"></div>
+      <div style="flex:1;min-width:120px"><label for="s-city">City</label><input type="text" id="s-city" class="place-city" maxlength="60" placeholder="Search cities…" style="width:100%"></div>
+      <div style="flex:1;min-width:120px"><label for="s-nation">Nation</label><input type="text" id="s-nation" class="place-nation" maxlength="60" placeholder="Search nations…" style="width:100%"></div>
       <div><label for="s-x">X</label><input type="number" id="s-x" style="width:90px"></div>
       <div><label for="s-z">Z</label><input type="number" id="s-z" style="width:90px"></div>
     </div>
@@ -42,7 +42,7 @@
     <div class="preview" id="s-desc-prev"></div>
 
     <label for="s-find">Find me (optional)</label>
-    <input type="text" id="s-find" maxlength="120" placeholder="e.g. 2nd floor, blue wool · underground entrance" style="width:100%">
+    <input type="text" id="s-find" maxlength="120" placeholder="e.g. 2nd floor, blue wool \u00b7 underground entrance" style="width:100%">
 
     <label>Shop picture</label>
     <div class="row">
@@ -70,12 +70,15 @@
 <script src="mock.js"></script>
 <script src="items.js"></script>
 <script src="item-picker.js"></script>
-<script src="app.js?v=5"></script>
+<script src="places.js"></script>
+<script src="place-picker.js"></script>
+<script src="app.js?v=6"></script>
 <script>
 let me = null;
 let shopsData = {};                 // shop id -> shop (with listings), from the last load
 let stockUndo = {};                 // shop id -> [{id, stock, in_stock, group_name}] snapshot for undo
 let addingListingSlot = null;       // { shopId, groupKey } when + add form is open
+let openSaleForms = new Set();      // shop ids with start-sale form expanded
 let lastField = null;               // last colour-code text box you clicked in
 let marketByItem = {};              // for owner price alerts
 let ownerAlertList = [];
@@ -120,7 +123,7 @@ document.addEventListener("click", async e => {
 const unitSelect = (cls, sel) => `<select class="unit ${cls}" title="unit (blank = single items)">
   <option value=""></option><option value="ci"${sel === "ci" ? " selected" : ""}>CI</option><option value="cs"${sel === "cs" ? " selected" : ""}>CS</option></select>`;
 const unitText = u => u ? " " + u.toUpperCase() : "";
-const fmtListing = l => `${l.want_amount}${unitText(l.want_unit)} ${l.want_item} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${l.sell_amount}${unitText(l.sell_unit)} ${l.sell_item}`;
+const fmtListing = l => `${l.want_amount}${unitText(l.want_unit)} ${l.want_item} \u2192 ${l.sell_amount}${unitText(l.sell_unit)} ${l.sell_item}`;
 
 async function loadMarketForAlerts() {
   marketByItem = {};
@@ -158,7 +161,7 @@ function paintOwnerAlerts(shops) {
     ownerAlertList.map((a, i) => `<div class="owner-alert" data-alert="${i}">
       <span class="tag ${kindTag(a.kind)}">${kindLabel(a.kind)}</span>
       <span class="owner-alert-body"><a href="shop.html?id=${a.shop.id}&listing=${a.listing.id}">${esc(a.shop.name)}</a>
-        · ${esc(a.text)}</span>
+        \u00b7 ${esc(a.text)}</span>
       <button type="button" class="small" data-act="ignore-alert" data-i="${i}">Ignore</button>
     </div>`).join("");
 }
@@ -204,23 +207,21 @@ async function paintNotifications() {
 function salePanelHtml(s) {
   if (shopSaleActive(s)) {
     const until = s.sale_ends_at ? (" until " + new Date(s.sale_ends_at).toLocaleString()) : " (until cancelled)";
-    const pct = s.sale_percent != null ? (s.sale_percent + "% off · ") : "";
-    return `<div class="sale-panel">
+    const pct = s.sale_percent != null ? (s.sale_percent + "% off \u00b7 ") : "";
+    return `<div class="sale-panel sale-panel-active">
       ${saleBadgeHtml(s)} <span class="meta">${esc(pct)}active${esc(until)}</span>
-      <button type="button" class="small" data-act="end-sale">End sale</button>
     </div>`;
   }
-  return `<div class="sale-panel" data-sale-form="${s.id}">
-    <details>
-      <summary class="meta">Start a shop sale</summary>
-      <div class="row" style="margin-top:8px;flex-wrap:wrap">
-        <input type="text" class="sale-name" maxlength="60" placeholder="Sale name" style="width:140px">
-        <input type="number" class="sale-pct" min="1" max="99" step="1" placeholder="% off" style="width:72px" title="Optional percent off diamond prices">
-        <input type="datetime-local" class="sale-end" title="End time (optional - leave blank until cancelled)">
-        <button type="button" class="small primary" data-act="start-sale">Start sale</button>
-      </div>
-      <p class="meta" style="margin:4px 0 0">Diamond listings get % off (original prices stored for restore). Public cards show ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ(Name) sale!ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â.</p>
-    </details>
+  const open = openSaleForms.has(String(s.id));
+  return `<div class="sale-panel" data-sale-form="${s.id}"${open ? "" : " hidden"}>
+    <div class="row" style="flex-wrap:wrap">
+      <input type="text" class="sale-name" maxlength="60" placeholder="Sale name" style="width:140px">
+      <input type="number" class="sale-pct" min="1" max="99" step="1" placeholder="% off" style="width:72px" title="Optional percent off diamond prices">
+      <input type="datetime-local" class="sale-end" title="End time (optional - leave blank until cancelled)">
+      <button type="button" class="small primary" data-act="start-sale">Start sale</button>
+      <button type="button" class="small" data-act="toggle-sale">Cancel</button>
+    </div>
+    <p class="meta" style="margin:4px 0 0">Diamond listings get % off (original prices stored for restore). Public cards show "(Name) sale!".</p>
   </div>`;
 }
 
@@ -308,6 +309,7 @@ function setupNewShopForm() {
     document.getElementById("s-file").value = "";
     refreshNewIconPrev();
   };
+  if (typeof bindPlaceFieldsIn === "function") bindPlaceFieldsIn(panel);
 }
 
 function setPick(btn, name) {
@@ -324,8 +326,8 @@ function panelHtml(s) {
   <div class="panel" data-panel="${s.id}" data-icon-item="${esc(s.icon_item || "")}" hidden>
     <div class="row">
       <div style="flex:2;min-width:180px"><label>Shop name (plain text, this is what people search)</label><input type="text" class="p-name" maxlength="60" value="${esc(s.name)}" style="width:100%"></div>
-      <div style="flex:1;min-width:100px"><label>City</label><input type="text" class="p-city" maxlength="60" value="${esc(s.city || "")}" style="width:100%"></div>
-      <div style="flex:1;min-width:100px"><label>Nation</label><input type="text" class="p-nation" maxlength="60" value="${esc(s.nation || "")}" style="width:100%"></div>
+      <div style="flex:1;min-width:120px"><label>City</label><input type="text" class="p-city place-city" maxlength="60" value="${esc(s.city || "")}" placeholder="Search cities…" style="width:100%"></div>
+      <div style="flex:1;min-width:120px"><label>Nation</label><input type="text" class="p-nation place-nation" maxlength="60" value="${esc(s.nation || "")}" placeholder="Search nations…" style="width:100%"></div>
       <div><label>X</label><input type="number" class="p-x" value="${s.x ?? ""}" style="width:90px"></div>
       <div><label>Z</label><input type="number" class="p-z" value="${s.z ?? ""}" style="width:90px"></div>
     </div>
@@ -451,7 +453,7 @@ function dashListingRow(l) {
     <div class="dash-listing-stock-col">
       ${stockToggle}${timed}
       <label class="dash-stock-label meta">Stock left</label>
-      <input type="number" min="0" class="dash-stock-amt" placeholder="ÃƒÂ¢Ã‹â€ Ã…Â¾" value="${stockVal}" title="Exchanges left (blank = unlimited)">
+      <input type="number" min="0" class="dash-stock-amt" placeholder="\u221e" value="${stockVal}" title="Exchanges left (blank = unlimited)">
       <span class="meta dash-stock-hint">blank = unlimited</span>
     </div>
   </div>`;
@@ -500,7 +502,7 @@ function addListingFormHtml(groupKey) {
     <div class="row add-row addform">
       <input type="number" min="1" value="1" class="l-wa" title="amount you're buying">
       ${unitSelect("l-wu")}
-      ${pickBtn("want")}
+      ${pickBtn("want", "diamond")}
       <span class="meta">&rarr;</span>
       <input type="number" min="1" value="1" class="l-sa" title="amount you're selling">
       ${unitSelect("l-su")}
@@ -596,7 +598,7 @@ async function render(resetShop) {
             ${saleBadgeHtml(s)}
             ${s.is_open === false ? '<span class="tag warn">closed - hidden from public</span>' : ""}
             ${s.timed_out ? '<span class="tag bad">timed out - hidden</span>' : ""}
-            <div class="meta">${placeHtml(s) ? placeHtml(s) + " · " : ""}${coordsHtml(s.x, s.z)}${nList ? " · " + nList + " listing" + (nList === 1 ? "" : "s") : ""}</div></div>
+            <div class="meta">${placeHtml(s) ? placeHtml(s) + " \u00b7 " : ""}${coordsHtml(s.x, s.z)}${nList ? " \u00b7 " + nList + " listing" + (nList === 1 ? "" : "s") : ""}</div></div>
         </div>
         <div class="action-cluster dash-shop-actions">
           ${iconBtn("external", { tag: "a", title: "Preview shop", attrs: `href="shop.html?id=${s.id}" target="_blank" rel="noopener"` })}
@@ -605,6 +607,9 @@ async function render(resetShop) {
           ${stockUndo[s.id] ? iconBtn("undo", { title: "Undo stock change", attrs: 'data-act="undo-stock"' }) : ""}
           ${iconBtn("table", { title: "Bulk edit stock", attrs: 'data-act="bulk-toggle"' })}
           ${iconBtn("pen", { title: "Edit shop details", attrs: 'data-act="toggle-panel"' })}
+          ${shopSaleActive(s)
+            ? `<button type="button" class="small primary" data-act="end-sale" title="End shop sale">End sale</button>`
+            : `<button type="button" class="small primary" data-act="toggle-sale" title="Start a shop sale">${openSaleForms.has(String(s.id)) ? "Hide sale" : "Sale"}</button>`}
           ${s.is_open === false
             ? iconBtn("eye", { primary: true, title: "Open shop", attrs: 'data-act="open-shop"' })
             : iconBtn("eyeOff", { title: "Close shop", attrs: 'data-act="close-shop"' })}
@@ -618,7 +623,7 @@ async function render(resetShop) {
       <div class="bulk-panel" data-bulk="${s.id}" hidden>
         <div class="row" style="margin-bottom:8px">
           <button type="button" class="small" data-act="bulk-out">Mark all out</button>
-          <button type="button" class="small" data-act="bulk-stock">Set stock to NÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</button>
+          <button type="button" class="small" data-act="bulk-stock">Set stock to N...</button>
           <button type="button" class="small primary" data-act="bulk-save">Save stock changes</button>
           ${iconBtn("x", { title: "Hide bulk edit", attrs: 'data-act="bulk-toggle"' })}
         </div>
@@ -627,7 +632,7 @@ async function render(resetShop) {
           <tbody>${s.listings.map(l => `<tr data-bulk-id="${l.id}">
             <td>${esc(l.want_amount + (l.want_unit ? " " + l.want_unit.toUpperCase() : "") + " " + l.want_item)}</td>
             <td>${esc(l.sell_amount + (l.sell_unit ? " " + l.sell_unit.toUpperCase() : "") + " " + l.sell_item)}</td>
-            <td><input type="number" min="0" class="b-stock" value="${l.stock == null ? "" : l.stock}" placeholder="ÃƒÂ¢Ã‹â€ Ã…Â¾" style="width:72px"></td>
+            <td><input type="number" min="0" class="b-stock" value="${l.stock == null ? "" : l.stock}" placeholder="\u221e" style="width:72px"></td>
             <td><input type="text" class="b-group" maxlength="60" value="${esc(l.group_name || "")}" placeholder=" - " style="width:90px"></td>
             <td class="meta">${updatedHtml(l.updated_at, { prefix: false })}</td>
           </tr>`).join("")}</tbody>
@@ -657,6 +662,7 @@ async function render(resetShop) {
     if (k.sell) setPick(add.querySelector('[data-pick="sell"]'), k.sell);
     if (k.want) setPick(add.querySelector('[data-pick="want"]'), k.want);
   });
+  if (typeof bindPlaceFieldsIn === "function") bindPlaceFieldsIn(box);
   clearDashDirty();
 }
 
@@ -678,7 +684,7 @@ async function dupOk(shop, f, ignoreId, verb) {
     title: "Similar listing exists",
     body: exact
       ? `You already have this exact listing:\n${fmtListing(same[0])}\n\n${verb} anyway?`
-      : `You already have a listing for ${f.si} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ${f.wi}:\n${same.map(fmtListing).join("\n")}\n\n${verb} this one anyway?`,
+      : `You already have a listing for ${f.si} \u2192 ${f.wi}:\n${same.map(fmtListing).join("\n")}\n\n${verb} this one anyway?`,
     confirmLabel: verb
   });
 }
@@ -1076,6 +1082,13 @@ document.getElementById("shops").addEventListener("click", async e => {
   // ---- shop details panel
   if (act === "toggle-panel") { panel.hidden = !panel.hidden; return; }
   if (act === "close-panel") { panel.hidden = true; return; }
+  if (act === "toggle-sale") {
+    const id = String(shopId);
+    if (openSaleForms.has(id)) openSaleForms.delete(id);
+    else openSaleForms.add(id);
+    render();
+    return;
+  }
   if (act === "mark-all-in" || act === "mark-all-out") {
     const ids = (shop.listings || []).map(l => l.id);
     if (!ids.length) { setMsg(msg, "No listings.", "err"); return; }
@@ -1256,6 +1269,7 @@ document.getElementById("shops").addEventListener("click", async e => {
       ends_at: endRaw ? new Date(endRaw).toISOString() : null
     });
     if (r.error) { setMsg(msg, r.error, "err"); return; }
+    openSaleForms.delete(String(shopId));
     setMsg(msg, "Sale started.", "ok");
     render();
     return;
@@ -1263,6 +1277,7 @@ document.getElementById("shops").addEventListener("click", async e => {
     if (!await confirmModal({ title: "End sale", body: "End this sale and restore original diamond prices?", confirmLabel: "End sale" })) return;
     const r = await endShopSale(shopId);
     if (r.error) { setMsg(msg, r.error, "err"); return; }
+    openSaleForms.delete(String(shopId));
     setMsg(msg, "Sale ended. Prices restored.", "ok");
     render();
     return;

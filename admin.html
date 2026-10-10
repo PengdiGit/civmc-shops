@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body class="admin-page">
 <nav id="nav"></nav>
@@ -176,7 +176,7 @@
             <option value="nation">Nation-wide</option>
           </select>
           <label for="sale-nation">Nation (if nation-wide)</label>
-          <input id="sale-nation" type="text" maxlength="60" placeholder="Mount Augusta" disabled>
+          <input id="sale-nation" class="place-nation" type="text" maxlength="60" placeholder="Search nations…" disabled>
           <label for="sale-pct">Percent off (optional)</label>
           <input id="sale-pct" type="number" min="1" max="99" step="1" placeholder="e.g. 15">
           <label for="sale-label">Label (optional, if no %)</label>
@@ -213,7 +213,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js?v=5"></script>
+<script src="places.js"></script>
+<script src="place-picker.js"></script>
+<script src="app.js?v=6"></script>
 <script>
 const msg = document.getElementById("msg");
 const usermsg = document.getElementById("usermsg");
@@ -255,6 +257,7 @@ function setupSalesUi() {
   const sync = () => { nation.disabled = scope.value !== "nation"; };
   scope.onchange = sync;
   sync();
+  if (typeof bindPlaceFieldsIn === "function") bindPlaceFieldsIn(document.getElementById("sales-wrap") || document);
   document.getElementById("sale-create").onclick = async () => {
     const salemsg = document.getElementById("salemsg");
     const r = await createAdminSaleAndNotify({

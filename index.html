@@ -242,7 +242,7 @@ function medianTip(l, buying) {
 
 const SORTS = {
   item: [["deal", "Best deal"], ["new", "Newest"], ["close", "Closest"]],
-  shop: [["featured", "Featured"], ["name", "AÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Z"], ["close", "Closest"]]
+  shop: [["featured", "Featured"], ["name", "A-Z"], ["close", "Closest"]]
 };
 
 function cleanTerm(s) {
@@ -269,7 +269,7 @@ function distTo(s, h) {
 }
 function distText(s, h) {
   const d = distTo(s, h);
-  return d === Infinity ? "" : " · ~" + Math.round(d) + " blocks away";
+  return d === Infinity ? "" : " \u00b7 ~" + Math.round(d) + " blocks away";
 }
 
 function fillSorts(preferClose, kind) {
@@ -364,7 +364,7 @@ function updateFilterChrome() {
   if (nationFilter) bits.push("Nation: " + nationFilter);
   if (cityFilter) bits.push("City: " + cityFilter);
   if (trustedOnly) bits.push("Trusted");
-  if (minRating) bits.push(minRating + "+ ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦");
+  if (minRating) bits.push(minRating + "+ \u2605");
   if (inStockOnly) bits.push("In stock");
   if (updatedThisWeek) bits.push("Updated this week");
   if (hasLocationOnly) bits.push("Has location");
@@ -897,7 +897,7 @@ function paintItemResults(data) {
       stale,
       href: "shop.html?id=" + l.shop_id + "&listing=" + l.id + (q.value.trim() ? "&q=" + encodeURIComponent(q.value.trim()) : ""),
       tags,
-      meta: `${shopName(s)}${place ? " · " + place : ""} · ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} · ${updatedHtml(l.updated_at)}`,
+      meta: `${shopName(s)}${place ? " \u00b7 " + place : ""} \u00b7 ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} \u00b7 ${updatedHtml(l.updated_at)}`,
       btns: iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` })
     });
   }).join("");
