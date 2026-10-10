@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
@@ -21,14 +21,12 @@
       <p class="bio" id="bio"></p>
       <dl class="facts profile-meta-facts" id="meta-facts"></dl>
     </div>
+    <button type="button" id="toggledit" data-ico="pen" title="Edit profile" aria-label="Edit profile" hidden></button>
   </div>
   <div class="msg" id="msg"></div>
   <div class="stats" id="stats"></div>
 
   <div id="edit-wrap" hidden>
-    <div class="row" style="margin-bottom:8px">
-      <button type="button" id="toggledit" data-ico="pen" title="Edit profile" aria-label="Edit profile"></button>
-    </div>
     <div class="edit-panel" id="own" hidden>
       <h2 style="margin-top:0">Edit profile</h2>
 
@@ -268,6 +266,7 @@ async function load() {
     setMsg(msg, ok ? "Profile link copied." : "Couldn't copy.", ok ? "ok" : "err");
   };
 
+  document.getElementById("toggledit").hidden = !own;
   document.getElementById("edit-wrap").hidden = !own;
   if (own) {
     document.getElementById("bioedit").value = p.bio || "";
