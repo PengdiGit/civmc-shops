@@ -3042,7 +3042,7 @@ body.market-page .market-scope-row { margin-bottom: 8px; padding-bottom: 8px; bo
 body.market-page .market-scope-label { font-weight: 600; white-space: nowrap; }
 body.market-page #m-nation,
 body.market-page #m-city { min-width: 140px; max-width: 220px; }
-body.market-page .market-scope-note { margin: -6px 0 14px; max-width: 72ch; }
+body.market-page .page-hero .market-scope-note { margin: 0; max-width: 62ch; }
 
 /* ---- batch 2: owner alerts + settings ---- */
 .owner-alert-badge {

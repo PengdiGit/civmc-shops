@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shop - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body class="shop-page">
 <nav id="nav"></nav>
@@ -222,7 +222,7 @@ function paintListings(staff, isOwner) {
       id: "listing-" + l.id,
       cls: (listingIsOut(l) || l.timed_out ? "out" : "") + (hl ? " find-hl" : ""),
       tags,
-      meta: updatedHtml(l.updated_at) + (g ? ` Ãƒâ€šÃ‚Â· <span class="meta">${esc(g)}</span>` : ""),
+      meta: updatedHtml(l.updated_at) + (g ? ` · <span class="meta">${esc(g)}</span>` : ""),
       btns: tipVotesHtml(l.id, tip.votes, tip.myVote),
       btnsEnd: end
     });
@@ -307,7 +307,7 @@ async function load() {
   if (newest) parts.push(updatedHtml(newest));
   const quiet = shopFreshnessHtml(allListings);
   if (quiet) parts.push(quiet);
-  document.getElementById("glance").innerHTML = parts.join('<span class="sep">Ãƒâ€šÃ‚Â·</span>');
+  document.getElementById("glance").innerHTML = parts.join('<span class="sep">·</span>');
 
   if (me) {
     const { data: f } = await sb.from("favorites").select("id").eq("user_id", me.id).eq("shop_id", shopId);
@@ -408,7 +408,7 @@ function paintReviewList(staff, isOwner) {
           <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${r.author_id}">${esc(pr ? pr.mc_username : "?")}</a>
             <span class="stars">${starsText(r.rating)}</span>
             ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
-            <span class="meta">Ãƒâ€šÃ‚Â· ${agoText(r.created_at)}</span> ${r.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
+            <span class="meta">· ${agoText(r.created_at)}</span> ${r.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
           <span class="action-cluster">${b}</span>
         </div>
         ${r.body ? `<p class="body">${linkMentions(r.body)}</p>` : ""}
@@ -481,7 +481,7 @@ function commentHtml(c, rootId, staff) {
       <div class="head">
         <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${c.author_id}">${esc(pr ? pr.mc_username : "?")}</a>
           ${isOwnerAuthor ? '<span class="tag owner">owner</span>' : ""}
-          <span class="meta">Ãƒâ€šÃ‚Â· ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
+          <span class="meta">· ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
         <span class="action-cluster">${b}</span>
       </div>
       ${c.body ? `<p class="body">${linkMentions(c.body)}</p>` : ""}${img}

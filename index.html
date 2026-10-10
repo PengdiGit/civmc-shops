@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body class="find-page">
 <nav id="nav"></nav>
@@ -269,7 +269,7 @@ function distTo(s, h) {
 }
 function distText(s, h) {
   const d = distTo(s, h);
-  return d === Infinity ? "" : " Ãƒâ€šÃ‚Â· ~" + Math.round(d) + " blocks away";
+  return d === Infinity ? "" : " · ~" + Math.round(d) + " blocks away";
 }
 
 function fillSorts(preferClose, kind) {
@@ -374,7 +374,7 @@ function updateFilterChrome() {
   if (mode.value !== "shop" && unitFilter) bits.push("Unit: " + (unitFilter === "each" ? "each" : unitFilter.toUpperCase()));
   if (bits.length) {
     activeFiltersEl.hidden = false;
-    activeFiltersEl.textContent = bits.join(" Â· ") + " Â· edit in Filters";
+    activeFiltersEl.textContent = bits.join(" \u00b7 ") + " \u00b7 edit in Filters";
   } else {
     activeFiltersEl.hidden = true;
     activeFiltersEl.textContent = "";
@@ -897,7 +897,7 @@ function paintItemResults(data) {
       stale,
       href: "shop.html?id=" + l.shop_id + "&listing=" + l.id + (q.value.trim() ? "&q=" + encodeURIComponent(q.value.trim()) : ""),
       tags,
-      meta: `${shopName(s)}${place ? " Ãƒâ€šÃ‚Â· " + place : ""} Ãƒâ€šÃ‚Â· ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} Ãƒâ€šÃ‚Â· ${updatedHtml(l.updated_at)}`,
+      meta: `${shopName(s)}${place ? " · " + place : ""} · ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} · ${updatedHtml(l.updated_at)}`,
       btns: iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` })
     });
   }).join("");

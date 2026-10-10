@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Market - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body class="market-page">
 <nav id="nav"></nav>
@@ -12,16 +12,16 @@
   <header class="page-hero">
     <span class="page-eyebrow">Prices</span>
     <h1>Market</h1>
-    <p class="sub">Diamond rates across shops, with history. Barter still shows in Find, but only diamond listings set the market.</p>
+    <p class="sub meta market-scope-note" id="market-scope-note"></p>
   </header>
 
   <div class="stickybar market-sticky">
     <div class="row market-scope-row">
       <span class="meta market-scope-label">Market for</span>
-      <select id="m-nation" title="Which nationÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s shops set these rates">
+      <select id="m-nation" title="Which nation's shops set these rates">
         <option value="">All nations</option>
       </select>
-      <select id="m-city" title="Which cityÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s shops set these rates">
+      <select id="m-city" title="Which city's shops set these rates">
         <option value="">All cities</option>
       </select>
     </div>
@@ -31,7 +31,6 @@
       <select id="unit"><option value="1">diamonds per item</option><option value="64">diamonds per stack (64)</option></select>
     </div>
   </div>
-  <p class="meta market-scope-note" id="market-scope-note"></p>
   <div class="msg" id="msg"></div>
   <div class="intel-grid" id="intel" hidden></div>
 
@@ -97,7 +96,7 @@ function fmtD(v) {
   return v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : String(+v.toPrecision(2));
 }
 const priceCell = (m) => m
-  ? `<b>${fmtD(m.median * k())}</b> d<small>${fmtD(m.low * k())} - ${fmtD(m.high * k())} Ãƒâ€šÃ‚Â· ${m.n} shop${m.n === 1 ? "" : "s"}</small>`
+  ? `<b>${fmtD(m.median * k())}</b> d<small>${fmtD(m.low * k())} - ${fmtD(m.high * k())} · ${m.n} shop${m.n === 1 ? "" : "s"}</small>`
   : '<span class="meta">-</span>';
 function spreadCell(e) {
   const sp = marketSpread(e.sell, e.buy);
@@ -147,7 +146,7 @@ function paintMarketScopeNote() {
     note.textContent = "Rates from all public shops server-wide. Pick a nation or city to see local market prices.";
     return;
   }
-  note.textContent = "Rates computed only from shops in " + bits.join(" Ãƒâ€šÃ‚Â· ") + ". Item filter below only hides rows in this table.";
+  note.textContent = "Rates computed only from shops in " + bits.join(" \u00b7 ") + ". Item filter below only hides rows in this table.";
 }
 
 function marketScopeQuery() {
@@ -252,7 +251,7 @@ async function renderIntel() {
         <span class="delta ${m.pct >= 0 ? "up" : "down"}">${m.pct >= 0 ? "+" : ""}${m.pct.toFixed(0)}%</span></div>`) +
     line("Wide spreads", spreads, s =>
       `<div class="rowline"><a href="#" data-open="${esc(s.i)}">${esc(s.i)}</a>
-        <span class="meta">${fmtD(s.ratio)}ÃƒÆ’Ã¢â‚¬â€ range Ãƒâ€šÃ‚Â· ${s.m.n} shops</span></div>`) +
+        <span class="meta">${fmtD(s.ratio)}ÃƒÆ’Ã¢â‚¬â€ range · ${s.m.n} shops</span></div>`) +
     line("Thin markets", thin, t =>
       `<div class="rowline"><a href="#" data-open="${esc(t.i)}">${esc(t.i)}</a>
         <span class="tag warn">${t.m.n} shop${t.m.n === 1 ? "" : "s"}</span></div>`);
@@ -310,8 +309,8 @@ function stat(label, m, color) {
   return `<div class="stat">
     <div class="lbl"><span style="color:${color}">ÃƒÂ¢Ã¢â‚¬â€Ã‚Â</span> ${label}</div>
     <div class="big">${fmtD(m.median * k())} <span class="meta">d / ${unitWord()}</span></div>
-    <div class="meta">usual range ${fmtD(m.low * k())} - ${fmtD(m.high * k())} Ãƒâ€šÃ‚Â· ${m.n} shop${m.n === 1 ? "" : "s"}
-      ${m.outliers ? ` Ãƒâ€šÃ‚Â· ${m.outliers} odd price${m.outliers === 1 ? "" : "s"} ignored` : ""}
+    <div class="meta">usual range ${fmtD(m.low * k())} - ${fmtD(m.high * k())} · ${m.n} shop${m.n === 1 ? "" : "s"}
+      ${m.outliers ? ` · ${m.outliers} odd price${m.outliers === 1 ? "" : "s"} ignored` : ""}
       ${m.n < 3 ? ' <span class="tag warn">few shops</span>' : ""}</div></div>`;
 }
 
@@ -330,7 +329,7 @@ function renderDetail() {
   const { nation, city } = marketPlaceFilter();
   const scopeBits = [city, nation].filter(Boolean);
   const scopeNote = scopeBits.length
-    ? ` Live rates above are for ${scopeBits.join(" Ãƒâ€šÃ‚Â· ")} only; history chart is still server-wide.`
+    ? ` Live rates above are for ${scopeBits.join(" · ")} only; history chart is still server-wide.`
     : "";
   document.getElementById("d-note").textContent = (days < 7
     ? `Only ${days} day${days === 1 ? "" : "s"} of history so far. The graph fills in as days pass.`

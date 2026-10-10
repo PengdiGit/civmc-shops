@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
@@ -310,7 +310,7 @@ async function load() {
     <div class="stat"><div class="big" style="font-size:1rem">${esc(since)}</div><div class="lbl">Member since</div></div>`;
 
   document.getElementById("shops-sub").textContent = full.length
-    ? full.length + " shop" + (full.length === 1 ? "" : "s") + " Ãƒâ€šÃ‚Â· " + totalListings + " listing" + (totalListings === 1 ? "" : "s")
+    ? full.length + " shop" + (full.length === 1 ? "" : "s") + " · " + totalListings + " listing" + (totalListings === 1 ? "" : "s")
     : "";
   document.getElementById("tab-shops").textContent = "Shops" + (full.length ? " (" + full.length + ")" : "");
 
@@ -347,7 +347,7 @@ async function load() {
             <span><span class="stars">${starsText(r.rating)}</span>
               <a href="shop.html?id=${r.shop_id}">${r.shops ? shopName(r.shops) : "shop"}</a>
               ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
-              <span class="meta">Ãƒâ€šÃ‚Â· ${agoText(r.created_at)}</span></span>
+              <span class="meta">· ${agoText(r.created_at)}</span></span>
           </div>
           ${r.body ? `<p class="body">${esc(r.body)}</p>` : ""}
           ${r.owner_reply ? `<div class="owner-reply"><span class="tag owner">owner reply</span>

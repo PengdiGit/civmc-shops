@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>My shops - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body class="dash-page">
 <nav id="nav"></nav>
@@ -42,7 +42,7 @@
     <div class="preview" id="s-desc-prev"></div>
 
     <label for="s-find">Find me (optional)</label>
-    <input type="text" id="s-find" maxlength="120" placeholder="e.g. 2nd floor, blue wool Ãƒâ€šÃ‚Â· underground entrance" style="width:100%">
+    <input type="text" id="s-find" maxlength="120" placeholder="e.g. 2nd floor, blue wool · underground entrance" style="width:100%">
 
     <label>Shop picture</label>
     <div class="row">
@@ -158,7 +158,7 @@ function paintOwnerAlerts(shops) {
     ownerAlertList.map((a, i) => `<div class="owner-alert" data-alert="${i}">
       <span class="tag ${kindTag(a.kind)}">${kindLabel(a.kind)}</span>
       <span class="owner-alert-body"><a href="shop.html?id=${a.shop.id}&listing=${a.listing.id}">${esc(a.shop.name)}</a>
-        Ãƒâ€šÃ‚Â· ${esc(a.text)}</span>
+        · ${esc(a.text)}</span>
       <button type="button" class="small" data-act="ignore-alert" data-i="${i}">Ignore</button>
     </div>`).join("");
 }
@@ -204,7 +204,7 @@ async function paintNotifications() {
 function salePanelHtml(s) {
   if (shopSaleActive(s)) {
     const until = s.sale_ends_at ? (" until " + new Date(s.sale_ends_at).toLocaleString()) : " (until cancelled)";
-    const pct = s.sale_percent != null ? (s.sale_percent + "% off Ãƒâ€šÃ‚Â· ") : "";
+    const pct = s.sale_percent != null ? (s.sale_percent + "% off · ") : "";
     return `<div class="sale-panel">
       ${saleBadgeHtml(s)} <span class="meta">${esc(pct)}active${esc(until)}</span>
       <button type="button" class="small" data-act="end-sale">End sale</button>
@@ -596,7 +596,7 @@ async function render(resetShop) {
             ${saleBadgeHtml(s)}
             ${s.is_open === false ? '<span class="tag warn">closed - hidden from public</span>' : ""}
             ${s.timed_out ? '<span class="tag bad">timed out - hidden</span>' : ""}
-            <div class="meta">${placeHtml(s) ? placeHtml(s) + " Ãƒâ€šÃ‚Â· " : ""}${coordsHtml(s.x, s.z)}${nList ? " Ãƒâ€šÃ‚Â· " + nList + " listing" + (nList === 1 ? "" : "s") : ""}</div></div>
+            <div class="meta">${placeHtml(s) ? placeHtml(s) + " · " : ""}${coordsHtml(s.x, s.z)}${nList ? " · " + nList + " listing" + (nList === 1 ? "" : "s") : ""}</div></div>
         </div>
         <div class="action-cluster dash-shop-actions">
           ${iconBtn("external", { tag: "a", title: "Preview shop", attrs: `href="shop.html?id=${s.id}" target="_blank" rel="noopener"` })}
