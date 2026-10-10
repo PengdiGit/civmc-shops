@@ -69,11 +69,8 @@ body {
 }
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
+  /* fade-in only — transform on main breaks sticky toolbars / confuses fixed chrome layout */
   main {
-    animation: fade-up .35s ease both;
-  }
-  /* transform on main breaks position:sticky for shop listing filter */
-  body.shop-page > main {
     animation: fade-in .35s ease both;
   }
   .shop-grid .shop-card,
@@ -127,8 +124,10 @@ nav {
     0 1px 0 color-mix(in srgb, #fff 4%, transparent),
     0 8px 24px rgba(0, 0, 0, .18);
   backdrop-filter: blur(10px);
-  position: sticky; top: var(--top-chrome-h); z-index: 40;
+  /* Fixed under verify/impersonate bars — body padding reserves the space */
+  position: fixed; top: var(--top-chrome-h); left: 0; right: 0; z-index: 40;
   min-height: 52px;
+  box-sizing: border-box;
 }
 nav .brand {
   display: inline-flex; align-items: center; gap: 9px;
@@ -207,8 +206,8 @@ nav a.navbtn.primary { background: var(--accent); border-color: var(--accent); c
 }
 .nav-backdrop.open { opacity: 1; pointer-events: auto; }
 .nav-drawer {
-  position: fixed; top: var(--top-chrome-h); right: 0; z-index: 100;
-  width: min(320px, 88vw); height: calc(100% - var(--top-chrome-h));
+  position: fixed; top: calc(var(--top-chrome-h) + var(--nav-h)); right: 0; z-index: 100;
+  width: min(320px, 88vw); height: calc(100% - var(--top-chrome-h) - var(--nav-h));
   background:
     linear-gradient(180deg,
       color-mix(in srgb, var(--panel) 90%, var(--accent) 8%) 0%,
@@ -483,10 +482,9 @@ a.primary.small { padding: 4px 12px; font-size: .85rem; }
   background: color-mix(in srgb, var(--warn) 12%, transparent);
 }
 .impersonate-bar button.small:hover { border-color: #f0d9a0; color: #fff; }
-/* Reserve space for fixed chrome; sticky nav/toolbars sit below via --top-chrome-h */
-body.has-verify-banner,
-body.impersonating {
-  padding-top: var(--top-chrome-h);
+/* Reserve space for fixed verify/impersonate + fixed nav */
+body {
+  padding-top: calc(var(--top-chrome-h) + var(--nav-h));
 }
 .note { color: var(--dim); font-size: .85rem; border-left: 3px solid var(--line); padding-left: 10px; margin: 8px 0 14px; }
 .inline-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
@@ -984,23 +982,15 @@ body.mod-page::before {
   background-size: var(--atm-grid-size) var(--atm-grid-size);
   mask-image: linear-gradient(180deg, #000 0%, transparent 68%);
 }
-body.find-page > nav,
+/* Do not set position on nav — it must stay position:fixed above. */
 body.find-page > main,
-body.market-page > nav,
 body.market-page > main,
-body.shop-page > nav,
 body.shop-page > main,
-body.profile-page > nav,
 body.profile-page > main,
-body.fav-page > nav,
 body.fav-page > main,
-body.dash-page > nav,
 body.dash-page > main,
-body.admin-page > nav,
 body.admin-page > main,
-body.auth-page > nav,
 body.auth-page > main,
-body.mod-page > nav,
 body.mod-page > main { position: relative; z-index: 1; }
 
 /* Shared page hero / eyebrow (Find board inspired) */

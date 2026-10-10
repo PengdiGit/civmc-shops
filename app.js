@@ -1062,15 +1062,16 @@ function clearImpersonationStorage() {
   syncTopChromeOffset();
 }
 
-/** Keep body padding / sticky nav tops in sync with fixed chrome bar heights. */
+/** Keep body padding / fixed nav + sticky toolbar tops in sync with chrome heights. */
 function syncTopChromeOffset() {
   const root = document.documentElement;
   const imp = document.getElementById("impersonate-bar");
   const verify = document.getElementById("verify-banner");
   const nav = document.getElementById("nav");
-  const ih = imp ? Math.ceil(imp.getBoundingClientRect().height) : 0;
-  const vh = verify ? Math.ceil(verify.getBoundingClientRect().height) : 0;
-  const nh = nav ? Math.ceil(nav.getBoundingClientRect().height) : 52;
+  // offsetHeight ignores visual transforms; ceil(rect) can double-count with zoom.
+  const ih = imp ? Math.ceil(imp.offsetHeight) : 0;
+  const vh = verify ? Math.ceil(verify.offsetHeight) : 0;
+  const nh = nav ? Math.ceil(nav.offsetHeight) : 52;
   root.style.setProperty("--impersonate-h", ih + "px");
   root.style.setProperty("--verify-h", vh + "px");
   root.style.setProperty("--nav-h", (nh || 52) + "px");
@@ -1367,6 +1368,8 @@ function renderVerifyBanner(profile) {
     `<a class="primary small verify-banner-cta" href="verify.html">verify here</a>`;
   syncTopChromeOffset();
   observeTopChrome();
+  // Second pass after layout so --verify-h matches wrapped banner height.
+  requestAnimationFrame(() => syncTopChromeOffset());
 }
 
 // every 20s: if the account got timed out while the page is open, log out
