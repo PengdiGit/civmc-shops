@@ -1593,25 +1593,29 @@ a.find-discord-embed:hover .find-discord-join {
 
 /* ---- profiles ---- */
 .profile-hero {
-  display: flex; gap: 24px 32px; align-items: flex-start; flex-wrap: wrap;
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
+  column-gap: 20px;
+  row-gap: 14px;
+  align-items: start;
+  justify-content: start;
   margin-bottom: 18px; padding: 18px; background: var(--panel);
   border: 1px solid var(--line); border-radius: var(--radius);
 }
-.profile-hero-main {
-  display: flex; gap: 20px; align-items: flex-start;
-  flex: 0 1 auto; min-width: 0;
-}
-.profile-hero-identity { flex: 1; min-width: 0; }
+.profile-hero > #avatar { display: block; line-height: 0; }
+.profile-hero-identity { min-width: 0; max-width: 28rem; }
 .profile-hero-side {
-  flex: 0 1 52ch; min-width: min(100%, 220px);
+  min-width: 0;
   max-width: 52ch;
+  align-self: start;
+  margin: 0;
+  padding: 0;
 }
 .profile-hero img.avatar { width: 128px; height: 128px; border-radius: 8px; }
 .profile-hero h1 { margin: 0 0 6px; }
-.profile-hero .bio { margin: 0; max-width: none; line-height: 1.55; }
+.profile-hero .bio { margin: 0; padding: 0; max-width: none; line-height: 1.55; }
 .profile-hero .inline-actions { margin-top: 12px; }
-.profile-meta-facts { margin-top: 12px; }
+.profile-meta-facts { margin-top: 10px; }
 .facts { margin: 8px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; align-items: center; }
 .facts dt { color: var(--dim); font-size: .85rem; }
 .facts dd { margin: 0; }
@@ -2918,9 +2922,12 @@ body.mod-page > main {
 @media (max-width: 720px) {
   .trade > .inline-actions { margin-left: 0; width: 100%; }
   .shop-grid { grid-template-columns: 1fr; }
-  .profile-hero { gap: 16px; }
-  .profile-hero-main { flex: 1 1 100%; }
-  .profile-hero-side { flex: 1 1 100%; max-width: none; }
+  .profile-hero {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 16px;
+    row-gap: 14px;
+  }
+  .profile-hero-side { grid-column: 1 / -1; max-width: none; }
   .profile-hero img.avatar { width: 96px; height: 96px; }
   .mod-hero { padding: 16px 16px 14px; }
   .mod-section { padding: 12px 12px 14px; }
