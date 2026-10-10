@@ -1080,7 +1080,7 @@ body.find-page > main {
 .find-board > * { position: relative; z-index: 1; }
 .find-board-top {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr auto;
   gap: 20px;
   align-items: start;
   padding: 18px 20px 14px;
@@ -1629,9 +1629,13 @@ a.find-discord-embed:hover .find-discord-join {
 .profile-hero-side {
   min-width: 0;
   max-width: 52ch;
-  align-self: start;
+  align-self: end;
   margin: 0;
   padding: 0;
+}
+.profile-hero > #actions {
+  grid-column: 2;
+  margin-top: 4px;
 }
 .profile-hero img.avatar { width: 128px; height: 128px; border-radius: 8px; }
 .profile-hero h1 { margin: 0 0 6px; }
@@ -1641,6 +1645,18 @@ a.find-discord-embed:hover .find-discord-join {
 .facts { margin: 8px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; align-items: center; }
 .facts dt { color: var(--dim); font-size: .85rem; }
 .facts dd { margin: 0; }
+.facts .fact-copy {
+  cursor: pointer;
+  border-radius: 3px;
+  outline: none;
+}
+.facts .fact-copy:hover,
+.facts .fact-copy:focus-visible {
+  color: color-mix(in srgb, var(--text) 82%, var(--accent) 18%);
+}
+.facts .fact-copy:focus-visible {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+}
 .bio { white-space: pre-wrap; word-break: break-word; }
 .stats {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -2949,7 +2965,12 @@ body.mod-page > main {
     column-gap: 16px;
     row-gap: 14px;
   }
-  .profile-hero-side { grid-column: 1 / -1; max-width: none; }
+  .profile-hero-side {
+    grid-column: 1 / -1;
+    max-width: none;
+    align-self: start;
+  }
+  .profile-hero > #actions { grid-column: 1 / -1; }
   .profile-hero img.avatar { width: 96px; height: 96px; }
   .mod-hero { padding: 16px 16px 14px; }
   .mod-section { padding: 12px 12px 14px; }

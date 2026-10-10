@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
@@ -101,9 +101,28 @@ const params = new URLSearchParams(location.search);
 let id = params.get("id");
 const nameParam = params.get("name");
 const msg = document.getElementById("msg");
+const factsEl = document.getElementById("facts");
 let own = false, myId = null, shown = null, myProfile = null;
 let lastField = null;
 let activeTab = "shops";
+
+async function copyFactValue(el) {
+  const text = el && el.getAttribute("data-copy");
+  if (!text) return;
+  const ok = await copyText(text);
+  setMsg(msg, ok ? "Copied." : "Couldn't copy.", ok ? "ok" : "err");
+}
+factsEl.addEventListener("click", e => {
+  const el = e.target.closest(".fact-copy");
+  if (el && factsEl.contains(el)) copyFactValue(el);
+});
+factsEl.addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const el = e.target.closest(".fact-copy");
+  if (!el || !factsEl.contains(el)) return;
+  e.preventDefault();
+  copyFactValue(el);
+});
 
 function memberSinceText(ts) {
   if (!ts) return "-";
@@ -235,20 +254,18 @@ async function load() {
   document.getElementById("tags").innerHTML = tags;
 
   const since = memberSinceText(p.created_at);
+  const login = userName(p);
+  const mcName = p.mc_username || "";
+  const dcName = p.discord_username || "";
   document.getElementById("facts").innerHTML =
-    `<dt>Username</dt><dd><b>${esc(primary)}</b></dd>
-     <dt>Minecraft</dt><dd>${esc(p.mc_username)}</dd>
-     <dt>Discord</dt><dd>${p.discord_username ? `<b>${esc(p.discord_username)}</b> <button class="small" id="copydc">Copy</button>` : '<span class="meta">not set</span>'}</dd>
+    `<dt>Username</dt><dd class="fact-copy" data-copy="${esc(login)}" title="Click to copy" role="button" tabindex="0"><b>${esc(primary)}</b></dd>
+     <dt>Minecraft</dt><dd${mcName ? ` class="fact-copy" data-copy="${esc(mcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${esc(mcName || "—")}</dd>
+     <dt>Discord</dt><dd${dcName ? ` class="fact-copy" data-copy="${esc(dcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${dcName ? `<b>${esc(dcName)}</b>` : '<span class="meta">not set</span>'}</dd>
      ${p.pronouns ? `<dt>Pronouns</dt><dd>${esc(p.pronouns)}</dd>` : ""}
      ${p.timezone ? `<dt>Timezone</dt><dd>${esc(p.timezone)}</dd>` : ""}`;
   document.getElementById("meta-facts").innerHTML =
     `<dt>Member since</dt><dd title="${esc(p.created_at ? new Date(p.created_at).toLocaleString() : "")}">${esc(since)}</dd>
      <dt>Last seen</dt><dd>${lastSeenHtml(p.last_seen_at)}</dd>`;
-  const cp = document.getElementById("copydc");
-  if (cp) cp.onclick = async () => {
-    const ok = await copyText(p.discord_username);
-    cp.textContent = ok ? "Copied" : "Couldn't copy";
-  };
 
   const bioEl = document.getElementById("bio");
   if (p.bio) bioEl.innerHTML = mcText(p.bio);
