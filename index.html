@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body class="find-page">
 <nav id="nav"></nav>
@@ -165,7 +165,7 @@
 <script src="config.js"></script>
 <script src="mock.js"></script>
 <script src="items.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 <script>
 const q = document.getElementById("q");
 const mode = document.getElementById("mode");
@@ -242,7 +242,7 @@ function medianTip(l, buying) {
 
 const SORTS = {
   item: [["deal", "Best deal"], ["new", "Newest"], ["close", "Closest"]],
-  shop: [["featured", "Featured"], ["name", "AÃ¢â‚¬â€œZ"], ["close", "Closest"]]
+  shop: [["featured", "Featured"], ["name", "AÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“Z"], ["close", "Closest"]]
 };
 
 function cleanTerm(s) {
@@ -269,7 +269,7 @@ function distTo(s, h) {
 }
 function distText(s, h) {
   const d = distTo(s, h);
-  return d === Infinity ? "" : " Ã‚Â· ~" + Math.round(d) + " blocks away";
+  return d === Infinity ? "" : " Ãƒâ€šÃ‚Â· ~" + Math.round(d) + " blocks away";
 }
 
 function fillSorts(preferClose, kind) {
@@ -364,7 +364,7 @@ function updateFilterChrome() {
   if (nationFilter) bits.push("Nation: " + nationFilter);
   if (cityFilter) bits.push("City: " + cityFilter);
   if (trustedOnly) bits.push("Trusted");
-  if (minRating) bits.push(minRating + "+ Ã¢Ëœâ€¦");
+  if (minRating) bits.push(minRating + "+ ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦");
   if (inStockOnly) bits.push("In stock");
   if (updatedThisWeek) bits.push("Updated this week");
   if (hasLocationOnly) bits.push("Has location");
@@ -374,7 +374,7 @@ function updateFilterChrome() {
   if (mode.value !== "shop" && unitFilter) bits.push("Unit: " + (unitFilter === "each" ? "each" : unitFilter.toUpperCase()));
   if (bits.length) {
     activeFiltersEl.hidden = false;
-    activeFiltersEl.textContent = bits.join(" · ") + " · edit in Filters";
+    activeFiltersEl.textContent = bits.join(" Â· ") + " Â· edit in Filters";
   } else {
     activeFiltersEl.hidden = true;
     activeFiltersEl.textContent = "";
@@ -897,7 +897,7 @@ function paintItemResults(data) {
       stale,
       href: "shop.html?id=" + l.shop_id + "&listing=" + l.id + (q.value.trim() ? "&q=" + encodeURIComponent(q.value.trim()) : ""),
       tags,
-      meta: `${shopName(s)}${place ? " Ã‚Â· " + place : ""} Ã‚Â· ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} Ã‚Â· ${updatedHtml(l.updated_at)}`,
+      meta: `${shopName(s)}${place ? " Ãƒâ€šÃ‚Â· " + place : ""} Ãƒâ€šÃ‚Â· ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} Ãƒâ€šÃ‚Â· ${updatedHtml(l.updated_at)}`,
       btns: iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` })
     });
   }).join("");

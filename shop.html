@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shop - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body class="shop-page">
 <nav id="nav"></nav>
@@ -29,7 +29,7 @@
     <div class="shop-catalog-main">
       <div class="shop-filter" id="listingfilter" hidden>
         <div class="row">
-          <input type="search" id="lq" placeholder="Filter listings in this shopÃ¢â‚¬Â¦" style="flex:1;min-width:160px">
+          <input type="search" id="lq" placeholder="Filter listings in this shopÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦" style="flex:1;min-width:160px">
           <select id="lstock">
             <option value="all" selected>All listings</option>
             <option value="in">In stock only</option>
@@ -77,7 +77,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const shopId = params.get("id");
@@ -222,7 +222,7 @@ function paintListings(staff, isOwner) {
       id: "listing-" + l.id,
       cls: (listingIsOut(l) || l.timed_out ? "out" : "") + (hl ? " find-hl" : ""),
       tags,
-      meta: updatedHtml(l.updated_at) + (g ? ` Ã‚Â· <span class="meta">${esc(g)}</span>` : ""),
+      meta: updatedHtml(l.updated_at) + (g ? ` Ãƒâ€šÃ‚Â· <span class="meta">${esc(g)}</span>` : ""),
       btns: tipVotesHtml(l.id, tip.votes, tip.myVote),
       btnsEnd: end
     });
@@ -307,7 +307,7 @@ async function load() {
   if (newest) parts.push(updatedHtml(newest));
   const quiet = shopFreshnessHtml(allListings);
   if (quiet) parts.push(quiet);
-  document.getElementById("glance").innerHTML = parts.join('<span class="sep">Ã‚Â·</span>');
+  document.getElementById("glance").innerHTML = parts.join('<span class="sep">Ãƒâ€šÃ‚Â·</span>');
 
   if (me) {
     const { data: f } = await sb.from("favorites").select("id").eq("user_id", me.id).eq("shop_id", shopId);
@@ -408,7 +408,7 @@ function paintReviewList(staff, isOwner) {
           <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${r.author_id}">${esc(pr ? pr.mc_username : "?")}</a>
             <span class="stars">${starsText(r.rating)}</span>
             ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
-            <span class="meta">Ã‚Â· ${agoText(r.created_at)}</span> ${r.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
+            <span class="meta">Ãƒâ€šÃ‚Â· ${agoText(r.created_at)}</span> ${r.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
           <span class="action-cluster">${b}</span>
         </div>
         ${r.body ? `<p class="body">${linkMentions(r.body)}</p>` : ""}
@@ -441,8 +441,8 @@ async function loadReviews(staff, isOwner) {
       <div class="composer">
         <div class="row" style="margin-bottom:6px"><span class="meta">Your rating</span>
           <select class="rating" id="rrating">
-            <option value="5">Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦ (5)</option><option value="4">Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€  (4)</option><option value="3">Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€ Ã¢Ëœâ€  (3)</option>
-            <option value="2">Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€ Ã¢Ëœâ€ Ã¢Ëœâ€  (2)</option><option value="1">Ã¢Ëœâ€¦Ã¢Ëœâ€ Ã¢Ëœâ€ Ã¢Ëœâ€ Ã¢Ëœâ€  (1)</option>
+            <option value="5">ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ (5)</option><option value="4">ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â  (4)</option><option value="3">ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â  (3)</option>
+            <option value="2">ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â  (2)</option><option value="1">ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â¦ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â ÃƒÂ¢Ã‹Å“Ã¢â‚¬Â  (1)</option>
           </select></div>
         <label class="meta" style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
           <input type="checkbox" id="rtraded"> I traded here
@@ -481,7 +481,7 @@ function commentHtml(c, rootId, staff) {
       <div class="head">
         <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${c.author_id}">${esc(pr ? pr.mc_username : "?")}</a>
           ${isOwnerAuthor ? '<span class="tag owner">owner</span>' : ""}
-          <span class="meta">Ã‚Â· ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
+          <span class="meta">Ãƒâ€šÃ‚Â· ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
         <span class="action-cluster">${b}</span>
       </div>
       ${c.body ? `<p class="body">${linkMentions(c.body)}</p>` : ""}${img}

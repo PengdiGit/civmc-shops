@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Market - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body class="market-page">
 <nav id="nav"></nav>
@@ -18,10 +18,10 @@
   <div class="stickybar market-sticky">
     <div class="row market-scope-row">
       <span class="meta market-scope-label">Market for</span>
-      <select id="m-nation" title="Which nationÃ¢â‚¬â„¢s shops set these rates">
+      <select id="m-nation" title="Which nationÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s shops set these rates">
         <option value="">All nations</option>
       </select>
-      <select id="m-city" title="Which cityÃ¢â‚¬â„¢s shops set these rates">
+      <select id="m-city" title="Which cityÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s shops set these rates">
         <option value="">All cities</option>
       </select>
     </div>
@@ -72,7 +72,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 <script>
 const msg = document.getElementById("msg");
 const unitSel = document.getElementById("unit");
@@ -82,7 +82,7 @@ const cityEl = document.getElementById("m-city");
 const SELL = "#7fb35a", BUY = "#d9a441";
 const DAYMS = 86400000;
 let byItem = {};          // item -> { sell: row|null, buy: row|null }
-let sparkByItem = {};     // item -> [median...] oldestÃ¢â€ â€™newest (sell side)
+let sparkByItem = {};     // item -> [median...] oldestÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢newest (sell side)
 let selected = null;
 let history = { sell: [], buy: [] };
 let rangeDays = 30;
@@ -97,14 +97,14 @@ function fmtD(v) {
   return v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : String(+v.toPrecision(2));
 }
 const priceCell = (m) => m
-  ? `<b>${fmtD(m.median * k())}</b> d<small>${fmtD(m.low * k())} - ${fmtD(m.high * k())} Ã‚Â· ${m.n} shop${m.n === 1 ? "" : "s"}</small>`
+  ? `<b>${fmtD(m.median * k())}</b> d<small>${fmtD(m.low * k())} - ${fmtD(m.high * k())} Ãƒâ€šÃ‚Â· ${m.n} shop${m.n === 1 ? "" : "s"}</small>`
   : '<span class="meta">-</span>';
 function spreadCell(e) {
   const sp = marketSpread(e.sell, e.buy);
   if (sp == null) return '<span class="meta">-</span>';
   const v = sp * k();
   const cls = v > 0 ? "spread-pos" : v < 0 ? "spread-neg" : "";
-  return `<span class="${cls}" title="Sell median Ã¢Ë†â€™ buy median">${v >= 0 ? "+" : ""}${fmtD(v)} d</span>`;
+  return `<span class="${cls}" title="Sell median ÃƒÂ¢Ã‹â€ Ã¢â‚¬â„¢ buy median">${v >= 0 ? "+" : ""}${fmtD(v)} d</span>`;
 }
 
 function applyMarketRows(rows) {
@@ -147,7 +147,7 @@ function paintMarketScopeNote() {
     note.textContent = "Rates from all public shops server-wide. Pick a nation or city to see local market prices.";
     return;
   }
-  note.textContent = "Rates computed only from shops in " + bits.join(" Ã‚Â· ") + ". Item filter below only hides rows in this table.";
+  note.textContent = "Rates computed only from shops in " + bits.join(" Ãƒâ€šÃ‚Â· ") + ". Item filter below only hides rows in this table.";
 }
 
 function marketScopeQuery() {
@@ -252,7 +252,7 @@ async function renderIntel() {
         <span class="delta ${m.pct >= 0 ? "up" : "down"}">${m.pct >= 0 ? "+" : ""}${m.pct.toFixed(0)}%</span></div>`) +
     line("Wide spreads", spreads, s =>
       `<div class="rowline"><a href="#" data-open="${esc(s.i)}">${esc(s.i)}</a>
-        <span class="meta">${fmtD(s.ratio)}Ãƒâ€” range Ã‚Â· ${s.m.n} shops</span></div>`) +
+        <span class="meta">${fmtD(s.ratio)}ÃƒÆ’Ã¢â‚¬â€ range Ãƒâ€šÃ‚Â· ${s.m.n} shops</span></div>`) +
     line("Thin markets", thin, t =>
       `<div class="rowline"><a href="#" data-open="${esc(t.i)}">${esc(t.i)}</a>
         <span class="tag warn">${t.m.n} shop${t.m.n === 1 ? "" : "s"}</span></div>`);
@@ -308,10 +308,10 @@ async function openItem(item) {
 function stat(label, m, color) {
   if (!m) return `<div class="stat"><div class="lbl"><i style="background:${color}"></i> ${label}</div><div class="big">-</div><div class="meta">nobody lists this right now</div></div>`;
   return `<div class="stat">
-    <div class="lbl"><span style="color:${color}">Ã¢â€”Â</span> ${label}</div>
+    <div class="lbl"><span style="color:${color}">ÃƒÂ¢Ã¢â‚¬â€Ã‚Â</span> ${label}</div>
     <div class="big">${fmtD(m.median * k())} <span class="meta">d / ${unitWord()}</span></div>
-    <div class="meta">usual range ${fmtD(m.low * k())} - ${fmtD(m.high * k())} Ã‚Â· ${m.n} shop${m.n === 1 ? "" : "s"}
-      ${m.outliers ? ` Ã‚Â· ${m.outliers} odd price${m.outliers === 1 ? "" : "s"} ignored` : ""}
+    <div class="meta">usual range ${fmtD(m.low * k())} - ${fmtD(m.high * k())} Ãƒâ€šÃ‚Â· ${m.n} shop${m.n === 1 ? "" : "s"}
+      ${m.outliers ? ` Ãƒâ€šÃ‚Â· ${m.outliers} odd price${m.outliers === 1 ? "" : "s"} ignored` : ""}
       ${m.n < 3 ? ' <span class="tag warn">few shops</span>' : ""}</div></div>`;
 }
 
@@ -330,7 +330,7 @@ function renderDetail() {
   const { nation, city } = marketPlaceFilter();
   const scopeBits = [city, nation].filter(Boolean);
   const scopeNote = scopeBits.length
-    ? ` Live rates above are for ${scopeBits.join(" Ã‚Â· ")} only; history chart is still server-wide.`
+    ? ` Live rates above are for ${scopeBits.join(" Ãƒâ€šÃ‚Â· ")} only; history chart is still server-wide.`
     : "";
   document.getElementById("d-note").textContent = (days < 7
     ? `Only ${days} day${days === 1 ? "" : "s"} of history so far. The graph fills in as days pass.`
@@ -379,7 +379,7 @@ function drawChart(el, series) {
     const px = (ev.clientX - r.left) / r.width * W;
     const d = days.reduce((best, x) => Math.abs(xOf(x) - px) < Math.abs(xOf(best) - px) ? x : best, days[0]);
     guide.setAttribute("x1", xOf(d)); guide.setAttribute("x2", xOf(d)); guide.setAttribute("visibility", "visible");
-    const rows = series.map(s => { const p = s.pts.find(q => q.d === d); return p ? `<div><span style="color:${s.color}">Ã¢â€”Â</span> ${s.name}: <b>${fmtD(p.m * kk)}</b> (${fmtD(p.lo * kk)} - ${fmtD(p.hi * kk)}, ${p.n} shop${p.n === 1 ? "" : "s"})</div>` : ""; }).join("");
+    const rows = series.map(s => { const p = s.pts.find(q => q.d === d); return p ? `<div><span style="color:${s.color}">ÃƒÂ¢Ã¢â‚¬â€Ã‚Â</span> ${s.name}: <b>${fmtD(p.m * kk)}</b> (${fmtD(p.lo * kk)} - ${fmtD(p.hi * kk)}, ${p.n} shop${p.n === 1 ? "" : "s"})</div>` : ""; }).join("");
     tip.innerHTML = `<b>${new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}</b>${rows}`;
     tip.hidden = false;
     const pct = xOf(d) / W * 100;
