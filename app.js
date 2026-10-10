@@ -429,7 +429,7 @@ function placeFilterMatch(s, city, nation) {
   if (nation && !placeEquals(s.nation, nation)) return false;
   return true;
 }
-/** Find, favourites, market, compare — not owner/staff preview. */
+/** Find, favourites, market, compare - not owner/staff preview. */
 function shopListedPublicly(s, ownerProfile) {
   if (!s || stillTimedOut(s) || s.archived || s.is_open === false) return false;
   if (ownerProfile && stillTimedOut(ownerProfile)) return false;
@@ -554,7 +554,7 @@ function paintCompareTray(pins, opts) {
       <div class="meta">${shopIcon(s, "sm")} ${shopName(s)}</div>
       <div class="trade" style="margin:6px 0">${itemText(l.want_amount, l.want_item, l.want_unit)} <span class="arrow">&rarr;</span> ${itemText(l.sell_amount, l.sell_item, l.sell_unit)}</div>
       <div class="meta">${r != null ? fmtRate(r) : "barter"} · ${stockHtml(l)} · ${updatedHtml(l.updated_at, { prefix: false })}</div>
-      <div class="meta">${place || "—"}${dist}</div>
+      <div class="meta">${place || "-"}${dist}</div>
       <div class="action-cluster" style="margin-top:8px">
         ${iconBtn("external", { tag: "a", title: "Open shop", attrs: `href="shop.html?id=${l.shop_id}&listing=${l.id}"` })}
         ${s.x != null && s.z != null ? iconBtn("map", { tag: "a", title: "Open on map", attrs: `href="${esc(mapUrl(s.x, s.z))}" target="_blank" rel="noopener"` }) : ""}
@@ -581,7 +581,7 @@ function wireCompareTray(getPins, setPins, opts) {
       const pins = getPins();
       if (!pins.length) return;
       const ok = await copyText(compareMarkdown(pins));
-      if (msgEl) setMsg(msgEl, ok ? "Compare list copied as markdown." : "Couldn't copy.", ok ? "ok" : "err");
+      if (msgEl) setMsg(msgEl, ok ? "Compare list copied." : "Couldn't copy.", ok ? "ok" : "err");
     };
   }
   if (shareBtn && !shareBtn.dataset.wired) {
@@ -591,7 +591,7 @@ function wireCompareTray(getPins, setPins, opts) {
       if (!pins.length) return;
       syncCompareStore(pins);
       const ok = await copyText(compareShareUrl(pins));
-      if (msgEl) setMsg(msgEl, ok ? "Compare tray link copied (works for guests)." : "Couldn't copy.", ok ? "ok" : "err");
+      if (msgEl) setMsg(msgEl, ok ? "Compare link copied." : "Couldn't copy.", ok ? "ok" : "err");
     };
   }
   if (body && !body.dataset.wired) {
@@ -801,7 +801,7 @@ function shopCardHtml(s, opts) {
   const where = (place || (s.x != null && s.z != null ? coordsHtml(s.x, s.z) : "no location")) + (o.distText || "");
   const owner = s.profiles && (s.owner_id || o.ownerId)
     ? ownerChip(s.profiles, s.owner_id || o.ownerId)
-    : '<span class="meta">—</span>';
+    : '<span class="meta">-</span>';
   const sale = saleBadgeHtml(s);
   return `<div class="card shop-card" data-href="shop.html?id=${s.id}">
     <div class="cardrow">${shopIcon(s, "card")}<div class="grow">
@@ -1107,7 +1107,7 @@ function renderImpersonateBar() {
   }
   let label = "user";
   try { label = sessionStorage.getItem(IMP_LABEL_KEY) || label; } catch (e) {}
-  bar.innerHTML = `<span>Impersonating <b>${esc(label)}</b> — site acts as this account until you exit.</span>` +
+  bar.innerHTML = `<span>Impersonating <b>${esc(label)}</b>. Exit to return to your account.</span>` +
     `<button type="button" class="small" id="impersonate-exit" title="Return to your admin account">Exit</button>` +
     `<button type="button" class="small" id="impersonate-exit-x" title="Exit impersonation" aria-label="Exit">✕</button>`;
   const exit = () => exitImpersonation();
@@ -1264,7 +1264,7 @@ async function renderNav() {
     if (profile && stillTimedOut(profile)) { await kickTimedOut(); return; }
     hadSession = true;
     nagProfile = profile;
-    // bump last-seen (best effort, throttle in session) — skip while impersonating
+    // bump last-seen (best effort, throttle in session) - skip while impersonating
     try {
       if (!isImpersonating() && !sessionStorage.getItem("seen_ping")) {
         sessionStorage.setItem("seen_ping", "1");
@@ -1368,7 +1368,7 @@ function renderVerifyBanner(profile) {
   document.body.classList.add("has-verify-banner");
   const countdown = deleteCountdownText(profile.created_at);
   bar.innerHTML =
-    `<span class="verify-banner-text">Your account isn't verified — <b>${esc(countdown)}</b>.</span>` +
+    `<span class="verify-banner-text">Not verified - <b>${esc(countdown)}</b>.</span>` +
     `<a class="primary small verify-banner-cta" href="verify.html">verify here</a>`;
   syncTopChromeOffset();
   observeTopChrome();
@@ -1812,7 +1812,7 @@ function collectOwnerAlerts(shops, marketByItem) {
       } else if (listingRestockAlert(l)) {
         alerts.push({
           kind: "restock", listing: l, shop: s,
-          text: `${l.sell_item}: ${listingIsOut(l) ? "out of stock — needs restock" : "stock nearly gone (" + l.stock + ")"}`,
+          text: `${l.sell_item}: ${listingIsOut(l) ? "out of stock (needs restock)" : "stock nearly gone (" + l.stock + ")"}`,
           key: "restock:" + l.id
         });
       }
@@ -2105,7 +2105,7 @@ function wireSearchAutocomplete(input, getSuggestions, opts) {
   return { refresh, hide, accept };
 }
 
-// Shop traction score for default All shops sort (heuristic — not a live feed)
+// Shop traction score for default All shops sort (heuristic - not a live feed)
 function shopTractionScore(s, tipByShop) {
   const ls = (s.listings || []).filter(l => !l.timed_out);
   let score = 0;

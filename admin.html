@@ -13,7 +13,7 @@
     <div class="mod-hero-copy">
       <span class="mod-eyebrow">Control room</span>
       <h1>Admin</h1>
-      <p class="sub">Make accounts and clean up shops. Timeouts and reports are on the <a href="mod.html" style="color:var(--accent)">Moderation</a> page. <span id="headnote"></span></p>
+      <p class="sub">Accounts and shop cleanup. Reports and timeouts are on <a href="mod.html" style="color:var(--accent)">Moderation</a>. <span id="headnote"></span></p>
     </div>
   </header>
 
@@ -25,7 +25,7 @@
             <span class="collapse-chevron" aria-hidden="true"></span>
             <span class="mod-section-head-text">
               <span class="mod-section-title">Signup requests</span>
-              <span class="meta">Match the Discord + Minecraft name to the CivShop ticket in contact PFA. Accept lets them comment, review and create shops. Deny deletes the account and everything it made. Accounts nobody accepts are deleted automatically 24 hours after signup.</span>
+              <span class="meta">Match Discord + Minecraft to the CivShop ticket. Accept unlocks the account; deny deletes it. Unverified accounts expire after 24 hours.</span>
             </span>
           </button>
         </h2>
@@ -45,7 +45,7 @@
           <span class="collapse-chevron" aria-hidden="true"></span>
           <span class="mod-section-head-text">
             <span class="mod-section-title">Create account</span>
-            <span class="meta">For people you vouch for. These start verified, with a popup suggesting they pick their own password.</span>
+            <span class="meta">Starts verified. They get a prompt to set their own password.</span>
           </span>
         </button>
       </h2>
@@ -75,7 +75,7 @@
           <span class="collapse-chevron" aria-hidden="true"></span>
           <span class="mod-section-head-text">
             <span class="mod-section-title">Rewrite place aliases</span>
-            <span class="meta">Optional DB cleanup: rewrite city/nation text on shop rows to a canonical name. Soft aliases in search still work without this.</span>
+            <span class="meta">Rewrite city/nation text on shop rows. Soft search aliases still work without this.</span>
           </span>
         </button>
       </h2>
@@ -111,7 +111,7 @@
             <span class="collapse-chevron" aria-hidden="true"></span>
             <span class="mod-section-head-text">
               <span class="mod-section-title">Server / nation sales</span>
-              <span class="meta">Head admin only. Creating an active sale notifies eligible shop owners so they can opt in. Prices adjust only if they say Yes.</span>
+              <span class="meta">Head admin only. Active sales notify eligible owners; prices change only if they opt in.</span>
             </span>
           </button>
         </h2>
@@ -149,7 +149,7 @@
           <span class="collapse-chevron" aria-hidden="true"></span>
           <span class="mod-section-head-text">
             <span class="mod-section-title">Stale shops</span>
-            <span class="meta">Shops whose newest in-stock listing hasn't been touched in 30+ days. Nudge owners to refresh or update stock.</span>
+            <span class="meta">Newest in-stock listing untouched for 30+ days.</span>
           </span>
         </button>
       </h2>
@@ -352,7 +352,7 @@ function paintLists() {
       .map(a => `<div class="listing">
         <div><a href="profile.html?id=${a.id}" style="color:inherit">${esc(a.mc_username)}</a>
           ${roleBadge(a)} ${statusBadge(a)}
-          <span class="meta">Ã‚Â· ${esc(a.discord_username || "Ã¢â‚¬â€")} Ã‚Â· ${esc(a.login_username)} Ã‚Â· made ${fmtDate(a.created_at)} Ã‚Â· last ${fmtDate(a.last_sign_in_at)}</span></div>
+          <span class="meta">Ã‚Â· ${esc(a.discord_username || "-")} Ã‚Â· ${esc(a.login_username)} Ã‚Â· made ${fmtDate(a.created_at)} Ã‚Â· last ${fmtDate(a.last_sign_in_at)}</span></div>
         <div class="acct-actions">${roleButtons(a)}</div>
       </div>`).join("") || '<p class="meta">None.</p>';
   } else {
@@ -469,7 +469,7 @@ document.querySelector("main").addEventListener("click", async e => {
     aliasPreviewRows = await findAliasHits(from, field);
     document.getElementById("alias-hits").innerHTML = aliasPreviewRows.length
       ? aliasPreviewRows.map(s => `<div class="listing"><div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
-          <span class="meta">Ã‚Â· ${esc(s.profiles?.mc_username || "?")} Ã‚Â· city: ${esc(s.city || "Ã¢â‚¬â€")} Ã‚Â· nation: ${esc(s.nation || "Ã¢â‚¬â€")}</span></div></div>`).join("")
+          <span class="meta">Ã‚Â· ${esc(s.profiles?.mc_username || "?")} Ã‚Â· city: ${esc(s.city || "-")} Ã‚Â· nation: ${esc(s.nation || "-")}</span></div></div>`).join("")
       : '<p class="meta">No shops store that exact text.</p>';
     if (act === "alias-preview") {
       setMsg(aliasmsg, aliasPreviewRows.length + " shop" + (aliasPreviewRows.length === 1 ? "" : "s") + " would change.", aliasPreviewRows.length ? "ok" : "err");

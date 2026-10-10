@@ -48,7 +48,7 @@
       <div class="row" style="margin-top:6px"><button id="saveidentity">Save pronouns / timezone</button></div>
 
       <label>Highlight colour</label>
-      <p class="meta" style="margin:0 0 6px">Frames the boxes on your public profile. Leave default for the normal border.</p>
+      <p class="meta" style="margin:0 0 6px">Colour for boxes on your public profile. Default keeps the normal border.</p>
       <div class="hl-swatches" id="hl-swatches"></div>
       <div class="row" style="margin-top:8px">
         <input type="text" id="hlhex" maxlength="7" placeholder="#7fb35a" spellcheck="false" autocomplete="off" aria-label="Custom highlight hex">
@@ -108,9 +108,9 @@ let lastField = null;
 let activeTab = "shops";
 
 function memberSinceText(ts) {
-  if (!ts) return "Ã¢â‚¬â€";
+  if (!ts) return "-";
   const d = new Date(ts);
-  if (Number.isNaN(d.getTime())) return "Ã¢â‚¬â€";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
 }
 
@@ -305,7 +305,7 @@ async function load() {
   document.getElementById("stats").innerHTML = `
     <div class="stat"><div class="big">${full.length}</div><div class="lbl">Shops</div></div>
     <div class="stat"><div class="big">${totalListings}</div><div class="lbl">Listings</div></div>
-    <div class="stat"><div class="big">${rating ? rating.avg.toFixed(1) : "Ã¢â‚¬â€"}</div><div class="lbl">${rating ? "Avg rating (" + rating.count + ")" : "No ratings"}</div></div>
+    <div class="stat"><div class="big">${rating ? rating.avg.toFixed(1) : " - "}</div><div class="lbl">${rating ? "Avg rating (" + rating.count + ")" : "No ratings"}</div></div>
     <div class="stat"><div class="big">${active ? "Active" : "Quiet"}</div><div class="lbl">${active ? "Updated in last 7 days" : "No recent listing updates"}</div></div>
     <div class="stat"><div class="big" style="font-size:1rem">${esc(since)}</div><div class="lbl">Member since</div></div>`;
 

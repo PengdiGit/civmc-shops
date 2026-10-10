@@ -13,7 +13,7 @@
     <div class="mod-hero-copy">
       <span class="mod-eyebrow">Staff console</span>
       <h1>Moderation</h1>
-      <p class="sub">A timed-out shop, listing or comment is hidden from everyone but staff (and its owner). A timed-out account is logged out everywhere and can't log in, and its shops are hidden. Timeouts last until staff lift them. Nothing is deleted.</p>
+      <p class="sub">Timeouts hide shops, listings, and comments from the public. Timed-out accounts can't log in. Nothing is deleted.</p>
     </div>
   </header>
 
@@ -43,7 +43,7 @@
           <span class="collapse-chevron" aria-hidden="true"></span>
           <span class="mod-section-head-text">
             <span class="mod-section-title">Tip-jar brigading</span>
-            <span class="meta">Suspicious Fair/High/Low vote bursts. Timeout the account or clear votes on a listing Ã¢â‚¬â€ nothing is deleted from shops.</span>
+            <span class="meta">Suspicious Fair/High/Low vote bursts. Timeout the account or clear votes - shops stay intact.</span>
           </span>
         </button>
       </h2>
@@ -191,7 +191,7 @@ function render() {
     const u = f.user_id ? data.users.find(x => same(x.id, f.user_id)) : null;
     const l = f.listing_id != null ? data.listings.find(x => same(x.id, f.listing_id)) : null;
     const shop = f.shop_id != null ? data.shops.find(x => same(x.id, f.shop_id)) : (l ? data.shops.find(x => same(x.id, l.shop_id)) : null);
-    const who = u ? `<a href="profile.html?id=${u.id}" style="color:var(--accent)">${esc(u.mc_username)}</a>` : '<span class="meta">Ã¢â‚¬â€</span>';
+    const who = u ? `<a href="profile.html?id=${u.id}" style="color:var(--accent)">${esc(u.mc_username)}</a>` : '<span class="meta">-</span>';
     const where = l
       ? `<a href="shop.html?id=${l.shop_id}&listing=${l.id}" style="color:var(--accent)">${esc(listingText(l))}</a>`
       : shop ? `<a href="shop.html?id=${shop.id}" style="color:var(--accent)">${esc(shop.name)}</a>` : "";

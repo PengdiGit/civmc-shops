@@ -25,7 +25,7 @@
   <h2>New shop</h2>
   <div class="panel" id="newshop" data-icon-item="">
     <div class="row">
-      <div style="flex:2;min-width:180px"><label for="s-name">Shop name (plain text, this is what people search)</label><input type="text" id="s-name" maxlength="60" style="width:100%"></div>
+      <div style="flex:2;min-width:180px"><label for="s-name">Shop name (what people search)</label><input type="text" id="s-name" maxlength="60" style="width:100%"></div>
       <div style="flex:1;min-width:100px"><label for="s-city">City</label><input type="text" id="s-city" maxlength="60" placeholder="Mount Augusta" style="width:100%"></div>
       <div style="flex:1;min-width:100px"><label for="s-nation">Nation</label><input type="text" id="s-nation" maxlength="60" placeholder="Commonwealth" style="width:100%"></div>
       <div><label for="s-x">X</label><input type="number" id="s-x" style="width:90px"></div>
@@ -51,7 +51,7 @@
       <input type="file" id="s-file" accept="image/png,image/jpeg,image/webp">
       <button type="button" id="s-clear-icon" data-ico="x" title="Clear icon" aria-label="Clear icon" hidden></button>
     </div>
-    <p class="meta" style="margin:4px 0 0">An uploaded picture is used instead of the item icon. With neither, your shop gets a chest.</p>
+    <p class="meta" style="margin:4px 0 0">Upload overrides the item icon. Default is a chest.</p>
 
     <div class="row" style="margin-top:12px">
       <button class="primary" id="add-shop">Create shop</button>
@@ -61,7 +61,7 @@
   </div>
   <div class="msg" id="msg"></div>
 
-  <p class="meta" style="margin:10px 0 0">Each listing reads: what you buy &rarr; what you sell. Hover an icon to see what it does.</p>
+  <p class="meta" style="margin:10px 0 0">Each listing: buy &rarr; sell. Hover icons for tips.</p>
   <div id="shops"></div>
 </main>
 
@@ -184,7 +184,7 @@ async function paintNotifications() {
     const pct = p.percent_off != null ? (p.percent_off + "% off") : (p.label || "sale");
     html += `<div class="owner-alert" data-note="${n.id}">
       <span class="tag sale">sale</span>
-      <span class="owner-alert-body"><b>${esc(p.name || "Sale")}</b> (${esc(scope)}, ${esc(String(pct))}) Ã¢â‚¬â€
+      <span class="owner-alert-body"><b>${esc(p.name || "Sale")}</b> (${esc(scope)}, ${esc(String(pct))})  - 
         There is a sale happening, want to participate?</span>
       <button type="button" class="small primary" data-act="sale-yes" data-note="${n.id}">Yes</button>
       <button type="button" class="small" data-act="sale-no" data-note="${n.id}">No</button>
@@ -216,7 +216,7 @@ function salePanelHtml(s) {
       <div class="row" style="margin-top:8px;flex-wrap:wrap">
         <input type="text" class="sale-name" maxlength="60" placeholder="Sale name" style="width:140px">
         <input type="number" class="sale-pct" min="1" max="99" step="1" placeholder="% off" style="width:72px" title="Optional percent off diamond prices">
-        <input type="datetime-local" class="sale-end" title="End time (optional Ã¢â‚¬â€ leave blank until cancelled)">
+        <input type="datetime-local" class="sale-end" title="End time (optional - leave blank until cancelled)">
         <button type="button" class="small primary" data-act="start-sale">Start sale</button>
       </div>
       <p class="meta" style="margin:4px 0 0">Diamond listings get % off (original prices stored for restore). Public cards show Ã¢â‚¬Å“(Name) sale!Ã¢â‚¬Â.</p>
@@ -247,8 +247,7 @@ async function load() {
 
   if (!isVerified(ctx.profile)) {
     document.getElementById("verify").innerHTML = `
-      <div class="banner"><b>Your account isn't verified yet.</b> Until you're verified you can browse, favourite and report, but you can't create shops, comment, review or upload pictures.
-      <a href="verify.html">Verify here</a> Ã¢â‚¬â€ ${PFA_HELP}, fill out the information, and wait (can take up to 24 hours).</div>`;
+      <div class="banner"><b>Account not verified.</b> You can browse, favourite, and report, but not create shops, comment, review, or upload. <a href="verify.html">Verify here</a> (${PFA_HELP}).</div>`;
     document.querySelectorAll("#newshop input, #newshop textarea, #newshop button").forEach(el => el.disabled = true);
   }
   setupNewShopForm();
@@ -346,7 +345,7 @@ function panelHtml(s) {
     <label>Paste sign dump (optional helper)</label>
     <textarea class="p-signs" rows="3" placeholder="One trade per line, e.g.&#10;64 blaze rod for 1 diamond [24]&#10;B 8 ender pearl : S 1 diamond"></textarea>
     <div class="row" style="margin-top:4px"><button type="button" class="small" data-act="parse-signs">Parse into draft listings</button></div>
-    <p class="meta" style="margin:4px 0 0">Adds parsed rows below Ã¢â‚¬â€ optional <code>[64]</code> stock suffix. Review amounts, then save each listing.</p>
+    <p class="meta" style="margin:4px 0 0">Adds parsed rows below - optional <code>[64]</code> stock suffix. Review amounts, then save each listing.</p>
 
     <label>Shop picture</label>
     <div class="row">
@@ -629,7 +628,7 @@ async function render(resetShop) {
             <td>${esc(l.want_amount + (l.want_unit ? " " + l.want_unit.toUpperCase() : "") + " " + l.want_item)}</td>
             <td>${esc(l.sell_amount + (l.sell_unit ? " " + l.sell_unit.toUpperCase() : "") + " " + l.sell_item)}</td>
             <td><input type="number" min="0" class="b-stock" value="${l.stock == null ? "" : l.stock}" placeholder="Ã¢Ë†Å¾" style="width:72px"></td>
-            <td><input type="text" class="b-group" maxlength="60" value="${esc(l.group_name || "")}" placeholder="Ã¢â‚¬â€" style="width:90px"></td>
+            <td><input type="text" class="b-group" maxlength="60" value="${esc(l.group_name || "")}" placeholder=" - " style="width:90px"></td>
             <td class="meta">${updatedHtml(l.updated_at, { prefix: false })}</td>
           </tr>`).join("")}</tbody>
         </table></div>
@@ -950,7 +949,7 @@ document.getElementById("owner-alerts").addEventListener("click", async e => {
   btn.disabled = true;
   const r = await ignoreOwnerAlert(a);
   if (r.error) { setMsg(msg, r.error, "err"); btn.disabled = false; return; }
-  setMsg(msg, a.kind === "stale" ? "Stale alert ignored Ã¢â‚¬â€ 7-day clock restarted." : "Alert ignored for 7 days (or until you edit the listing).", "ok");
+  setMsg(msg, a.kind === "stale" ? "Stale alert ignored - 7-day clock restarted." : "Alert ignored for 7 days (or until you edit the listing).", "ok");
   render();
 });
 
@@ -1154,7 +1153,7 @@ document.getElementById("shops").addEventListener("click", async e => {
     }
     panel.querySelector(".p-signs").value = "";
     setMsg(msg, drafts.length === 1
-      ? "Parsed 1 listing into the add form Ã¢â‚¬â€ click Add listing."
+      ? "Parsed 1 listing into the add form - click Add listing."
       : "Added " + (drafts.length - 1) + " listing(s); first is in the add form.", "ok");
     if (drafts.length > 1) render();
     return;

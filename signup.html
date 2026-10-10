@@ -10,10 +10,10 @@
 <nav id="nav"></nav>
 <main>
   <div class="auth-wrap" id="signup-wrap">
-    <span class="page-eyebrow">Gate</span>
+    <span class="page-eyebrow">Account</span>
     <h1>Sign up</h1>
     <p class="sub">Already have an account? <a id="login-link" href="login.html">Log in</a>.</p>
-    <p class="meta" style="margin:0 0 14px">Anyone can make an account, but it has to be verified within 24 hours or it gets deleted. Until you're verified you can browse, favourite and report, but not comment, review, upload pictures or create shops.</p>
+    <p class="meta" style="margin:0 0 14px">Verify within 24 hours or the account is deleted. Until then you can browse, favourite, and report.</p>
 
     <form class="stack" id="form">
       <label for="u">Login username</label>
@@ -27,7 +27,7 @@
       <div class="msg" id="msg"></div>
       <button class="primary" type="submit">Create account</button>
     </form>
-    <p class="meta" style="margin-top:14px">After signup, verify on the <a href="verify.html">verify page</a>: join the PFA Discord, open a "CivShop" ticket in "contact PFA", fill out the information, and wait (can take up to 24 hours).</p>
+    <p class="meta" style="margin-top:14px">Next: <a href="verify.html">verify your account</a> on Discord (up to 24 hours).</p>
   </div>
 </main>
 
@@ -57,13 +57,13 @@ async function showSignupSuccess() {
   wrap.innerHTML = `
     <span class="page-eyebrow">Almost there</span>
     <h1>Account created</h1>
-    <p class="sub msg ok" style="margin-bottom:14px">You're signed in, but your account isn't verified yet.</p>
-    <p class="meta" style="margin:0 0 14px">Verification is required to comment, review, upload pictures, or create shops. Unverified accounts are deleted about 24 hours after signup Ã¢â‚¬â€ <b>${esc(countdown)}</b>.</p>
+    <p class="sub msg ok" style="margin-bottom:14px">Signed in. Verify next to unlock shops, comments, and reviews.</p>
+    <p class="meta" style="margin:0 0 14px">Unverified accounts are deleted in about 24 hours (<b>${esc(countdown)}</b>).</p>
     <div class="row" style="flex-wrap:wrap;gap:10px;margin-bottom:12px">
       <a class="primary" href="verify.html">Verify your account</a>
       <a class="small" href="index.html">Browse shops</a>
     </div>
-    <p class="meta">You'll need to join the PFA Discord and open a CivShop ticket. Steps are on the verify page.</p>`;
+    <p class="meta">Steps are on the verify page.</p>`;
   renderNav().catch(() => {});
 }
 

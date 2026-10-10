@@ -39,7 +39,7 @@
           <span class="meta" id="lcount"></span>
         </div>
       </div>
-      <p class="meta shop-catalog-hint" style="margin:0 0 8px">Each row: what the shop buys &rarr; what the shop sells. Out-of-stock rows look faded but stay visible.</p>
+      <p class="meta shop-catalog-hint" style="margin:0 0 8px">Buy &rarr; sell. Out-of-stock rows stay visible but faded.</p>
       <div class="offers" id="offers"></div>
     </div>
   </div>
@@ -67,8 +67,8 @@
       <b>Compare</b>
       <span class="meta" id="compare-count">0 / 4</span>
       <button type="button" id="compare-md" data-ico="copy" title="Copy markdown for Discord" aria-label="Copy markdown"></button>
-      <button type="button" id="compare-share" data-ico="link" title="Copy link with compare tray in the URL hash" aria-label="Share tray"></button>
-      <button type="button" id="compare-clear" data-ico="x" title="Clear compare tray" aria-label="Clear compare tray"></button>
+      <button type="button" id="compare-share" data-ico="link" title="Copy compare link" aria-label="Share tray"></button>
+      <button type="button" id="compare-clear" data-ico="x" title="Clear compare" aria-label="Clear compare tray"></button>
     </div>
     <div class="compare-body" id="compare-body"></div>
   </div>
@@ -96,7 +96,7 @@ let hlListingId = focusId ? String(focusId) : null;
 let reviewCache = [];
 let reviewSort = "newest";
 
-const verifyHelp = () => `Only verified accounts can comment, review or upload pictures. <a href="verify.html">Verify your account</a> Ã¢â‚¬â€ ${PFA_HELP}, fill out the information, and wait (can take up to 24 hours).`;
+const verifyHelp = () => `Verified accounts only. <a href="verify.html">Verify here</a> (${PFA_HELP}).`;
 
 function listingMatchesFind(l) {
   if (!findQ) return false;
@@ -206,7 +206,7 @@ function paintListings(staff, isOwner) {
     if (l.timed_out) tags += ' <span class="tag bad">timed out</span>';
     if (stale) tags += ' <span class="tag warn">might be out of date</span>';
     const quietDays = daysAgo(l.updated_at);
-    if (l.in_stock && quietDays >= 14) tags += ' <span class="tag warn" title="Listing is old Ã¢â‚¬â€ stock may be stale">quiet + stock</span>';
+    if (l.in_stock && quietDays >= 14) tags += ' <span class="tag warn" title="Listing is old - stock may be stale">quiet + stock</span>';
     const tip = tipDisplayForListing(l.id, tipByListing[String(l.id)] || [], me);
     const pinned = comparePins.some(p => String(p.listing.id) === String(l.id));
     let end = `<span class="action-cluster">`;
@@ -322,10 +322,10 @@ async function load() {
 
   const p = s.profiles || {};
   let banner = "";
-  if (s.is_open === false) banner += `<div class="banner"><span class="tag warn">closed</span> Hidden from Find and public viewers. Open it from your dashboard when you're ready.</div>`;
-  if (s.archived) banner += `<div class="banner"><span class="tag warn">archived</span> Hidden from Find. Only you and staff can see this shop.</div>`;
-  if (s.timed_out) banner += `<div class="banner"><span class="tag bad">shop timed out</span> Hidden from everyone except staff and the owner.</div>`;
-  if (p.timed_out) banner += `<div class="banner"><span class="tag bad">owner account timed out</span> This shop is hidden because its owner's account is timed out.</div>`;
+  if (s.is_open === false) banner += `<div class="banner"><span class="tag warn">closed</span> Hidden from Find. Open it from your dashboard when ready.</div>`;
+  if (s.archived) banner += `<div class="banner"><span class="tag warn">archived</span> Hidden from Find. Only you and staff can see it.</div>`;
+  if (s.timed_out) banner += `<div class="banner"><span class="tag bad">shop timed out</span> Hidden except from staff and the owner.</div>`;
+  if (p.timed_out) banner += `<div class="banner"><span class="tag bad">owner account timed out</span> Hidden because the owner is timed out.</div>`;
   if (shopSaleActive(s)) banner += `<div class="banner"><span class="tag sale">(${esc(shopSaleLabel(s))}) sale!</span> ${s.sale_percent != null ? esc(s.sale_percent + "% off diamond prices") : "Special sale prices"}.</div>`;
   let btns = "";
   if (staff) btns += iconBtn("clock", { cls: "btn-timeout", title: s.timed_out ? "Remove shop timeout" : "Timeout shop", attrs: `data-act="shop-timeout" data-to="${s.timed_out ? 0 : 1}"` });
@@ -537,7 +537,7 @@ document.querySelector("main").addEventListener("click", async e => {
     const label = btn.textContent;
     btn.textContent = ok ? "Copied!" : "Copy failed";
     setTimeout(() => { btn.textContent = label; }, 1500);
-    setMsg(msg, ok ? "Shop link copied." : "Couldn't copy Ã¢â‚¬â€ copy the URL from the address bar.", ok ? "ok" : "err");
+    setMsg(msg, ok ? "Shop link copied." : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");
     return;
   }
   if (act === "copy-coords") {

@@ -12,7 +12,7 @@
   <header class="page-hero">
     <span class="page-eyebrow">Collection</span>
     <h1>Favourites</h1>
-    <p class="sub">Shops you've starred. Only you can see this list.</p>
+    <p class="sub">Shops you've starred. Private to you.</p>
   </header>
   <div class="msg" id="msg"></div>
   <div id="list" class="shop-grid"></div>
@@ -38,7 +38,7 @@ async function load() {
   const box = document.getElementById("list");
   if (!rows.length) {
     box.className = "";
-    box.innerHTML = emptyState("Nothing here yet. Star a shop you want to come back to.", "index.html", "Browse shops");
+    box.innerHTML = emptyState("No favourites yet. Star a shop to save it here.", "index.html", "Browse shops");
     return;
   }
   box.className = "shop-grid";
