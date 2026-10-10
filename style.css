@@ -2998,6 +2998,9 @@ body.shop-page .shop-filter .row { flex-wrap: wrap; }
   align-items: start;
 }
 .shop-group-sidebar {
+  position: sticky;
+  top: calc(var(--top-chrome-h) + var(--nav-h));
+  z-index: 20;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -3121,6 +3124,7 @@ body.settings-page {
     grid-template-columns: 1fr;
   }
   .shop-group-sidebar {
+    position: static;
     flex-direction: row;
     flex-wrap: wrap;
   }
