@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=15">
+<link rel="stylesheet" href="style.css?v=16">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
@@ -22,7 +22,7 @@
     </div>
     <div class="inline-actions" id="actions"></div>
     <div class="action-cluster profile-hero-actions" id="hero-actions">
-      <button type="button" id="favprof" hidden title="Favourite this profile" aria-label="Favourite this profile"></button>
+      <button type="button" id="favprof" class="icon-btn" hidden title="Favourite this profile" aria-label="Favourite this profile" data-ico="star"></button>
       <button type="button" id="shareprof" class="primary" data-ico="share" title="Copy profile link" aria-label="Share profile"></button>
       <button type="button" id="toggledit" data-ico="pen" title="Edit profile" aria-label="Edit profile" hidden></button>
     </div>
@@ -111,8 +111,10 @@ let activeTab = "shops";
 function paintFavProfBtn() {
   const fb = document.getElementById("favprof");
   if (!fb) return;
-  fb.hidden = !!own;
-  if (own) return;
+  // Own profile only: never show. Others: show (login required to toggle).
+  const show = !own && !!shown;
+  fb.hidden = !show;
+  if (!show) return;
   fb.className = "icon-btn" + (isFavProf ? " on" : "");
   fb.title = isFavProf ? "Remove from favourites" : "Favourite this profile";
   fb.setAttribute("aria-label", fb.title);

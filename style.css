@@ -1523,8 +1523,12 @@ body.find-page > main {
   right: 10px;
   z-index: 2;
 }
-.profile-hero:has(#toggledit:not([hidden])) {
+.profile-hero:has(#toggledit:not([hidden])),
+.profile-hero:has(#favprof:not([hidden])) {
   padding-right: 100px;
+}
+.profile-hero:has(#favprof:not([hidden])):has(#toggledit:not([hidden])) {
+  padding-right: 132px;
 }
 .profile-hero-actions #shareprof.primary {
   background: linear-gradient(165deg,
@@ -2279,15 +2283,26 @@ body.fav-page .fav-person-name {
   text-overflow: ellipsis;
 }
 body.fav-page .fav-person .icon-btn { margin-left: auto; }
-body.profile-page #favprof.on {
+/* Profile favourite: yellow hollow (off) / solid (on) */
+body.profile-page #favprof {
   color: #e0b45a;
-  border-color: color-mix(in srgb, #e0b45a 65%, var(--line));
-  background: color-mix(in srgb, #e0b45a 18%, var(--panel));
+  border-color: color-mix(in srgb, #e0b45a 55%, var(--line));
+  background: color-mix(in srgb, #e0b45a 12%, var(--panel));
+}
+body.profile-page #favprof:hover {
+  color: #f0c96a;
+  border-color: #e0b45a;
+  background: color-mix(in srgb, #e0b45a 20%, var(--panel));
+}
+body.profile-page #favprof.on {
+  color: #e8bc4a;
+  border-color: color-mix(in srgb, #e0b45a 75%, var(--line));
+  background: color-mix(in srgb, #e0b45a 26%, var(--panel));
 }
 body.profile-page #favprof.on:hover {
   color: #f0c96a;
   border-color: #e0b45a;
-  background: color-mix(in srgb, #e0b45a 26%, var(--panel));
+  background: color-mix(in srgb, #e0b45a 32%, var(--panel));
 }
 body.fav-page .shop-card.card:hover,
 body.fav-page a.shop-card.card:hover,
