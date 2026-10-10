@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -26,8 +26,8 @@
   <div class="panel" id="newshop" data-icon-item="">
     <div class="row">
       <div style="flex:2;min-width:180px"><label for="s-name">Shop name (what people search)</label><input type="text" id="s-name" maxlength="60" style="width:100%"></div>
-      <div style="flex:1;min-width:120px"><label for="s-city">City</label><input type="text" id="s-city" class="place-city" maxlength="60" placeholder="Search cities…" style="width:100%"></div>
-      <div style="flex:1;min-width:120px"><label for="s-nation">Nation</label><input type="text" id="s-nation" class="place-nation" maxlength="60" placeholder="Search nations…" style="width:100%"></div>
+      <div style="flex:1;min-width:120px"><label for="s-city">City</label><input type="text" id="s-city" class="place-city" maxlength="60" placeholder="Search citiesΓÇª" style="width:100%"></div>
+      <div style="flex:1;min-width:120px"><label for="s-nation">Nation</label><input type="text" id="s-nation" class="place-nation" maxlength="60" placeholder="Search nationsΓÇª" style="width:100%"></div>
       <div><label for="s-x">X</label><input type="number" id="s-x" style="width:90px"></div>
       <div><label for="s-z">Z</label><input type="number" id="s-z" style="width:90px"></div>
     </div>
@@ -326,8 +326,8 @@ function panelHtml(s) {
   <div class="panel" data-panel="${s.id}" data-icon-item="${esc(s.icon_item || "")}" hidden>
     <div class="row">
       <div style="flex:2;min-width:180px"><label>Shop name (plain text, this is what people search)</label><input type="text" class="p-name" maxlength="60" value="${esc(s.name)}" style="width:100%"></div>
-      <div style="flex:1;min-width:120px"><label>City</label><input type="text" class="p-city place-city" maxlength="60" value="${esc(s.city || "")}" placeholder="Search cities…" style="width:100%"></div>
-      <div style="flex:1;min-width:120px"><label>Nation</label><input type="text" class="p-nation place-nation" maxlength="60" value="${esc(s.nation || "")}" placeholder="Search nations…" style="width:100%"></div>
+      <div style="flex:1;min-width:120px"><label>City</label><input type="text" class="p-city place-city" maxlength="60" value="${esc(s.city || "")}" placeholder="Search citiesΓÇª" style="width:100%"></div>
+      <div style="flex:1;min-width:120px"><label>Nation</label><input type="text" class="p-nation place-nation" maxlength="60" value="${esc(s.nation || "")}" placeholder="Search nationsΓÇª" style="width:100%"></div>
       <div><label>X</label><input type="number" class="p-x" value="${s.x ?? ""}" style="width:90px"></div>
       <div><label>Z</label><input type="number" class="p-z" value="${s.z ?? ""}" style="width:90px"></div>
     </div>
@@ -527,7 +527,7 @@ function dashListingRow(l) {
 <<<<<<< Updated upstream
         <p class="meta" style="margin:4px 0 0">Alt prices show as a fork into the item you sell (e.g. diamonds or ender eye).</p>
 =======
-        <p class="meta" style="margin:4px 0 0">Alt prices are OR options — buyers pay any one (shown as a fork into the item you sell).</p>
+        <p class="meta" style="margin:4px 0 0">Alt prices are OR options ΓÇö buyers pay any one (shown as a fork into the item you sell).</p>
 >>>>>>> Stashed changes
       </div>
       <div class="dash-listing-extra">
@@ -535,11 +535,11 @@ function dashListingRow(l) {
           <input type="text" class="dash-enchants" maxlength="300" value="${esc(l.enchants || "")}" placeholder="Protection IV, Unbreaking III">
         </label>
         <label>Notes
-          <textarea class="dash-notes" maxlength="400" rows="2" placeholder="Condition, repair level, extras…">${esc(l.notes || "")}</textarea>
+          <textarea class="dash-notes" maxlength="400" rows="2" placeholder="Condition, repair level, extrasΓÇª">${esc(l.notes || "")}</textarea>
         </label>
         <div class="dash-bundle-row" ${showBundle ? "" : "hidden"}>
           <button type="button" class="small" data-act="edit-bundle">Edit bundle contents</button>
-          <span class="meta dash-bundle-summary">${bundle && bundle.length ? bundle.length + " slot" + (bundle.length === 1 ? "" : "s") + " filled · public page: click bundle to view" : "Empty barrel"}</span>
+          <span class="meta dash-bundle-summary">${bundle && bundle.length ? bundle.length + " slot" + (bundle.length === 1 ? "" : "s") + " filled ┬╖ public page: click bundle to view" : "Empty barrel"}</span>
         </div>
       </div>
       <div class="meta dash-listing-meta">${updatedHtml(l.updated_at)}</div>
@@ -847,7 +847,7 @@ function dashGroupListEl(from) {
 }
 
 function listingDisplaySnapshot(listings) {
-  // Capture sort/group BEFORE any drag mutate — shared refs would hide the patch.
+  // Capture sort/group BEFORE any drag mutate ΓÇö shared refs would hide the patch.
   return new Map((listings || []).map(l => [String(l.id), {
     sort_order: l.sort_order,
     group_name: l.group_name == null ? null : (String(l.group_name).trim() || null)
@@ -1593,7 +1593,7 @@ document.getElementById("shops").addEventListener("focusout", async e => {
     const r = await commitListingRow(row, shop, shopId);
     if (r.ok && !r.skipped) {
       setMsg(msg, "Listing updated.", "ok");
-      // Don't full-render on notes/enchants — keeps caret; only refresh for trade/stock
+      // Don't full-render on notes/enchants ΓÇö keeps caret; only refresh for trade/stock
       if (t.matches(".dash-wa, .dash-sa, .dash-stock-amt")) render();
       else clearDashDirty();
     }
