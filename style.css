@@ -1109,7 +1109,7 @@ body.find-page > main {
 }
 .find-page .find-board .sub { margin: 0; max-width: 56ch; }
 
-/* Discord-style server invite — Find-board olive panel, not Discord slate */
+/* Discord invite — same olive family as .find-loc (not Discord slate) */
 .find-discord-invite {
   grid-column: 2;
   justify-self: center;
@@ -1120,39 +1120,28 @@ body.find-page > main {
 }
 a.find-discord-embed {
   display: block;
-  padding: 14px 16px 16px;
+  padding: 12px 12px 14px;
   text-decoration: none;
   color: inherit;
-  background:
-    linear-gradient(155deg,
-      color-mix(in srgb, var(--panel) 78%, var(--accent) 22%) 0%,
-      color-mix(in srgb, var(--panel) 92%, var(--bg) 8%) 48%,
-      color-mix(in srgb, var(--panel) 88%, var(--warn) 6%) 100%);
-  border: 1px solid color-mix(in srgb, var(--line) 68%, var(--accent) 32%);
-  border-radius: var(--radius);
-  box-shadow:
-    0 1px 0 color-mix(in srgb, #fff 5%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, #000 22%, transparent),
-    0 8px 22px color-mix(in srgb, var(--bg) 55%, transparent);
-  transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+  /* Match .find-loc panel: translucent olive over board, muted line border */
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: none;
+  transition: border-color .15s ease, background .15s ease;
 }
 a.find-discord-embed:hover {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
-  transform: translateY(-1px);
-  box-shadow:
-    0 1px 0 color-mix(in srgb, #fff 6%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, #000 18%, transparent),
-    0 12px 28px color-mix(in srgb, var(--bg) 65%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--bg) 62%, var(--panel));
 }
 a.find-discord-embed:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .find-discord-label {
-  margin: 0 0 12px;
-  font-size: .68rem;
-  font-weight: 700;
+  margin: 0 0 10px;
+  font-size: .72rem;
+  font-weight: 600;
   letter-spacing: .04em;
   text-transform: uppercase;
   color: var(--dim);
@@ -1167,11 +1156,12 @@ a.find-discord-embed:focus-visible {
   flex-shrink: 0;
   width: 56px;
   height: 56px;
-  border-radius: 16px;
+  border-radius: 8px;
   object-fit: cover;
   image-rendering: auto;
-  background: var(--slot);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 70%, var(--accent) 30%);
+  background: color-mix(in srgb, var(--bg) 80%, var(--panel));
+  border: 1px solid var(--line);
+  box-shadow: none;
 }
 .find-discord-copy {
   flex: 1 1 140px;
@@ -1207,14 +1197,13 @@ a.find-discord-embed:focus-visible {
   font-size: .88rem;
   font-weight: 600;
   color: var(--btn-on-accent);
+  /* Site lime accent (Search), not stock Discord green */
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--accent) 72%, #c8e6a8) 0%,
     var(--accent) 48%,
     color-mix(in srgb, var(--accent) 78%, #3d6a28) 100%);
   border: 1px solid color-mix(in srgb, var(--accent) 70%, #3d6a28);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent),
-    0 2px 8px color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
 }
 a.find-discord-embed:hover .find-discord-join {
   background: linear-gradient(180deg,
