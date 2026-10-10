@@ -1138,14 +1138,6 @@ a.find-discord-embed:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.find-discord-label {
-  margin: 0 0 10px;
-  font-size: .72rem;
-  font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: var(--dim);
-}
 .find-discord-row {
   display: flex;
   align-items: center;
@@ -1188,6 +1180,7 @@ a.find-discord-embed:focus-visible {
 }
 .find-discord-join {
   flex-shrink: 0;
+  align-self: center;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1557,8 +1550,8 @@ a.find-discord-embed:hover .find-discord-join {
     width: 100%;
     order: 3;
   }
-  .find-discord-join { width: 100%; margin-left: 0; }
-  .find-discord-row { align-items: flex-start; }
+  .find-discord-join { width: 100%; margin-left: 0; align-self: stretch; }
+  .find-discord-row { align-items: center; flex-wrap: wrap; }
   .find-sort { margin-left: 0; }
 }
 
@@ -1600,19 +1593,38 @@ a.find-discord-embed:hover .find-discord-join {
   row-gap: 14px;
   align-items: start;
   justify-content: start;
-  margin-bottom: 18px; padding: 18px; background: var(--panel);
+  margin-bottom: 18px; padding: 18px; padding-right: 64px; background: var(--panel);
   border: 1px solid var(--line); border-radius: var(--radius);
 }
 .profile-hero > #avatar { display: block; line-height: 0; }
-.profile-hero > #toggledit {
+.profile-hero > .profile-hero-actions {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   z-index: 2;
 }
 .profile-hero:has(#toggledit:not([hidden])) {
-  padding-right: 52px;
+  padding-right: 100px;
 }
+.profile-hero-actions #shareprof.primary {
+  background: linear-gradient(165deg,
+    color-mix(in srgb, var(--accent) 72%, #c8e6a8) 0%,
+    var(--accent) 48%,
+    color-mix(in srgb, var(--accent) 78%, #3d6a28) 100%);
+  border-color: color-mix(in srgb, var(--accent) 70%, #3d6a28);
+  color: var(--btn-on-accent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent);
+}
+.profile-hero-actions #shareprof.primary:hover {
+  background: linear-gradient(165deg,
+    color-mix(in srgb, var(--accent) 60%, #fff) 0%,
+    color-mix(in srgb, var(--accent) 88%, #fff) 45%,
+    var(--accent) 100%);
+  border-color: color-mix(in srgb, var(--accent) 75%, #fff);
+  color: var(--btn-on-accent);
+}
+.inline-actions:empty,
+.inline-actions[hidden] { display: none; }
 .profile-hero-identity { min-width: 0; max-width: 28rem; }
 .profile-hero-side {
   min-width: 0;
@@ -2223,7 +2235,7 @@ body.profile-page .profile-hero::after {
   background: linear-gradient(118deg, color-mix(in srgb, #fff 6%, transparent), transparent 40%);
   opacity: .7;
 }
-body.profile-page .profile-hero > *:not(#toggledit) { position: relative; z-index: 1; }
+body.profile-page .profile-hero > *:not(.profile-hero-actions) { position: relative; z-index: 1; }
 body.profile-page .stat {
   background:
     linear-gradient(155deg,
