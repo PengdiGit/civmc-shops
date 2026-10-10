@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body class="find-page">
 <nav id="nav"></nav>
@@ -33,8 +33,10 @@
           <option value="sell" selected>Who is selling</option>
           <option value="want">Who is buying</option>
           <option value="shop">Shop name</option>
+          <option value="enchant">Enchants</option>
         </select>
         <input type="search" id="q" list="items" placeholder="diamond" autocomplete="off">
+        <input type="search" id="enchant-pick" class="find-enchant-pick" placeholder="Search enchants…" autocomplete="off" hidden aria-label="Search enchantments">
         <button class="primary" id="go">Search</button>
         <span class="find-sort">
           <span class="meta">Sort</span>
@@ -46,6 +48,7 @@
           <span class="find-filter-badge" id="filter-badge" hidden>0</span>
         </button>
       </div>
+      <div class="citychips find-enchant-chips" id="enchant-chips" hidden></div>
       <p class="find-active-filters meta" id="active-filters" hidden></p>
       <div class="find-quick-chips" id="quick-chips">
         <button type="button" class="chip-btn" id="near-me" title="Sort by Closest using your saved coords">Near me</button>
@@ -139,8 +142,9 @@
       </div>
       <div class="filter-group" id="fg-enchant">
         <span class="meta">Enchants (item search)</span>
+        <p class="meta" id="fg-enchant-hint" style="margin:0 0 6px">Prefer the Enchants mode in the search bar for named enchant lookup.</p>
         <div class="find-filter-toggles" style="flex-direction:column;align-items:stretch;gap:8px">
-          <label class="find-filter-check"><span class="find-filter-check-label">Contains</span>
+          <label class="find-filter-check" id="fg-enchant-contains"><span class="find-filter-check-label">Contains</span>
             <input type="search" id="f-enchant" placeholder="protection, silk touch…" maxlength="60" style="width:min(100%,220px)"></label>
           <label class="find-filter-check"><input type="checkbox" id="f-has-enchants"> Enchanted only</label>
         </div>
@@ -159,9 +163,12 @@
 <script src="config.js"></script>
 <script src="mock.js"></script>
 <script src="items.js"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
+<script src="place-picker.js"></script>
 <script>
 const q = document.getElementById("q");
+const enchantPick = document.getElementById("enchant-pick");
+const enchantChipsEl = document.getElementById("enchant-chips");
 const mode = document.getElementById("mode");
 const sortSel = document.getElementById("sort");
 const hx = document.getElementById("hx");
@@ -175,6 +182,7 @@ const filterOverlay = document.getElementById("filter-overlay");
 const filterBadge = document.getElementById("filter-badge");
 const activeFiltersEl = document.getElementById("active-filters");
 const FIND_DEFAULTS_KEY = "civmc_find_defaults";
+const FIND_MODES = ["sell", "want", "shop", "enchant"];
 const fTrusted = document.getElementById("f-trusted");
 const fMinRating = document.getElementById("f-min-rating");
 const fInStock = document.getElementById("f-in-stock");
@@ -199,7 +207,7 @@ let hasDirectionsOnly = false;
 let minDealRate = null; // null = any
 let maxDealRate = null;
 let unitFilter = ""; // "" | each | ci | cs
-let enchantFilter = ""; // substring match on listings.enchants
+let enchantFilter = ""; // substring match on listings.enchants (sell/want filters)
 let hasEnchantsOnly = false;
 let lastItemRows = [];
 let lastShopRows = [];
@@ -270,10 +278,62 @@ function distText(s, h) {
   return d === Infinity ? "" : " \u00b7 ~" + Math.round(d) + " blocks away";
 }
 
+function isEnchantMode() { return mode.value === "enchant"; }
+function isItemMode() { return mode.value === "sell" || mode.value === "want" || mode.value === "enchant"; }
+function activeQueryInput() { return isEnchantMode() ? enchantPick : q; }
+function currentSearchTerm() {
+  return isEnchantMode() ? norm(enchantPick.value) : cleanTerm(q.value);
+}
+function setSearchTerm(term) {
+  const t = String(term || "");
+  q.value = t;
+  enchantPick.value = t;
+}
 function fillSorts(preferClose, kind) {
   const k = kind || (mode.value === "shop" ? "shop" : "item");
+  const prev = sortSel.value;
   sortSel.innerHTML = SORTS[k].map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
   if (preferClose && getHere() && SORTS[k].some(([v]) => v === "close")) sortSel.value = "close";
+  else if (isEnchantMode() && SORTS[k].some(([v]) => v === "enchant")) sortSel.value = "enchant";
+  else if (prev && [...sortSel.options].some(o => o.value === prev)) sortSel.value = prev;
+}
+function renderEnchantChips() {
+  if (!enchantChipsEl) return;
+  if (!isEnchantMode()) {
+    enchantChipsEl.hidden = true;
+    enchantChipsEl.innerHTML = "";
+    return;
+  }
+  enchantChipsEl.hidden = false;
+  const selected = norm(enchantPick.value);
+  const needle = selected;
+  const catalog = (typeof filterEnchantSuggestions === "function")
+    ? filterEnchantSuggestions(needle, 28)
+    : (typeof COMMON_MC_ENCHANTS !== "undefined" ? COMMON_MC_ENCHANTS.slice(0, 28) : []);
+  if (!catalog.length) {
+    enchantChipsEl.innerHTML = `<span class="meta">No enchant matches</span>`;
+    return;
+  }
+  enchantChipsEl.innerHTML = catalog.map(name =>
+    `<button type="button" data-enchant-pick="${esc(name)}" class="${selected && norm(name) === selected ? "on" : ""}">${esc(name)}</button>`
+  ).join("");
+}
+function syncModeUi() {
+  const enchantMode = isEnchantMode();
+  q.hidden = enchantMode;
+  const enchantWrap = enchantPick.closest(".place-combo");
+  if (enchantWrap) enchantWrap.hidden = !enchantMode;
+  enchantPick.hidden = !enchantMode;
+  if (enchantMode) {
+    enchantPick.placeholder = "Search enchants…";
+    enchantPick.title = "Type to filter enchant names, then pick one";
+    if (q.value && !enchantPick.value) enchantPick.value = q.value;
+  } else {
+    q.placeholder = mode.value === "shop" ? "shop name" : "diamond";
+    if (enchantPick.value && !q.value && mode.value !== "shop") q.value = enchantPick.value;
+  }
+  renderEnchantChips();
+  updateFilterChrome();
 }
 
 function defaultFindFilters() {
@@ -341,21 +401,29 @@ function syncFilterControls() {
   fUnit.value = unitFilter || "";
   fEnchant.value = enchantFilter || "";
   fHasEnchants.checked = !!hasEnchantsOnly;
-  const itemMode = mode.value !== "shop";
+  const itemMode = isItemMode();
+  const sellWant = mode.value === "sell" || mode.value === "want";
   document.getElementById("fg-deal").hidden = !itemMode;
   document.getElementById("fg-unit").hidden = !itemMode;
-  document.getElementById("fg-enchant").hidden = !itemMode;
+  // Enchants mode owns named enchant search — keep only "Enchanted only" for sell/want
+  document.getElementById("fg-enchant").hidden = !sellWant;
+  const containsRow = document.getElementById("fg-enchant-contains");
+  const enchantHint = document.getElementById("fg-enchant-hint");
+  if (containsRow) containsRow.hidden = true; // prefer Enchants mode picker
+  if (enchantHint) enchantHint.hidden = !sellWant;
 }
 function activeFilterCount() {
+  const listingMode = isItemMode();
+  const sellWant = mode.value === "sell" || mode.value === "want";
   return (nationFilter ? 1 : 0) + (cityFilter ? 1 : 0)
     + (trustedOnly ? 1 : 0) + (minRating ? 1 : 0)
     + (inStockOnly ? 1 : 0) + (updatedThisWeek ? 1 : 0)
     + (hasLocationOnly ? 1 : 0) + (hasDirectionsOnly ? 1 : 0)
-    + (mode.value !== "shop" && minDealRate != null ? 1 : 0)
-    + (mode.value !== "shop" && maxDealRate != null ? 1 : 0)
-    + (mode.value !== "shop" && unitFilter ? 1 : 0)
-    + (mode.value !== "shop" && enchantFilter ? 1 : 0)
-    + (mode.value !== "shop" && hasEnchantsOnly ? 1 : 0);
+    + (listingMode && minDealRate != null ? 1 : 0)
+    + (listingMode && maxDealRate != null ? 1 : 0)
+    + (listingMode && unitFilter ? 1 : 0)
+    + (sellWant && enchantFilter ? 1 : 0)
+    + (sellWant && hasEnchantsOnly ? 1 : 0);
 }
 function updateFilterChrome() {
   syncFilterControls();
@@ -377,11 +445,11 @@ function updateFilterChrome() {
   if (updatedThisWeek) bits.push("Updated this week");
   if (hasLocationOnly) bits.push("Has location");
   if (hasDirectionsOnly) bits.push("Has directions");
-  if (mode.value !== "shop" && minDealRate != null) bits.push("Min " + minDealRate + " d/item");
-  if (mode.value !== "shop" && maxDealRate != null) bits.push("Max " + maxDealRate + " d/item");
-  if (mode.value !== "shop" && unitFilter) bits.push("Unit: " + (unitFilter === "each" ? "each" : unitFilter.toUpperCase()));
-  if (mode.value !== "shop" && enchantFilter) bits.push("Enchant: " + enchantFilter);
-  if (mode.value !== "shop" && hasEnchantsOnly) bits.push("Enchanted only");
+  if (isItemMode() && minDealRate != null) bits.push("Min " + minDealRate + " d/item");
+  if (isItemMode() && maxDealRate != null) bits.push("Max " + maxDealRate + " d/item");
+  if (isItemMode() && unitFilter) bits.push("Unit: " + (unitFilter === "each" ? "each" : unitFilter.toUpperCase()));
+  if ((mode.value === "sell" || mode.value === "want") && enchantFilter) bits.push("Enchant: " + enchantFilter);
+  if ((mode.value === "sell" || mode.value === "want") && hasEnchantsOnly) bits.push("Enchanted only");
   if (bits.length) {
     activeFiltersEl.hidden = false;
     activeFiltersEl.textContent = bits.join(" \u00b7 ") + " \u00b7 edit in Filters";
@@ -435,16 +503,19 @@ function closeFilters() {
 }
 
 function syncUrl() {
-  const term = q.value.trim();
   const u = new URL(location.href);
   const sp = u.searchParams;
   [...sp.keys()].forEach(k => sp.delete(k));
+  const term = isEnchantMode() ? norm(enchantPick.value) : q.value.trim();
   if (term) {
     sp.set("q", term);
     sp.set("mode", mode.value);
     if (sortSel.value !== "deal" && sortSel.value !== "name" && sortSel.value !== "featured") sp.set("sort", sortSel.value);
   } else if (mode.value === "shop") {
     if (sortSel.value && sortSel.value !== "featured") sp.set("sort", sortSel.value);
+  } else if (isEnchantMode()) {
+    sp.set("mode", "enchant");
+    if (sortSel.value && sortSel.value !== "enchant") sp.set("sort", sortSel.value);
   }
   if (nationFilter) sp.set("nation", nationFilter);
   if (cityFilter) sp.set("city", cityFilter);
@@ -456,12 +527,12 @@ function syncUrl() {
   if (updatedThisWeek) sp.set("updated_week", "1");
   if (hasLocationOnly) sp.set("has_loc", "1");
   if (hasDirectionsOnly) sp.set("directions", "1");
-  if (mode.value !== "shop") {
+  if (isItemMode()) {
     if (minDealRate != null) sp.set("min_rate", String(minDealRate));
     if (maxDealRate != null) sp.set("max_rate", String(maxDealRate));
     if (unitFilter) sp.set("unit", unitFilter);
-    if (enchantFilter) sp.set("enchant", enchantFilter);
-    if (hasEnchantsOnly) sp.set("has_enchants", "1");
+    if ((mode.value === "sell" || mode.value === "want") && enchantFilter) sp.set("enchant", enchantFilter);
+    if ((mode.value === "sell" || mode.value === "want") && hasEnchantsOnly) sp.set("has_enchants", "1");
   }
   const qs = sp.toString();
   history.replaceState(null, "", u.pathname + (qs ? "?" + qs : "") + u.hash);
@@ -513,6 +584,7 @@ function shopHasDirections(s) {
 /** @param {"shop"|"listing"} kind */
 function applyFindFilters(rows, shopOf, kind) {
   const buying = mode.value === "want";
+  const sellWant = mode.value === "sell" || mode.value === "want";
   return rows.filter(r => {
     const s = shopOf(r);
     if (!s || !placeFilterMatch(s, cityFilter, nationFilter)) return false;
@@ -546,11 +618,13 @@ function applyFindFilters(rows, shopOf, kind) {
         if (minDealRate != null && rate < minDealRate) return false;
         if (maxDealRate != null && rate > maxDealRate) return false;
       }
-      const ench = String(r.enchants || "").toLowerCase();
-      if (hasEnchantsOnly && !ench.trim()) return false;
-      if (enchantFilter) {
-        const needles = enchantFilter.toLowerCase().split(/\s+/).filter(Boolean);
-        if (!needles.every(w => ench.includes(w))) return false;
+      if (sellWant) {
+        const ench = String(r.enchants || "").toLowerCase();
+        if (hasEnchantsOnly && !ench.trim()) return false;
+        if (enchantFilter) {
+          const needles = enchantFilter.toLowerCase().split(/\s+/).filter(Boolean);
+          if (!needles.every(w => ench.includes(w))) return false;
+        }
       }
     }
     return true;
@@ -558,7 +632,7 @@ function applyFindFilters(rows, shopOf, kind) {
 }
 
 function reapplyFindFilters(opts) {
-  const needItemRefetch = opts && opts.refetchItems && mode.value !== "shop" && cleanTerm(q.value);
+  const needItemRefetch = opts && opts.refetchItems && isItemMode() && currentSearchTerm();
   syncUrl();
   updateFilterChrome();
   if (needItemRefetch) return search(true);
@@ -662,19 +736,30 @@ document.getElementById("recent-searches").addEventListener("click", e => {
   if (!b) return;
   const r = loadRecentSearches()[Number(b.dataset.recent)];
   if (!r) return;
-  mode.value = r.mode;
-  q.value = r.q;
-  q.setAttribute("list", mode.value === "shop" ? "" : "items");
+  mode.value = FIND_MODES.includes(r.mode) ? r.mode : "sell";
+  setSearchTerm(r.q);
+  q.setAttribute("list", "");
+  syncModeUi();
   fillSorts(!!getHere());
+  search(false);
+});
+
+enchantChipsEl.addEventListener("click", e => {
+  const b = e.target.closest("[data-enchant-pick]");
+  if (!b) return;
+  setSearchTerm(b.dataset.enchantPick || "");
+  renderEnchantChips();
   search(false);
 });
 
 mode.addEventListener("change", () => {
   q.setAttribute("list", ""); // custom autocomplete for all modes
-  q.placeholder = mode.value === "shop" ? "shop name" : "diamond";
+  syncModeUi();
   fillSorts(!!getHere());
-  updateFilterChrome();
-  search(true);
+  if (isEnchantMode()) loadEnchantCatalog().then(() => renderEnchantChips());
+  const term = currentSearchTerm();
+  if (term) search(true);
+  else if (mode.value === "shop") showShops("");
 });
 sortSel.addEventListener("change", () => { search(true); });
 [hx, hz].forEach(el => el.addEventListener("change", () => { saveHere(); search(true); }));
@@ -696,10 +781,11 @@ document.addEventListener("keydown", e => {
   if (document.body.classList.contains("ui-modal-open")) return;
   if (e.key === "Escape") {
     if (!filterOverlay.hidden) { closeFilters(); return; }
-    if (document.activeElement === q || q.value) {
+    if (document.activeElement === q || document.activeElement === enchantPick || currentSearchTerm()) {
       e.preventDefault();
-      const hadTerm = !!norm(q.value);
-      q.value = "";
+      const hadTerm = !!currentSearchTerm();
+      setSearchTerm("");
+      renderEnchantChips();
       setResultCount(null);
       setFindCompact(false);
       if (mode.value === "shop" || !hadTerm) showShops("");
@@ -709,10 +795,12 @@ document.addEventListener("keydown", e => {
   }
   const t = e.target;
   const inField = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
-  if (inField && t !== q) return;
+  if (inField && t !== q && t !== enchantPick) return;
   if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !filterOverlay.hidden) return;
-  const acOpen = document.getElementById("ac-box") && !document.getElementById("ac-box").hidden;
-  if ((e.key === "ArrowDown" || e.key === "ArrowUp") && acOpen && t === q) return;
+  const acBox = document.getElementById("ac-box");
+  const placeList = enchantPick.closest(".place-combo") && enchantPick.closest(".place-combo").querySelector(".place-combo-list");
+  const acOpen = (acBox && !acBox.hidden) || (placeList && !placeList.hidden);
+  if ((e.key === "ArrowDown" || e.key === "ArrowUp") && acOpen && (t === q || t === enchantPick)) return;
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     const cards = resultCards();
     if (!cards.length) return;
@@ -746,7 +834,7 @@ function sortListings(rows, how, h) {
       if (!ea && eb) return 1;
       const c = ea.localeCompare(eb);
       if (c) return c;
-      return String(a.sell_item || "").localeCompare(String(b.sell_item || ""));
+      return String(a.sell_item || a.want_item || "").localeCompare(String(b.sell_item || b.want_item || ""));
     });
   }
 }
@@ -917,6 +1005,7 @@ function paintItemResults(data) {
   setResultCount(rows.length, totalBefore, "listing");
 
   const buying = mode.value === "want";
+  const qTerm = currentSearchTerm();
   results.className = "offers";
   results.innerHTML = rows.map(l => {
     const s = l.shops;
@@ -930,7 +1019,7 @@ function paintItemResults(data) {
     return tradeRow(l, {
       buying,
       stale,
-      href: "shop.html?id=" + l.shop_id + "&listing=" + l.id + (q.value.trim() ? "&q=" + encodeURIComponent(q.value.trim()) : ""),
+      href: "shop.html?id=" + l.shop_id + "&listing=" + l.id + (qTerm ? "&q=" + encodeURIComponent(qTerm) : ""),
       tags,
       meta: `${shopName(s)}${place ? " \u00b7 " + place : ""} \u00b7 ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} \u00b7 ${updatedHtml(l.updated_at)}`,
       btns: iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` })
@@ -951,8 +1040,14 @@ results.addEventListener("click", e => {
 });
 
 async function showItems(term) {
-  heading.textContent = (mode.value === "sell" ? "Shops selling " : "Shops buying ") + term;
-  document.title = (mode.value === "sell" ? "Selling " : "Buying ") + term + " - CivMC Shops";
+  const enchantMode = isEnchantMode();
+  if (enchantMode) {
+    heading.textContent = 'Listings with enchant "' + term + '"';
+    document.title = term + " enchants - CivMC Shops";
+  } else {
+    heading.textContent = (mode.value === "sell" ? "Shops selling " : "Shops buying ") + term;
+    document.title = (mode.value === "sell" ? "Selling " : "Buying ") + term + " - CivMC Shops";
+  }
   setMsg(msg, "Searching...");
   results.innerHTML = "";
   results.className = "offers";
@@ -961,17 +1056,21 @@ async function showItems(term) {
   renderRecentChips();
   setFindCompact(true);
 
-  const col = mode.value === "sell" ? "sell_item" : "want_item";
-  // Match item name OR enchants (so "silk touch" / "protection" finds gear)
   const safeTerm = String(term).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
   let query = sb
     .from("listings")
     .select("*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out), reviews(rating, traded, timed_out, created_at))")
-    .or(`${col}.ilike.%${safeTerm}%,enchants.ilike.%${safeTerm}%`)
     .order("updated_at", { ascending: false })
     .limit(200);
+  if (enchantMode) {
+    query = query.ilike("enchants", "%" + safeTerm + "%");
+  } else {
+    const col = mode.value === "sell" ? "sell_item" : "want_item";
+    // Match item name OR enchants (so "silk touch" / "protection" finds gear)
+    query = query.or(`${col}.ilike.%${safeTerm}%,enchants.ilike.%${safeTerm}%`);
+  }
   if (inStockOnly) query = query.eq("in_stock", true);
-  if (enchantFilter) {
+  if (!enchantMode && enchantFilter) {
     const safeEnch = String(enchantFilter).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
     if (safeEnch) query = query.ilike("enchants", "%" + safeEnch + "%");
   }
@@ -990,7 +1089,9 @@ async function showItems(term) {
     updateFilterChrome();
     results.className = "";
     results.innerHTML = emptyState(
-      "Nobody has that listed yet. Try another item or check the market.",
+      enchantMode
+        ? "Nobody has that enchant listed yet. Try another name or browse the market."
+        : "Nobody has that listed yet. Try another item or check the market.",
       "market.html",
       "Browse market"
     );
@@ -1001,21 +1102,38 @@ async function showItems(term) {
 
 function search(quiet) {
   if (mode.value === "shop") return showShops(norm(q.value));
-  const term = cleanTerm(q.value);
+  const term = currentSearchTerm();
   if (!term) {
-    if (quiet && !norm(q.value) && results.classList.contains("shop-grid")) return showShops("");
-    if (!quiet) setMsg(msg, "Type an item first.", "err");
+    if (quiet && !norm(activeQueryInput().value) && results.classList.contains("shop-grid")) return showShops("");
+    if (!quiet) setMsg(msg, isEnchantMode() ? "Pick or type an enchant first." : "Type an item first.", "err");
     return;
   }
-  if (![...sortSel.options].some(o => o.value === "deal")) fillSorts(sortSel.value === "close");
+  if (isEnchantMode()) {
+    if (![...sortSel.options].some(o => o.value === "enchant")) fillSorts(!!getHere());
+  } else if (![...sortSel.options].some(o => o.value === "deal")) {
+    fillSorts(sortSel.value === "close");
+  }
   return showItems(term);
 }
 
 document.getElementById("go").onclick = () => search(false);
 q.addEventListener("keydown", e => { if (e.key === "Enter") search(false); });
+enchantPick.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    // place-combo may consume Enter when a suggestion is highlighted
+    setTimeout(() => search(false), 0);
+  }
+});
+enchantPick.addEventListener("input", () => {
+  if (isEnchantMode()) {
+    q.value = enchantPick.value;
+    renderEnchantChips();
+  }
+});
 q.setAttribute("list", ""); // custom autocomplete replaces datalist for Tab-accept
 wireSearchAutocomplete(q, term => {
   const t = norm(term);
+  if (isEnchantMode()) return [];
   if (mode.value === "shop") {
     const names = shopNameCache.length ? shopNameCache : [];
     return names.filter(n => !t || norm(n).includes(t)).slice(0, 8);
@@ -1023,18 +1141,31 @@ wireSearchAutocomplete(q, term => {
   if (typeof ITEMS === "undefined") return [];
   return ITEMS.filter(i => !t || norm(i).includes(t) || norm(i).startsWith(t)).slice(0, 8);
 }, { onAccept: () => { /* leave search to Enter / button */ } });
+
+if (typeof bindSearchCombo === "function") {
+  bindSearchCombo(enchantPick, () => {
+    if (typeof getEnchantCatalog === "function") return getEnchantCatalog();
+    return typeof COMMON_MC_ENCHANTS !== "undefined" ? COMMON_MC_ENCHANTS.slice() : [];
+  }, label => {
+    setSearchTerm(label);
+    renderEnchantChips();
+    search(false);
+  });
+}
 renderRecentChips();
+syncModeUi();
 
 (async () => {
   fillSorts(false);
   loadHere();
   const preferClose = !!getHere();
   fillSorts(preferClose);
-  // Prefetch shop names for autocomplete
+  // Prefetch shop names + enchant catalog for autocomplete
   try {
     const { data } = await sb.from("shops").select("name").order("name").limit(500);
     shopNameCache = (data || []).map(s => s.name).filter(Boolean);
   } catch (e) {}
+  try { await loadEnchantCatalog(); } catch (e) {}
   const ps = new URLSearchParams(location.search);
   const defaults = loadFilterDefaults();
   // URL wins; otherwise restore saved defaults
@@ -1063,20 +1194,24 @@ renderRecentChips();
   updateFilterChrome();
   const hasCmp = /#cmp=/.test(location.hash);
   const hasStoredCmp = loadCompareSpecs().length > 0;
-  if (ps.get("q")) {
-    mode.value = ["sell", "want", "shop"].includes(ps.get("mode")) ? ps.get("mode") : "sell";
-    q.value = ps.get("q");
+  if (ps.get("q") || ps.get("mode") === "enchant") {
+    mode.value = FIND_MODES.includes(ps.get("mode")) ? ps.get("mode") : "sell";
+    setSearchTerm(ps.get("q") || "");
     q.setAttribute("list", "");
+    syncModeUi();
     fillSorts(preferClose);
     if (ps.get("sort") && [...sortSel.options].some(o => o.value === ps.get("sort"))) sortSel.value = ps.get("sort");
-    await search(false);
+    if (ps.get("q")) await search(false);
+    else if (mode.value === "shop") await showShops("");
+    else renderEnchantChips();
   } else if (!hasCmp) {
     mode.value = "sell";
-    q.placeholder = "diamond";
+    syncModeUi();
     fillSorts(preferClose, "shop");
     await showShops("");
   } else {
     mode.value = "sell";
+    syncModeUi();
     fillSorts(preferClose);
   }
   if (hasCmp || hasStoredCmp) await restoreCompareFromHash();

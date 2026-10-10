@@ -346,6 +346,74 @@ function normalizeListingEnchants(raw) {
   return t.length > 300 ? t.slice(0, 300) : t;
 }
 
+/** Split listing.enchants blobs into individual tokens ("Protection IV, Silk Touch"). */
+function parseEnchantTokens(raw) {
+  return String(raw || "")
+    .split(/\s*,\s*/)
+    .map(s => s.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+}
+
+/** Common Minecraft enchant names (base + frequent levels) so Find has options even on an empty DB. */
+const COMMON_MC_ENCHANTS = [
+  "Aqua Affinity", "Bane of Arthropods", "Bane of Arthropods V", "Binding Curse", "Blast Protection",
+  "Blast Protection IV", "Breach", "Channeling", "Density", "Depth Strider", "Depth Strider III",
+  "Efficiency", "Efficiency V", "Feather Falling", "Feather Falling IV", "Fire Aspect", "Fire Aspect II",
+  "Fire Protection", "Fire Protection IV", "Flame", "Fortune", "Fortune III", "Frost Walker",
+  "Impaling", "Infinity", "Knockback", "Knockback II", "Looting", "Looting III", "Loyalty",
+  "Luck of the Sea", "Lure", "Mending", "Multishot", "Piercing", "Power", "Power V",
+  "Projectile Protection", "Projectile Protection IV", "Protection", "Protection IV", "Punch",
+  "Quick Charge", "Respiration", "Respiration III", "Riptide", "Sharpness", "Sharpness V",
+  "Silk Touch", "Smite", "Smite V", "Soul Speed", "Sweeping Edge", "Swift Sneak", "Thorns",
+  "Thorns III", "Unbreaking", "Unbreaking III", "Vanishing Curse", "Wind Burst"
+];
+
+let _enchantCatalog = null;
+
+function mergeEnchantCatalog(extraTokens) {
+  const map = new Map();
+  COMMON_MC_ENCHANTS.forEach(e => map.set(e.toLowerCase(), e));
+  (extraTokens || []).forEach(tok => {
+    const t = String(tok || "").trim().replace(/\s+/g, " ");
+    if (!t) return;
+    const k = t.toLowerCase();
+    if (!map.has(k)) map.set(k, t);
+  });
+  return [...map.values()].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+/** Live distinct enchant tokens from listings, merged with COMMON_MC_ENCHANTS. */
+async function loadEnchantCatalog(force) {
+  if (_enchantCatalog && !force) return _enchantCatalog;
+  const extras = [];
+  try {
+    const { data } = await sb.from("listings").select("enchants").not("enchants", "is", null).limit(2000);
+    (data || []).forEach(row => parseEnchantTokens(row.enchants).forEach(t => extras.push(t)));
+  } catch (e) {}
+  _enchantCatalog = mergeEnchantCatalog(extras);
+  return _enchantCatalog;
+}
+
+function getEnchantCatalog() {
+  return _enchantCatalog || COMMON_MC_ENCHANTS.slice();
+}
+
+function filterEnchantSuggestions(term, limit) {
+  const max = limit == null ? 16 : limit;
+  const list = getEnchantCatalog();
+  const needle = norm(term);
+  if (!needle) return list.slice(0, max);
+  const starts = [];
+  const contains = [];
+  for (const item of list) {
+    const n = norm(item);
+    if (n.startsWith(needle)) starts.push(item);
+    else if (n.includes(needle)) contains.push(item);
+    if (starts.length + contains.length >= max) break;
+  }
+  return starts.concat(contains).slice(0, max);
+}
+
 /** Normalize barrel-style bundle slots: [{slot,item,amount,notes?}] length ≤ 27. */
 function normalizeBundleContents(raw) {
   if (raw == null || raw === "") return null;
@@ -1996,7 +2064,7 @@ function loadRecentSearches() {
 function pushRecentSearch(mode, q) {
   const term = String(q || "").trim();
   if (!term) return;
-  const m = ["sell", "want", "shop"].includes(mode) ? mode : "sell";
+  const m = ["sell", "want", "shop", "enchant"].includes(mode) ? mode : "sell";
   const next = [{ mode: m, q: term }, ...loadRecentSearches().filter(x => !(x.mode === m && x.q.toLowerCase() === term.toLowerCase()))].slice(0, 8);
   try { localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next)); } catch (e) {}
 }
@@ -2574,8 +2642,12 @@ document.addEventListener("keydown", e => {
   if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
     const t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
-    const q = document.getElementById("q");
-    if (!q) return;
+    const modeEl = document.getElementById("mode");
+    const enchantPick = document.getElementById("enchant-pick");
+    const q = (modeEl && modeEl.value === "enchant" && enchantPick && !enchantPick.hidden)
+      ? enchantPick
+      : document.getElementById("q");
+    if (!q || q.hidden) return;
     e.preventDefault();
     q.focus();
     q.select();

@@ -155,6 +155,13 @@
     });
   }
 
+  /** Generic searchable combobox (same UI as nation/city pickers). */
+  window.bindSearchCombo = function bindSearchCombo(input, getOptions, onCommit) {
+    if (!input || input.dataset.searchComboBound) return;
+    input.dataset.searchComboBound = "1";
+    bindCombo(input, typeof getOptions === "function" ? getOptions : () => [], onCommit || (() => {}));
+  };
+
   window.bindNationField = function bindNationField(nationInput) {
     if (!nationInput || nationInput.dataset.placeBound) return;
     nationInput.dataset.placeBound = "1";

@@ -1446,11 +1446,22 @@ body.find-page > main {
 .find-page .find-board-search input[type="search"] {
   background: color-mix(in srgb, var(--bg) 70%, var(--panel));
 }
-.find-page .find-board-search #q {
+.find-page .find-board-search #q,
+.find-page .find-board-search #enchant-pick,
+.find-page .find-board-search .place-combo {
   flex: 1 1 220px;
   min-width: 160px;
 }
+.find-page .find-board-search .place-combo[hidden],
+.find-page .find-board-search #q[hidden],
+.find-page .find-board-search #enchant-pick[hidden] { display: none !important; }
+.find-page .find-enchant-chips {
+  margin-top: 8px;
+  max-height: 7.5rem;
+  overflow-y: auto;
+}
 .find-page .find-board-search #q:focus,
+.find-page .find-board-search #enchant-pick:focus,
 .find-page .find-board-search select:focus {
   border-color: var(--accent);
 }
