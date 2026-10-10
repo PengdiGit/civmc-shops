@@ -325,6 +325,196 @@ function itemText(amount, name, unit, big) {
   return `<span class="itemline">${itemIcon(name, big)}<b>${amount}${unit ? " " + esc(unit.toUpperCase()) : ""} ${esc(name)}</b></span>`;
 }
 
+function isBundleItem(name) {
+  return /\bbundle\b/i.test(String(name || ""));
+}
+
+function normalizeListingNotes(raw) {
+  const t = String(raw == null ? "" : raw).trim();
+  if (!t) return null;
+  return t.length > 400 ? t.slice(0, 400) : t;
+}
+
+function normalizeListingEnchants(raw) {
+  const t = String(raw == null ? "" : raw).trim().replace(/\s+/g, " ");
+  if (!t) return null;
+  return t.length > 300 ? t.slice(0, 300) : t;
+}
+
+/** Normalize barrel-style bundle slots: [{slot,item,amount,notes?}] length ≤ 27. */
+function normalizeBundleContents(raw) {
+  if (raw == null || raw === "") return null;
+  let arr = raw;
+  if (typeof raw === "string") {
+    try { arr = JSON.parse(raw); } catch (e) { return null; }
+  }
+  if (!Array.isArray(arr)) return null;
+  const out = [];
+  const seen = new Set();
+  arr.forEach(row => {
+    if (!row || typeof row !== "object") return;
+    const slot = Number(row.slot);
+    if (!Number.isInteger(slot) || slot < 0 || slot > 26 || seen.has(slot)) return;
+    const item = norm(row.item || "");
+    if (!item || item.length > 60) return;
+    const amount = Math.max(1, Math.min(64, parseInt(row.amount, 10) || 1));
+    const notes = String(row.notes || "").trim().slice(0, 80) || null;
+    const enchants = normalizeListingEnchants(row.enchants || "");
+    seen.add(slot);
+    const entry = { slot, item, amount };
+    if (notes) entry.notes = notes;
+    if (enchants) entry.enchants = enchants;
+    out.push(entry);
+  });
+  out.sort((a, b) => a.slot - b.slot);
+  return out.length ? out : null;
+}
+
+function bundleContentsPreviewHtml(contents, opts) {
+  const o = opts || {};
+  const slots = normalizeBundleContents(contents);
+  if (!slots || !slots.length) return o.emptyHtml || "";
+  const bySlot = {};
+  slots.forEach(s => { bySlot[s.slot] = s; });
+  let cells = "";
+  for (let i = 0; i < 27; i++) {
+    const s = bySlot[i];
+    if (s) {
+      const tip = [s.item, s.amount > 1 ? "x" + s.amount : "", s.enchants || "", s.notes || ""].filter(Boolean).join(" · ");
+      cells += `<span class="barrel-slot filled" title="${esc(tip)}">${itemIcon(s.item, false)}${s.amount > 1 ? `<span class="barrel-qty">${s.amount}</span>` : ""}</span>`;
+    } else {
+      cells += `<span class="barrel-slot empty" aria-hidden="true"></span>`;
+    }
+  }
+  return `<div class="barrel-gui${o.compact ? " compact" : ""}" title="Bundle contents">${cells}</div>`;
+}
+
+function listingExtrasHtml(l) {
+  if (!l) return "";
+  const ench = String(l.enchants || "").trim();
+  const notes = String(l.notes || "").trim();
+  const bundle = isBundleItem(l.sell_item) ? normalizeBundleContents(l.bundle_contents) : null;
+  if (!ench && !notes && !(bundle && bundle.length)) return "";
+  let html = `<div class="listing-extras">`;
+  if (ench) {
+    html += `<div class="listing-enchants" title="Enchantments">${ench.split(/\s*,\s*/).filter(Boolean).map(e =>
+      `<span class="enchant-chip">${esc(e)}</span>`).join("")}</div>`;
+  }
+  if (notes) html += `<div class="listing-notes">${esc(notes)}</div>`;
+  if (bundle && bundle.length) html += bundleContentsPreviewHtml(bundle, { compact: true });
+  html += `</div>`;
+  return html;
+}
+
+/** Open Minecraft barrel-style 27-slot editor. Resolves cleaned contents array or null if cancelled. */
+function openBundleContentsEditor(initial) {
+  return new Promise(resolve => {
+    const slots = Array.from({ length: 27 }, () => null);
+    (normalizeBundleContents(initial) || []).forEach(s => {
+      slots[s.slot] = { item: s.item, amount: s.amount, notes: s.notes || "", enchants: s.enchants || "" };
+    });
+    const root = document.createElement("div");
+    root.className = "modal-overlay barrel-editor-overlay";
+    root.innerHTML = `<div class="modal barrel-editor" role="dialog" aria-modal="true" aria-labelledby="barrel-editor-title">
+      <h2 id="barrel-editor-title">Bundle contents</h2>
+      <p class="meta" style="margin:0 0 10px">Click a slot to set an item (barrel layout — 27 slots). Empty slots are fine.</p>
+      <div class="barrel-gui barrel-gui-edit" id="barrel-grid"></div>
+      <div class="ui-modal-actions row" style="margin-top:12px">
+        <button type="button" class="small" data-barrel-clear>Clear all</button>
+        <span style="flex:1"></span>
+        <button type="button" class="small" data-barrel-cancel>Cancel</button>
+        <button type="button" class="primary small" data-barrel-save>Save contents</button>
+      </div>
+    </div>`;
+    document.body.appendChild(root);
+    document.body.classList.add("ui-modal-open");
+    const grid = root.querySelector("#barrel-grid");
+
+    function paint() {
+      grid.innerHTML = slots.map((s, i) => {
+        if (!s) return `<button type="button" class="barrel-slot empty" data-slot="${i}" title="Empty slot ${i + 1}" aria-label="Empty slot ${i + 1}"></button>`;
+        const tip = [s.item, "x" + s.amount, s.enchants, s.notes].filter(Boolean).join(" · ");
+        return `<button type="button" class="barrel-slot filled" data-slot="${i}" title="${esc(tip)}" aria-label="${esc(tip)}">${itemIcon(s.item, false)}${s.amount > 1 ? `<span class="barrel-qty">${s.amount}</span>` : ""}</button>`;
+      }).join("");
+    }
+
+    async function editSlot(i) {
+      const cur = slots[i];
+      openItemPicker(async name => {
+        const amtRaw = await promptModal({
+          title: "Stack size",
+          label: "Amount (1–64)",
+          defaultValue: String(cur && cur.item === name ? cur.amount : 1),
+          inputType: "number",
+          maxLength: 3,
+          confirmLabel: "Next"
+        });
+        if (amtRaw == null) return;
+        let amount = parseInt(amtRaw, 10);
+        if (!(amount > 0)) amount = 1;
+        amount = Math.min(64, amount);
+        const ench = await promptModal({
+          title: "Slot enchants (optional)",
+          label: "e.g. Protection IV, Unbreaking III",
+          defaultValue: cur && cur.item === name ? (cur.enchants || "") : "",
+          maxLength: 300,
+          confirmLabel: "Next"
+        });
+        if (ench == null) return;
+        const notes = await promptModal({
+          title: "Slot note (optional)",
+          label: "e.g. random, undamaged",
+          defaultValue: cur && cur.item === name ? (cur.notes || "") : "",
+          maxLength: 80,
+          confirmLabel: "Set slot"
+        });
+        if (notes == null) return;
+        slots[i] = {
+          item: name,
+          amount,
+          enchants: String(ench || "").trim(),
+          notes: String(notes || "").trim()
+        };
+        paint();
+      });
+    }
+
+    function done(v) {
+      root.remove();
+      document.body.classList.remove("ui-modal-open");
+      resolve(v);
+    }
+
+    paint();
+    grid.addEventListener("click", e => {
+      const btn = e.target.closest("[data-slot]");
+      if (!btn) return;
+      const i = Number(btn.dataset.slot);
+      if (slots[i] && e.shiftKey) {
+        slots[i] = null;
+        paint();
+        return;
+      }
+      editSlot(i);
+    });
+    root.querySelector("[data-barrel-clear]").onclick = () => {
+      for (let i = 0; i < 27; i++) slots[i] = null;
+      paint();
+    };
+    root.querySelector("[data-barrel-cancel]").onclick = () => done(null);
+    root.querySelector("[data-barrel-save]").onclick = () => {
+      const packed = slots.map((s, slot) => s ? {
+        slot, item: s.item, amount: s.amount,
+        notes: s.notes || undefined,
+        enchants: s.enchants || undefined
+      } : null).filter(Boolean);
+      done(normalizeBundleContents(packed));
+    };
+    root.addEventListener("click", e => { if (e.target === root) done(null); });
+    root.addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); done(null); } });
+  });
+}
+
 function tradeRow(l, opts) {
   const o = opts || {};
   const big = !!o.big;
@@ -333,6 +523,7 @@ function tradeRow(l, opts) {
   const stale = o.stale;
   const tags = o.tags || "";
   const meta = o.meta || "";
+  const extras = o.extras !== undefined ? o.extras : listingExtrasHtml(l);
   const btns = o.btns || "";
   const btnsEnd = o.btnsEnd || "";
   const idAttr = o.id ? ` id="${esc(o.id)}"` : "";
@@ -354,6 +545,7 @@ function tradeRow(l, opts) {
         </div>
       </div>
     </div>
+    ${extras}
     ${meta ? `<div class="meta">${meta}</div>` : ""}
     ${foot}
   </div>`;

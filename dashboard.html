@@ -367,6 +367,13 @@ function dashListingOut(l) {
 function listingFieldsFromRow(root, shop) {
   const src = (shop.listings || []).find(x => listingIdEq(x.id, root.dataset.listing));
   const gn = src ? (src.group_name == null ? null : (String(src.group_name).trim() || null)) : null;
+  let bundle_contents = src ? normalizeBundleContents(src.bundle_contents) : null;
+  if (root.dataset.bundleContents != null && root.dataset.bundleContents !== "") {
+    try { bundle_contents = normalizeBundleContents(JSON.parse(root.dataset.bundleContents)); }
+    catch (e) { /* keep src */ }
+  } else if (root.dataset.bundleContents === "") {
+    bundle_contents = null;
+  }
   return {
     wa: parseInt(root.querySelector(".dash-wa").value, 10),
     sa: parseInt(root.querySelector(".dash-sa").value, 10),
@@ -375,8 +382,15 @@ function listingFieldsFromRow(root, shop) {
     wu: root.querySelector(".dash-wu").value,
     su: root.querySelector(".dash-su").value,
     stock: parseStockInput(root.querySelector(".dash-stock-amt").value),
-    group_name: gn
+    group_name: gn,
+    enchants: normalizeListingEnchants(root.querySelector(".dash-enchants")?.value || ""),
+    notes: normalizeListingNotes(root.querySelector(".dash-notes")?.value || ""),
+    bundle_contents: isBundleItem(root.dataset.sellItem || "") ? bundle_contents : null
   };
+}
+
+function listingBundleKey(v) {
+  return JSON.stringify(normalizeBundleContents(v) || null);
 }
 
 function listingRowMatchesFields(l, f) {
@@ -385,7 +399,10 @@ function listingRowMatchesFields(l, f) {
     && l.want_item === f.wi && l.sell_item === f.si
     && (l.stock ?? null) === (f.stock ?? null)
     && l.in_stock === inStockFromStock(f.stock)
-    && (l.group_name || null) === f.group_name;
+    && (l.group_name || null) === f.group_name
+    && (normalizeListingEnchants(l.enchants) || null) === (f.enchants || null)
+    && (normalizeListingNotes(l.notes) || null) === (f.notes || null)
+    && listingBundleKey(l.bundle_contents) === listingBundleKey(f.bundle_contents);
 }
 
 async function commitListingRow(root, shop, shopId) {
@@ -405,12 +422,19 @@ async function commitListingRow(root, shop, shopId) {
     sell_item: f.si, sell_amount: f.sa, sell_unit: f.su,
     want_item: f.wi, want_amount: f.wa, want_unit: f.wu,
     stock: f.stock, in_stock, group_name: f.group_name,
+    enchants: f.enchants, notes: f.notes, bundle_contents: f.bundle_contents,
     updated_at: new Date().toISOString()
   }).eq("id", lid);
   if (res.error) {
     setMsg(msg, res.error.message, "err");
     return { ok: false };
   }
+  Object.assign(src, {
+    sell_item: f.si, sell_amount: f.sa, sell_unit: f.su,
+    want_item: f.wi, want_amount: f.wa, want_unit: f.wu,
+    stock: f.stock, in_stock, group_name: f.group_name,
+    enchants: f.enchants, notes: f.notes, bundle_contents: f.bundle_contents
+  });
   return { ok: true };
 }
 
@@ -421,7 +445,10 @@ function dashListingRow(l) {
     : `<button type="button" class="tag ok dash-stock-toggle" data-act="toggle-stock">in stock</button>`;
   const stockVal = l.stock == null ? "" : l.stock;
   const timed = l.timed_out ? ' <span class="tag bad">timed out</span>' : "";
-  return `<div class="listing-row dash-listing-row" data-listing="${l.id}" data-want-item="${esc(l.want_item)}" data-sell-item="${esc(l.sell_item)}">
+  const bundle = normalizeBundleContents(l.bundle_contents);
+  const bundleAttr = bundle ? esc(JSON.stringify(bundle)) : "";
+  const showBundle = isBundleItem(l.sell_item);
+  return `<div class="listing-row dash-listing-row" data-listing="${l.id}" data-want-item="${esc(l.want_item)}" data-sell-item="${esc(l.sell_item)}" data-bundle-contents="${bundleAttr}">
     <div class="dash-listing-main">
       <div class="dash-trade">
         <div class="dash-trade-side">
@@ -441,6 +468,19 @@ function dashListingRow(l) {
           ${iconBtn("copy", { title: "Duplicate listing", attrs: 'data-act="duplicate"' })}
           ${iconBtn("refresh", { title: "Mark still available", attrs: 'data-act="refresh"' })}
           ${iconBtn("trash", { danger: true, title: "Remove listing", attrs: 'data-act="del-listing"' })}
+        </div>
+      </div>
+      <div class="dash-listing-extra">
+        <label>Enchants
+          <input type="text" class="dash-enchants" maxlength="300" value="${esc(l.enchants || "")}" placeholder="Protection IV, Unbreaking III">
+        </label>
+        <label>Notes
+          <textarea class="dash-notes" maxlength="400" rows="2" placeholder="Condition, repair level, extras…">${esc(l.notes || "")}</textarea>
+        </label>
+        <div class="dash-bundle-row" ${showBundle ? "" : "hidden"}>
+          <button type="button" class="small" data-act="edit-bundle">Edit bundle contents</button>
+          <span class="meta dash-bundle-summary">${bundle && bundle.length ? bundle.length + " slot" + (bundle.length === 1 ? "" : "s") + " filled" : "Empty barrel"}</span>
+          ${bundle && bundle.length ? bundleContentsPreviewHtml(bundle, { compact: true }) : ""}
         </div>
       </div>
       <div class="meta dash-listing-meta">${updatedHtml(l.updated_at)}</div>
@@ -1035,6 +1075,25 @@ document.getElementById("shops").addEventListener("click", async e => {
     return;
   }
 
+  if (act === "edit-bundle") {
+    const shopEl = btn.closest("[data-shop]");
+    const row = btn.closest(".dash-listing-row");
+    if (!shopEl || !row) return;
+    const shop = shopsData[shopEl.dataset.shop];
+    let initial = null;
+    try { initial = row.dataset.bundleContents ? JSON.parse(row.dataset.bundleContents) : null; }
+    catch (e) { initial = null; }
+    const next = await openBundleContentsEditor(initial);
+    if (next === null) return;
+    row.dataset.bundleContents = next ? JSON.stringify(next) : "";
+    const r = await commitListingRow(row, shop, shopEl.dataset.shop);
+    if (r.ok) {
+      setMsg(msg, r.skipped ? "Bundle contents unchanged." : "Bundle contents saved.", "ok");
+      if (!r.skipped) render();
+    }
+    return;
+  }
+
   if (act === "dash-pick-item") {
     const shopEl = btn.closest("[data-shop]");
     const row = btn.closest(".dash-listing-row");
@@ -1043,7 +1102,12 @@ document.getElementById("shops").addEventListener("click", async e => {
     const side = btn.dataset.side;
     openItemPicker(async name => {
       if (side === "want") row.dataset.wantItem = name;
-      else row.dataset.sellItem = name;
+      else {
+        row.dataset.sellItem = name;
+        const bundleRow = row.querySelector(".dash-bundle-row");
+        if (bundleRow) bundleRow.hidden = !isBundleItem(name);
+        if (!isBundleItem(name)) row.dataset.bundleContents = "";
+      }
       const sideEl = btn.closest(".dash-trade-side");
       if (sideEl) sideEl.querySelector(".dash-item-label").textContent = name;
       btn.innerHTML = itemIcon(name, false);
@@ -1284,7 +1348,10 @@ document.getElementById("shops").addEventListener("click", async e => {
       sell_item: src.sell_item, sell_amount: src.sell_amount, sell_unit: src.sell_unit || "",
       want_item: src.want_item, want_amount: src.want_amount, want_unit: src.want_unit || "",
       stock: src.stock, in_stock: inStockFromStock(src.stock),
-      group_name: src.group_name || null, sort_order
+      group_name: src.group_name || null, sort_order,
+      enchants: normalizeListingEnchants(src.enchants),
+      notes: normalizeListingNotes(src.notes),
+      bundle_contents: isBundleItem(src.sell_item) ? normalizeBundleContents(src.bundle_contents) : null
     });
     if (!res.error) setMsg(msg, "Listing duplicated.", "ok");
   } else if (act === "toggle-stock") {
@@ -1356,7 +1423,7 @@ document.getElementById("shops").addEventListener("change", async e => {
 
 document.getElementById("shops").addEventListener("focusout", async e => {
   const t = e.target;
-  if (!t.matches(".dash-wa, .dash-sa, .dash-stock-amt")) return;
+  if (!t.matches(".dash-wa, .dash-sa, .dash-stock-amt, .dash-enchants, .dash-notes")) return;
   const row = t.closest(".dash-listing-row");
   const shopEl = t.closest("[data-shop]");
   if (!row || !shopEl) return;
@@ -1367,7 +1434,9 @@ document.getElementById("shops").addEventListener("focusout", async e => {
     const r = await commitListingRow(row, shop, shopId);
     if (r.ok && !r.skipped) {
       setMsg(msg, "Listing updated.", "ok");
-      render();
+      // Don't full-render on notes/enchants — keeps caret; only refresh for trade/stock
+      if (t.matches(".dash-wa, .dash-sa, .dash-stock-amt")) render();
+      else clearDashDirty();
     }
   });
 });

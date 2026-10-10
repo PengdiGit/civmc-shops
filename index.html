@@ -14,7 +14,7 @@
       <div class="find-hero-copy">
         <span class="find-eyebrow">Directory</span>
         <h1>Find a shop</h1>
-        <p class="sub">Search by item or shop name. Press <kbd>/</kbd> to focus search.</p>
+        <p class="sub">Search by item, enchant, or shop name. Press <kbd>/</kbd> to focus search.</p>
       </div>
       <div class="find-board-side">
         <a class="btn-favourites" href="favourites.html">Favourites</a>
@@ -137,6 +137,14 @@
           </label>
         </div>
       </div>
+      <div class="filter-group" id="fg-enchant">
+        <span class="meta">Enchants (item search)</span>
+        <div class="find-filter-toggles" style="flex-direction:column;align-items:stretch;gap:8px">
+          <label class="find-filter-check"><span class="find-filter-check-label">Contains</span>
+            <input type="search" id="f-enchant" placeholder="protection, silk touch…" maxlength="60" style="width:min(100%,220px)"></label>
+          <label class="find-filter-check"><input type="checkbox" id="f-has-enchants"> Enchanted only</label>
+        </div>
+      </div>
     </div>
     <div class="find-overlay-actions">
       <button type="button" class="primary" id="save-filter-defaults">Save filters as default</button>
@@ -176,6 +184,8 @@ const fDirections = document.getElementById("f-directions");
 const fMinRate = document.getElementById("f-min-rate");
 const fMaxRate = document.getElementById("f-max-rate");
 const fUnit = document.getElementById("f-unit");
+const fEnchant = document.getElementById("f-enchant");
+const fHasEnchants = document.getElementById("f-has-enchants");
 const resultCountEl = document.getElementById("result-count");
 const findBoard = document.querySelector(".find-board");
 let cityFilter = "";
@@ -189,6 +199,8 @@ let hasDirectionsOnly = false;
 let minDealRate = null; // null = any
 let maxDealRate = null;
 let unitFilter = ""; // "" | each | ci | cs
+let enchantFilter = ""; // substring match on listings.enchants
+let hasEnchantsOnly = false;
 let lastItemRows = [];
 let lastShopRows = [];
 let lastResultFocus = -1;
@@ -227,7 +239,7 @@ function medianTip(l, buying) {
 }
 
 const SORTS = {
-  item: [["deal", "Best deal"], ["new", "Newest"], ["close", "Closest"]],
+  item: [["deal", "Best deal"], ["new", "Newest"], ["close", "Closest"], ["enchant", "Enchants A-Z"]],
   shop: [["featured", "Featured"], ["name", "A-Z"], ["close", "Closest"]]
 };
 
@@ -269,7 +281,8 @@ function defaultFindFilters() {
     nation: "", city: "",
     trusted: false, minRating: 0,
     inStock: true, updatedWeek: false, hasLocation: false, directions: false,
-    minRate: null, maxRate: null, unit: ""
+    minRate: null, maxRate: null, unit: "",
+    enchant: "", hasEnchants: false
   };
 }
 function loadFilterDefaults() {
@@ -289,7 +302,9 @@ function loadFilterDefaults() {
       directions: !!o.directions,
       minRate: numOrNull(o.minRate),
       maxRate: numOrNull(o.maxRate),
-      unit: ["each", "ci", "cs"].includes(o.unit) ? o.unit : ""
+      unit: ["each", "ci", "cs"].includes(o.unit) ? o.unit : "",
+      enchant: typeof o.enchant === "string" ? o.enchant : "",
+      hasEnchants: !!o.hasEnchants
     };
   } catch (e) {
     return base;
@@ -308,7 +323,9 @@ function saveFilterDefaults() {
       directions: !!hasDirectionsOnly,
       minRate: minDealRate,
       maxRate: maxDealRate,
-      unit: unitFilter || ""
+      unit: unitFilter || "",
+      enchant: enchantFilter || "",
+      hasEnchants: !!hasEnchantsOnly
     }));
   } catch (e) {}
 }
@@ -322,9 +339,12 @@ function syncFilterControls() {
   fMinRate.value = minDealRate != null ? String(minDealRate) : "";
   fMaxRate.value = maxDealRate != null ? String(maxDealRate) : "";
   fUnit.value = unitFilter || "";
+  fEnchant.value = enchantFilter || "";
+  fHasEnchants.checked = !!hasEnchantsOnly;
   const itemMode = mode.value !== "shop";
   document.getElementById("fg-deal").hidden = !itemMode;
   document.getElementById("fg-unit").hidden = !itemMode;
+  document.getElementById("fg-enchant").hidden = !itemMode;
 }
 function activeFilterCount() {
   return (nationFilter ? 1 : 0) + (cityFilter ? 1 : 0)
@@ -333,7 +353,9 @@ function activeFilterCount() {
     + (hasLocationOnly ? 1 : 0) + (hasDirectionsOnly ? 1 : 0)
     + (mode.value !== "shop" && minDealRate != null ? 1 : 0)
     + (mode.value !== "shop" && maxDealRate != null ? 1 : 0)
-    + (mode.value !== "shop" && unitFilter ? 1 : 0);
+    + (mode.value !== "shop" && unitFilter ? 1 : 0)
+    + (mode.value !== "shop" && enchantFilter ? 1 : 0)
+    + (mode.value !== "shop" && hasEnchantsOnly ? 1 : 0);
 }
 function updateFilterChrome() {
   syncFilterControls();
@@ -358,6 +380,8 @@ function updateFilterChrome() {
   if (mode.value !== "shop" && minDealRate != null) bits.push("Min " + minDealRate + " d/item");
   if (mode.value !== "shop" && maxDealRate != null) bits.push("Max " + maxDealRate + " d/item");
   if (mode.value !== "shop" && unitFilter) bits.push("Unit: " + (unitFilter === "each" ? "each" : unitFilter.toUpperCase()));
+  if (mode.value !== "shop" && enchantFilter) bits.push("Enchant: " + enchantFilter);
+  if (mode.value !== "shop" && hasEnchantsOnly) bits.push("Enchanted only");
   if (bits.length) {
     activeFiltersEl.hidden = false;
     activeFiltersEl.textContent = bits.join(" \u00b7 ") + " \u00b7 edit in Filters";
@@ -436,6 +460,8 @@ function syncUrl() {
     if (minDealRate != null) sp.set("min_rate", String(minDealRate));
     if (maxDealRate != null) sp.set("max_rate", String(maxDealRate));
     if (unitFilter) sp.set("unit", unitFilter);
+    if (enchantFilter) sp.set("enchant", enchantFilter);
+    if (hasEnchantsOnly) sp.set("has_enchants", "1");
   }
   const qs = sp.toString();
   history.replaceState(null, "", u.pathname + (qs ? "?" + qs : "") + u.hash);
@@ -520,6 +546,12 @@ function applyFindFilters(rows, shopOf, kind) {
         if (minDealRate != null && rate < minDealRate) return false;
         if (maxDealRate != null && rate > maxDealRate) return false;
       }
+      const ench = String(r.enchants || "").toLowerCase();
+      if (hasEnchantsOnly && !ench.trim()) return false;
+      if (enchantFilter) {
+        const needles = enchantFilter.toLowerCase().split(/\s+/).filter(Boolean);
+        if (!needles.every(w => ench.includes(w))) return false;
+      }
     }
     return true;
   });
@@ -583,6 +615,11 @@ function parseRateInput(el) {
 fMinRate.addEventListener("change", () => { minDealRate = parseRateInput(fMinRate); reapplyFindFilters(); });
 fMaxRate.addEventListener("change", () => { maxDealRate = parseRateInput(fMaxRate); reapplyFindFilters(); });
 fUnit.addEventListener("change", () => { unitFilter = fUnit.value || ""; reapplyFindFilters(); });
+fEnchant.addEventListener("change", () => { enchantFilter = norm(fEnchant.value); reapplyFindFilters(); });
+fEnchant.addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); enchantFilter = norm(fEnchant.value); reapplyFindFilters(); }
+});
+fHasEnchants.addEventListener("change", () => { hasEnchantsOnly = fHasEnchants.checked; reapplyFindFilters(); });
 
 document.getElementById("filter-open").addEventListener("click", openFilters);
 filterOverlay.addEventListener("click", e => {
@@ -600,6 +637,8 @@ document.getElementById("clear-filters").addEventListener("click", () => {
   minDealRate = null;
   maxDealRate = null;
   unitFilter = "";
+  enchantFilter = "";
+  hasEnchantsOnly = false;
   reapplyFindFilters({ refetchItems: true });
 });
 document.getElementById("save-filter-defaults").addEventListener("click", () => {
@@ -699,6 +738,16 @@ function sortListings(rows, how, h) {
     });
   } else if (how === "close") {
     rows.sort((a, b) => distTo(a.shops, h) - distTo(b.shops, h));
+  } else if (how === "enchant") {
+    rows.sort((a, b) => {
+      const ea = String(a.enchants || "").trim().toLowerCase();
+      const eb = String(b.enchants || "").trim().toLowerCase();
+      if (ea && !eb) return -1;
+      if (!ea && eb) return 1;
+      const c = ea.localeCompare(eb);
+      if (c) return c;
+      return String(a.sell_item || "").localeCompare(String(b.sell_item || ""));
+    });
   }
 }
 
@@ -913,13 +962,19 @@ async function showItems(term) {
   setFindCompact(true);
 
   const col = mode.value === "sell" ? "sell_item" : "want_item";
+  // Match item name OR enchants (so "silk touch" / "protection" finds gear)
+  const safeTerm = String(term).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
   let query = sb
     .from("listings")
     .select("*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out), reviews(rating, traded, timed_out, created_at))")
-    .ilike(col, "%"+term+"%")
+    .or(`${col}.ilike.%${safeTerm}%,enchants.ilike.%${safeTerm}%`)
     .order("updated_at", { ascending: false })
     .limit(200);
   if (inStockOnly) query = query.eq("in_stock", true);
+  if (enchantFilter) {
+    const safeEnch = String(enchantFilter).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
+    if (safeEnch) query = query.ilike("enchants", "%" + safeEnch + "%");
+  }
   const { data: all, error } = await query;
 
   if (error) { setMsg(msg, "Search failed: " + error.message, "err"); return; }
@@ -1003,6 +1058,8 @@ renderRecentChips();
   unitFilter = ps.has("unit")
     ? (["each", "ci", "cs"].includes(ps.get("unit")) ? ps.get("unit") : "")
     : (defaults.unit || "");
+  enchantFilter = ps.has("enchant") ? norm(ps.get("enchant") || "") : norm(defaults.enchant || "");
+  hasEnchantsOnly = ps.has("has_enchants") ? ps.get("has_enchants") === "1" : !!defaults.hasEnchants;
   updateFilterChrome();
   const hasCmp = /#cmp=/.test(location.hash);
   const hasStoredCmp = loadCompareSpecs().length > 0;

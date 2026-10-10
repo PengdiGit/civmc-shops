@@ -665,6 +665,138 @@ img.avatar {
 }
 .btns-start, .btns-end { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .btns-end { margin-left: auto; }
+.listing-extras {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: 42rem;
+}
+.listing-enchants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.enchant-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  font-size: .78rem;
+  line-height: 1.35;
+  color: #7ec8a3;
+  background: color-mix(in srgb, #2a6b4a 22%, var(--panel));
+  border: 1px solid color-mix(in srgb, #3d8f63 45%, var(--line));
+  border-radius: 3px;
+}
+.listing-notes {
+  font-size: .88rem;
+  color: var(--dim);
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+.barrel-gui {
+  display: grid;
+  grid-template-columns: repeat(9, 28px);
+  gap: 2px;
+  width: max-content;
+  padding: 6px;
+  background: linear-gradient(180deg, #8b6a3f 0%, #6e5130 40%, #5a4228 100%);
+  border: 2px solid #3a2a18;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px #c4a06a, 0 2px 0 #2a1e10;
+}
+.barrel-gui.compact {
+  grid-template-columns: repeat(9, 22px);
+  gap: 1px;
+  padding: 4px;
+  transform-origin: left top;
+}
+.barrel-gui.compact .slot {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.barrel-gui.compact .icon {
+  width: 16px;
+  height: 16px;
+}
+.barrel-slot {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #8b8b8b;
+  border: 2px solid;
+  border-color: #373737 #fff #fff #373737;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  cursor: default;
+  color: inherit;
+}
+.barrel-gui.compact .barrel-slot {
+  width: 22px;
+  height: 22px;
+  border-width: 1px;
+}
+.barrel-gui-edit .barrel-slot { cursor: pointer; }
+.barrel-gui-edit .barrel-slot:hover {
+  outline: 1px solid #ffff8b;
+  outline-offset: -1px;
+}
+.barrel-slot .slot {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+.barrel-slot .icon {
+  width: 20px;
+  height: 20px;
+  image-rendering: pixelated;
+}
+.barrel-qty {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+  line-height: 1;
+  pointer-events: none;
+}
+.barrel-editor { max-width: 360px; }
+.barrel-editor-overlay { z-index: 85; }
+.dash-listing-extra {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed color-mix(in srgb, var(--line) 70%, transparent);
+}
+.dash-listing-extra label {
+  display: grid;
+  gap: 3px;
+  font-size: .82rem;
+  color: var(--dim);
+}
+.dash-listing-extra input,
+.dash-listing-extra textarea {
+  width: 100%;
+  max-width: 36rem;
+}
+.dash-bundle-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
 button.btn-timeout {
   color: var(--warn);
   border-color: color-mix(in srgb, var(--warn) 70%, var(--line));
@@ -1761,6 +1893,7 @@ p.sub a:hover, .cname a:hover, .comment a:hover, .review a:hover { color: var(--
   position: fixed; inset: 0; background: rgba(0,0,0,.65);
   display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px;
 }
+.picker-overlay { z-index: 90; } /* above barrel editor when picking slot items */
 .picker {
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
   width: 100%; max-width: 520px; max-height: 80vh;
@@ -1787,7 +1920,7 @@ button.pickbtn img {
   width: 100%; max-width: 400px; padding: 16px;
 }
 .modal h2 { margin-top: 0; }
-.ui-modal-overlay { z-index: 80; }
+.ui-modal-overlay { z-index: 95; }
 .ui-modal { max-width: 440px; box-shadow: 0 16px 40px rgba(0,0,0,.45); }
 .ui-modal-list { max-width: 420px; }
 .ui-modal-body { margin: 0 0 14px; color: var(--dim); line-height: 1.45; }
