@@ -93,7 +93,15 @@ const k = () => Number(unitSel.value);
 const unitWord = () => k() === 64 ? "stack" : "item";
 function fmtD(v) {
   if (v == null || isNaN(v)) return "-";
-  return v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : String(+v.toPrecision(2));
+  if (v >= 100) return v.toFixed(0);
+  if (v >= 10) return v.toFixed(1);
+  if (v >= 1) return v.toFixed(2);
+  if (v === 0) return "0";
+  // Keep tiny diamond rates readable (avoid 8.5e-3 style on chart axes)
+  const s = Number(v).toPrecision(2);
+  if (!/[eE]/.test(s)) return String(+s);
+  const digits = Math.min(8, Math.max(2, Math.ceil(-Math.log10(Math.abs(v))) + 1));
+  return Number(v).toFixed(digits).replace(/\.?0+$/, "") || "0";
 }
 const priceCell = (m) => m
   ? `<b>${fmtD(m.median * k())}</b> d<small>${fmtD(m.low * k())} - ${fmtD(m.high * k())} \u00b7 ${m.n} shop${m.n === 1 ? "" : "s"}</small>`
@@ -307,7 +315,7 @@ async function openItem(item) {
 function stat(label, m, color) {
   if (!m) return `<div class="stat"><div class="lbl"><i style="background:${color}"></i> ${label}</div><div class="big">-</div><div class="meta">nobody lists this right now</div></div>`;
   return `<div class="stat">
-    <div class="lbl"><span style="color:">\u25cf</span> ${label}</div>
+    <div class="lbl"><i style="background:${color}"></i> ${label}</div>
     <div class="big">${fmtD(m.median * k())} <span class="meta">d / ${unitWord()}</span></div>
     <div class="meta">usual range ${fmtD(m.low * k())} - ${fmtD(m.high * k())} \u00b7 ${m.n} shop${m.n === 1 ? "" : "s"}
       ${m.outliers ? ` \u00b7 ${m.outliers} odd price${m.outliers === 1 ? "" : "s"} ignored` : ""}
@@ -340,20 +348,26 @@ function drawChart(el, series) {
   const kk = k();
   const all = series.flatMap(s => s.pts);
   if (!all.length) { el.innerHTML = '<p class="meta">No history in this range yet.</p>'; return; }
-  const W = 720, H = 290, L = 52, R = 14, T = 12, B = 28;
+  const W = 720, H = 290, R = 14, T = 12, B = 28;
   const days = [...new Set(all.map(p => p.d))].sort();
-  const t0 = Date.parse(days[0]), span = Math.max(Date.parse(days[days.length - 1]) - t0, DAYMS);
-  const xOf = d => L + (days.length === 1 ? (W - L - R) / 2 : (Date.parse(d) - t0) / span * (W - L - R));
   let lo = Math.min(...all.map(p => p.lo * kk)), hi = Math.max(...all.map(p => p.hi * kk));
   const pad = (hi - lo) * 0.12 || hi * 0.1 || 1;
   lo = Math.max(0, lo - pad); hi += pad;
+
+  const raw = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw || 1e-9)));
+  const step = ([1, 2, 2.5, 5, 10].find(m => m * mag >= raw) || 10) * mag;
+  const yTicks = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) yTicks.push({ v, label: fmtD(v) });
+  // Extra left pad so end-anchored axis labels (e.g. 0.0085) are not clipped by the viewBox
+  const L = Math.max(56, Math.min(88, 16 + Math.max(4, ...yTicks.map(t => t.label.length)) * 7.2));
+  const t0 = Date.parse(days[0]), span = Math.max(Date.parse(days[days.length - 1]) - t0, DAYMS);
+  const xOf = d => L + (days.length === 1 ? (W - L - R) / 2 : (Date.parse(d) - t0) / span * (W - L - R));
   const yOf = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
 
-  const raw = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw)));
-  const step = ([1, 2, 2.5, 5, 10].find(m => m * mag >= raw) || 10) * mag;
   let grid = "";
-  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step)
-    grid += `<line x1="${L}" x2="${W - R}" y1="${yOf(v)}" y2="${yOf(v)}" stroke="#3a3e37" stroke-width="1"/><text x="${L - 8}" y="${yOf(v) + 4}" text-anchor="end">${fmtD(v)}</text>`;
+  yTicks.forEach(({ v, label }) => {
+    grid += `<line x1="${L}" x2="${W - R}" y1="${yOf(v)}" y2="${yOf(v)}" stroke="#3a3e37" stroke-width="1"/><text x="${L - 8}" y="${yOf(v) + 4}" text-anchor="end">${label}</text>`;
+  });
   const nTicks = Math.min(6, days.length);
   for (let i = 0; i < nTicks; i++) {
     const d = days[Math.round(i * (days.length - 1) / Math.max(1, nTicks - 1))];
@@ -378,7 +392,7 @@ function drawChart(el, series) {
     const px = (ev.clientX - r.left) / r.width * W;
     const d = days.reduce((best, x) => Math.abs(xOf(x) - px) < Math.abs(xOf(best) - px) ? x : best, days[0]);
     guide.setAttribute("x1", xOf(d)); guide.setAttribute("x2", xOf(d)); guide.setAttribute("visibility", "visible");
-    const rows = series.map(s => { const p = s.pts.find(q => q.d === d); return p ? `<div><span style="color:">\u25cf</span> ${s.name}: <b>${fmtD(p.m * kk)}</b> (${fmtD(p.lo * kk)} - ${fmtD(p.hi * kk)}, ${p.n} shop${p.n === 1 ? "" : "s"})</div>` : ""; }).join("");
+    const rows = series.map(s => { const p = s.pts.find(q => q.d === d); return p ? `<div><span style="color:${s.color}">\u25cf</span> ${s.name}: <b>${fmtD(p.m * kk)}</b> (${fmtD(p.lo * kk)} - ${fmtD(p.hi * kk)}, ${p.n} shop${p.n === 1 ? "" : "s"})</div>` : ""; }).join("");
     tip.innerHTML = `<b>${new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}</b>${rows}`;
     tip.hidden = false;
     const pct = xOf(d) / W * 100;
