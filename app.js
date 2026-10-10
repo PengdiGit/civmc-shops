@@ -879,8 +879,29 @@ function linkMentions(text) {
     `<a class="mention" href="profile.html?name=${encodeURIComponent(name)}">@${esc(name)}</a>`);
 }
 async function copyText(text) {
-  try { await navigator.clipboard.writeText(text); return true; }
-  catch (e) { return false; }
+  const value = text == null ? "" : String(text);
+  // Clipboard API needs a secure context; HTTP pages leave it undefined.
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch (e) { /* fall through to execCommand */ }
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = value;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return !!ok;
+  } catch (e) {
+    return false;
+  }
 }
 
 // shrink a picked image to a small JPEG (keeps uploads tiny), then upload it. folder: "comments" | "avatars"
