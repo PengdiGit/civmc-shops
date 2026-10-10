@@ -165,7 +165,7 @@
 <script src="config.js"></script>
 <script src="mock.js"></script>
 <script src="items.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=7"></script>
 <script>
 const q = document.getElementById("q");
 const mode = document.getElementById("mode");
@@ -831,7 +831,7 @@ async function showShops(term) {
   else setFindCompact(searchRan && !!norm(q.value));
 
   let query = sb.from("shops")
-    .select("id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(mc_username, discord_username, avatar_path, timed_out), listings(id, updated_at, stock, in_stock, timed_out), reviews(rating, traded, timed_out, created_at)")
+    .select("id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out), listings(id, updated_at, stock, in_stock, timed_out), reviews(rating, traded, timed_out, created_at)")
     .order("name", { ascending: true });
   if (term) query = query.ilike("name", "%"+term+"%");
   const { data: all, error } = await query;
@@ -929,7 +929,7 @@ async function showItems(term) {
   const col = mode.value === "sell" ? "sell_item" : "want_item";
   let query = sb
     .from("listings")
-    .select("*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(mc_username, discord_username, avatar_path, timed_out), reviews(rating, traded, timed_out, created_at))")
+    .select("*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out), reviews(rating, traded, timed_out, created_at))")
     .ilike(col, "%"+term+"%")
     .order("updated_at", { ascending: false })
     .limit(200);

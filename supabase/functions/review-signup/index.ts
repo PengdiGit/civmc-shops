@@ -14,17 +14,34 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
+const CUTOFF_MS = 24 * 3600 * 1000;
 
-// Unverified accounts are deleted 24 hours after signup (staff accounts are never touched).
-async function purgeExpired(admin: ReturnType<typeof createClient>) {
-  const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const { data: old } = await admin.from("profiles").select("id")
+type Admin = ReturnType<typeof createClient>;
+
+/** Unverified non-staff accounts older than 24h. Throws on query failure (never treat as empty). */
+async function listExpiredUnverified(admin: Admin) {
+  const cutoff = new Date(Date.now() - CUTOFF_MS).toISOString();
+  const { data, error } = await admin.from("profiles").select("id, username, mc_username")
     .is("verified_at", null).eq("is_admin", false).eq("is_mod", false).eq("is_head", false).lt("created_at", cutoff);
-  for (const o of old || []) await admin.auth.admin.deleteUser(o.id);   // cascades to their profile + comments
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function purgeExpired(admin: Admin) {
+  const old = await listExpiredUnverified(admin);
+  let purged = 0;
+  const errors: string[] = [];
+  for (const o of old) {
+    await removeFiles(admin, o.id);
+    const { error } = await admin.auth.admin.deleteUser(o.id);
+    if (error) errors.push(`${o.username || o.mc_username || o.id}: ${error.message}`);
+    else purged++;
+  }
+  return { purged, errors, found: old.length };
 }
 
 // remove the pictures an account uploaded (comment pictures, profile picture, shop icons)
-async function removeFiles(admin: ReturnType<typeof createClient>, uid: string) {
+async function removeFiles(admin: Admin, uid: string) {
   for (const folder of ["comments", "avatars", "shops"]) {
     const { data } = await admin.storage.from("uploads").list(`${folder}/${uid}`, { limit: 1000 });
     if (data && data.length) await admin.storage.from("uploads").remove(data.map((o) => `${folder}/${uid}/${o.name}`));
@@ -45,19 +62,22 @@ Deno.serve(async (req) => {
   const { action, user_id } = await req.json();
 
   if (action === "purge_unverified") {
-    const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const { data: old } = await admin.from("profiles").select("id, mc_username")
-      .is("verified_at", null).eq("is_admin", false).eq("is_mod", false).eq("is_head", false).lt("created_at", cutoff);
-    const ids = old || [];
-    for (const o of ids) {
-      await removeFiles(admin, o.id);
-      await admin.auth.admin.deleteUser(o.id);
+    try {
+      const { purged, errors, found } = await purgeExpired(admin);
+      if (errors.length && purged === 0) {
+        return json({ error: "Purge failed: " + errors[0] }, 400);
+      }
+      return json({ ok: true, purged, found, errors: errors.length ? errors : undefined });
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : "Purge failed." }, 400);
     }
-    return json({ ok: true, purged: ids.length });
   }
 
   if (action === "list") {
-    await purgeExpired(admin);
+    let auto_purged = 0;
+    try {
+      auto_purged = (await purgeExpired(admin)).purged;
+    } catch (_) { /* listing still useful if cleanup fails */ }
     const { data: profiles, error } = await admin.from("profiles").select("*");
     if (error) return json({ error: error.message }, 400);
     const { data: list, error: lErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -67,11 +87,11 @@ Deno.serve(async (req) => {
       const u = byId.get(p.id);
       return {
         ...p,
-        login_username: (u?.email || "").replace("@civmc.local", ""),
+        login_username: p.username || (u?.email || "").replace("@civmc.local", ""),
         last_sign_in_at: u?.last_sign_in_at ?? null,
       };
     });
-    return json({ accounts });
+    return json({ accounts, auto_purged });
   }
 
   if (action === "delete") {

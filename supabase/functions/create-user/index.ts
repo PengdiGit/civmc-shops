@@ -36,6 +36,7 @@ Deno.serve(async (req) => {
 
   const { error: pErr } = await admin.from("profiles").insert({
     id: created.user.id,
+    username,
     mc_username,
     discord_username: String(discord_username).slice(0, 40) || null,
     is_mod: role === "mod",

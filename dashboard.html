@@ -72,7 +72,7 @@
 <script src="item-picker.js"></script>
 <script src="places.js"></script>
 <script src="place-picker.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 <script>
 let me = null;
 let shopsData = {};                 // shop id -> shop (with listings), from the last load
@@ -241,7 +241,7 @@ async function load() {
   const ctx = await requireLogin();
   if (!ctx) return;
   me = ctx;
-  document.getElementById("who").textContent = "Logged in as " + (ctx.profile?.mc_username || "?");
+  document.getElementById("who").textContent = "Logged in as " + userName(ctx.profile);
 
   document.getElementById("toggle-new-shop").onclick = () => setNewShopOpen(true);
   document.getElementById("cancel-new-shop").onclick = () => setNewShopOpen(false);

@@ -374,6 +374,11 @@ function avatarImg(p, size) {
   const px = size || 24;
   return `<img class="avatar" width="${px}" height="${px}" src="${esc(avatarUrl(p, px))}" alt="" onerror="this.style.visibility='hidden'">`;
 }
+/** Primary site name = login username (Minecraft name stays for heads / secondary facts). */
+function userName(p) {
+  if (!p) return "?";
+  return p.username || p.login_username || p.mc_username || "?";
+}
 
 function mapUrl(x, z) {
   // CivInfo map: https://map.civinfo.net/#c=x,z
@@ -391,7 +396,7 @@ function emptyState(text, actionHref, actionLabel) {
 }
 function ownerChip(p, ownerId) {
   if (!p || !ownerId) return '<span class="meta">owner: ?</span>';
-  return `<a class="owner-chip" href="profile.html?id=${esc(ownerId)}">${avatarImg(p, 22)} ${esc(p.mc_username)}</a>`;
+  return `<a class="owner-chip" href="profile.html?id=${esc(ownerId)}">${avatarImg(p, 22)} ${esc(userName(p))}</a>`;
 }
 // "Mount Augusta \u00b7 Commonwealth" style place line for cards / meta
 // Soft city/nation aliases (display + filter matching without rewriting DB rows)
@@ -479,7 +484,7 @@ function writeCompareHash(pins) {
 
 // Cross-page compare tray (sessionStorage + optional #cmp=)
 const COMPARE_STORE_KEY = "civmc_compare_pins";
-const COMPARE_LISTING_SELECT = "*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(mc_username, discord_username, avatar_path, timed_out))";
+const COMPARE_LISTING_SELECT = "*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out))";
 function loadCompareSpecs() {
   try {
     const arr = JSON.parse(sessionStorage.getItem(COMPARE_STORE_KEY) || "[]");
@@ -1135,7 +1140,7 @@ async function startImpersonation(userId) {
     : { access_token: session.access_token, refresh_token: session.refresh_token };
   try {
     sessionStorage.setItem(IMP_RESTORE_KEY, JSON.stringify(restore));
-    sessionStorage.setItem(IMP_LABEL_KEY, r.data.mc_username || "user");
+    sessionStorage.setItem(IMP_LABEL_KEY, r.data.username || r.data.mc_username || "user");
   } catch (e) {
     return { ok: false, message: "Could not save admin session for exit." };
   }
@@ -1272,7 +1277,7 @@ async function renderNav() {
       }
     } catch (e) {}
 
-    const name = profile && profile.mc_username ? esc(profile.mc_username) : "Account";
+    const name = profile ? esc(userName(profile)) : "Account";
     drawer += `<div class="nav-drawer-user"><span class="nav-drawer-user-label">Signed in</span><strong>${name}</strong></div>`;
     drawer += `<a class="nav-drawer-link" href="dashboard.html">My shops</a>`;
     drawer += `<a class="nav-drawer-link" href="favourites.html">Favourites</a>`;
@@ -1445,7 +1450,7 @@ function setMsg(el, text, kind) {
 // "Owner: <profile link> \u00b7 Discord: name" (plain meta line)
 function ownerHtml(p, ownerId) {
   if (!p) return "owner: ?";
-  const link = ownerId ? `<a href="profile.html?id=${esc(ownerId)}">${esc(p.mc_username)}</a>` : esc(p.mc_username);
+  const link = ownerId ? `<a href="profile.html?id=${esc(ownerId)}">${esc(userName(p))}</a>` : esc(userName(p));
   return "owner: " + link + (p.discord_username ? " \u00b7 Discord: " + esc(p.discord_username) : "");
 }
 

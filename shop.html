@@ -78,7 +78,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=7"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const shopId = params.get("id");
@@ -269,7 +269,7 @@ async function load() {
 
   const { data: s, error } = await sb
     .from("shops")
-    .select("*, listings(*), profiles(mc_username, discord_username, avatar_path, timed_out)")
+    .select("*, listings(*), profiles(username, mc_username, discord_username, avatar_path, timed_out)")
     .eq("id", shopId)
     .single();
 
@@ -407,7 +407,7 @@ function paintReviewList(staff, isOwner) {
     return `
       <div class="review" id="review-${r.id}">
         <div class="top">
-          <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${r.author_id}">${esc(pr ? pr.mc_username : "?")}</a>
+          <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${r.author_id}">${esc(userName(pr))}</a>
             <span class="stars">${starsText(r.rating)}</span>
             ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
             <span class="meta">\u00b7 ${agoText(r.created_at)}</span> ${r.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
@@ -423,7 +423,7 @@ function paintReviewList(staff, isOwner) {
 }
 
 async function loadReviews(staff, isOwner) {
-  const { data, error } = await sb.from("reviews").select("*, profiles(mc_username, avatar_path)")
+  const { data, error } = await sb.from("reviews").select("*, profiles(username, mc_username, avatar_path)")
     .eq("shop_id", shopId).order("created_at", { ascending: false });
   const box = document.getElementById("reviews");
   if (error) { box.innerHTML = '<p class="meta">Couldn\'t load reviews.</p>'; return; }
@@ -473,7 +473,7 @@ function commentHtml(c, rootId, staff) {
   const pr = c.profiles;
   const isOwnerAuthor = shop && c.author_id === shop.owner_id;
   let b = "";
-  if (isVerified(me)) b += iconBtn("reply", { title: "Reply", attrs: `data-act="reply" data-root="${rootId}" data-name="${esc(pr ? pr.mc_username : "")}"` });
+  if (isVerified(me)) b += iconBtn("reply", { title: "Reply", attrs: `data-act="reply" data-root="${rootId}" data-name="${esc(userName(pr))}"` });
   if (!mine) b += iconBtn("flag", { cls: "btn-report", title: "Report comment", attrs: `data-act="report" data-type="comment" data-id="${c.id}"` });
   if (staff) b += iconBtn(c.timed_out ? "eye" : "eyeOff", { cls: "btn-timeout", title: c.timed_out ? "Unhide comment" : "Hide comment", attrs: `data-act="comment-timeout" data-id="${c.id}" data-to="${c.timed_out ? 0 : 1}"` });
   if (me && (me.is_admin || mine)) b += iconBtn("trash", { danger: true, title: "Delete comment", attrs: `data-act="comment-delete" data-id="${c.id}" data-path="${esc(c.image_path || "")}"` });
@@ -481,7 +481,7 @@ function commentHtml(c, rootId, staff) {
   return `
     <div class="comment" id="comment-${c.id}">
       <div class="head">
-        <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${c.author_id}">${esc(pr ? pr.mc_username : "?")}</a>
+        <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${c.author_id}">${esc(userName(pr))}</a>
           ${isOwnerAuthor ? '<span class="tag owner">owner</span>' : ""}
           <span class="meta">\u00b7 ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
         <span class="action-cluster">${b}</span>
@@ -491,7 +491,7 @@ function commentHtml(c, rootId, staff) {
 }
 
 async function loadComments(staff) {
-  const { data, error } = await sb.from("comments").select("*, profiles(mc_username, avatar_path)")
+  const { data, error } = await sb.from("comments").select("*, profiles(username, mc_username, avatar_path)")
     .eq("shop_id", shopId).order("created_at", { ascending: true });
   const box = document.getElementById("comments");
   if (error) { box.innerHTML = '<p class="meta">Couldn\'t load comments.</p>'; return; }

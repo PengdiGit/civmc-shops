@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
@@ -96,7 +96,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=7"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let id = params.get("id");
@@ -205,9 +205,15 @@ async function load() {
   myId = session ? session.user.id : null;
   myProfile = myId ? await getProfile(myId) : null;
   if (!id && nameParam) {
-    const { data: byName } = await sb.from("profiles").select("id, mc_username").ilike("mc_username", nameParam).limit(10);
-    const exact = (byName || []).find(p => p.mc_username && p.mc_username.toLowerCase() === nameParam.toLowerCase());
-    const hit = exact || (byName && byName[0]);
+    const needle = nameParam.toLowerCase();
+    const { data: byUser } = await sb.from("profiles").select("id, username, mc_username").ilike("username", nameParam).limit(10);
+    let exact = (byUser || []).find(p => p.username && p.username.toLowerCase() === needle);
+    let hit = exact || (byUser && byUser[0]);
+    if (!hit) {
+      const { data: byMc } = await sb.from("profiles").select("id, username, mc_username").ilike("mc_username", nameParam).limit(10);
+      exact = (byMc || []).find(p => p.mc_username && p.mc_username.toLowerCase() === needle);
+      hit = exact || (byMc && byMc[0]);
+    }
     if (hit) { id = hit.id; history.replaceState(null, "", "profile.html?id=" + encodeURIComponent(id)); }
   }
   if (!id) { setMsg(msg, "No profile picked.", "err"); return; }
@@ -216,8 +222,9 @@ async function load() {
   shown = p;
   own = myId === p.id;
 
-  document.title = p.mc_username + " - CivMC Shops";
-  document.getElementById("name").textContent = p.mc_username;
+  const primary = userName(p);
+  document.title = primary + " - CivMC Shops";
+  document.getElementById("name").textContent = primary;
   document.getElementById("avatar").innerHTML = avatarImg(p, 128);
   applyHighlight(p.highlight_color || null);
 
@@ -230,7 +237,8 @@ async function load() {
 
   const since = memberSinceText(p.created_at);
   document.getElementById("facts").innerHTML =
-    `<dt>Minecraft</dt><dd><b>${esc(p.mc_username)}</b></dd>
+    `<dt>Username</dt><dd><b>${esc(primary)}</b></dd>
+     <dt>Minecraft</dt><dd>${esc(p.mc_username)}</dd>
      <dt>Discord</dt><dd>${p.discord_username ? `<b>${esc(p.discord_username)}</b> <button class="small" id="copydc">Copy</button>` : '<span class="meta">not set</span>'}</dd>
      ${p.pronouns ? `<dt>Pronouns</dt><dd>${esc(p.pronouns)}</dd>` : ""}
      ${p.timezone ? `<dt>Timezone</dt><dd>${esc(p.timezone)}</dd>` : ""}`;

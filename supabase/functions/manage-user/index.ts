@@ -50,6 +50,7 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       token_hash: link.properties.hashed_token,
+      username: target.username,
       mc_username: target.mc_username,
       user_id: target.id,
     });

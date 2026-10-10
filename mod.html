@@ -106,7 +106,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=7"></script>
 <script>
 const msg = document.getElementById("msg");
 const filter = document.getElementById("filter");
@@ -119,12 +119,12 @@ async function load() {
   if (!ctx) return;
   me = ctx.profile;
   const [u, s, l, c, r, rv, tv] = await Promise.all([
-    sb.from("profiles").select("*").order("mc_username"),
-    sb.from("shops").select("id, name, city, nation, timed_out, owner_id, profiles(mc_username)").order("name"),
+    sb.from("profiles").select("*").order("username"),
+    sb.from("shops").select("id, name, city, nation, timed_out, owner_id, profiles(username, mc_username)").order("name"),
     sb.from("listings").select("*, shops(name)").order("id"),
-    sb.from("comments").select("id, shop_id, author_id, body, timed_out, profiles(mc_username)").order("id"),
+    sb.from("comments").select("id, shop_id, author_id, body, timed_out, profiles(username, mc_username)").order("id"),
     sb.from("reports").select("*").order("id", { ascending: false }),
-    sb.from("reviews").select("id, shop_id, author_id, rating, body, timed_out, profiles(mc_username)").order("id"),
+    sb.from("reviews").select("id, shop_id, author_id, rating, body, timed_out, profiles(username, mc_username)").order("id"),
     sb.from("tip_votes").select("id, user_id, listing_id, vote, created_at").order("created_at", { ascending: false })
   ]);
   data = { users: u.data || [], shops: s.data || [], listings: l.data || [], comments: c.data || [], reviews: rv.data || [], reports: r.data || [], tipVotes: tv.data || [] };
@@ -147,14 +147,14 @@ function targetInfo(r) {
   }
   if (r.target_type === "comment") {
     const c = data.comments.find(x => same(x.id, r.target_id));
-    return c && { label: `Comment by ${c.profiles ? c.profiles.mc_username : "?"}: "${c.body.slice(0, 80)}"`, href: "shop.html?id=" + c.shop_id + "#comment-" + c.id, out: stillTimedOut(c), table: "comments" };
+    return c && { label: `Comment by ${c.profiles ? userName(c.profiles) : "?"}: "${c.body.slice(0, 80)}"`, href: "shop.html?id=" + c.shop_id + "#comment-" + c.id, out: stillTimedOut(c), table: "comments" };
   }
   if (r.target_type === "review") {
     const v = data.reviews.find(x => same(x.id, r.target_id));
-    return v && { label: `Review by ${v.profiles ? v.profiles.mc_username : "?"} (${v.rating}/5)${v.body ? ": \"" + v.body.slice(0, 80) + "\"" : ""}`, href: "shop.html?id=" + v.shop_id + "#review-" + v.id, out: stillTimedOut(v), table: "reviews" };
+    return v && { label: `Review by ${v.profiles ? userName(v.profiles) : "?"} (${v.rating}/5)${v.body ? ": \"" + v.body.slice(0, 80) + "\"" : ""}`, href: "shop.html?id=" + v.shop_id + "#review-" + v.id, out: stillTimedOut(v), table: "reviews" };
   }
   const u = data.users.find(x => same(x.id, r.target_id));
-  return u && { label: "User: " + u.mc_username, href: "profile.html?id=" + u.id, out: stillTimedOut(u), user: u, canTimeout: canTimeoutUser(u) };
+  return u && { label: "User: " + userName(u), href: "profile.html?id=" + u.id, out: stillTimedOut(u), user: u, canTimeout: canTimeoutUser(u) };
 }
 
 function render() {
@@ -173,7 +173,7 @@ function render() {
         <div>${t ? `<a ${href} style="color:var(--accent)">${esc(t.label)}</a>` : '<span class="meta">(already deleted)</span>'}
           ${t && t.out ? '<span class="tag bad">timed out</span>' : ""}
           <span class="tag bad">${esc(r.target_type)}</span></div>
-        <span class="meta">by ${esc(who ? who.mc_username : "?")} \u00b7 ${agoText(r.created_at)}</span>
+        <span class="meta">by ${esc(who ? userName(who) : "?")} \u00b7 ${agoText(r.created_at)}</span>
       </div>
       <div class="mod-report-reason">
         <span class="tag warn">${esc(parsed.label)}</span>
@@ -191,7 +191,7 @@ function render() {
     const u = f.user_id ? data.users.find(x => same(x.id, f.user_id)) : null;
     const l = f.listing_id != null ? data.listings.find(x => same(x.id, f.listing_id)) : null;
     const shop = f.shop_id != null ? data.shops.find(x => same(x.id, f.shop_id)) : (l ? data.shops.find(x => same(x.id, l.shop_id)) : null);
-    const who = u ? `<a href="profile.html?id=${u.id}" style="color:var(--accent)">${esc(u.mc_username)}</a>` : '<span class="meta">-</span>';
+    const who = u ? `<a href="profile.html?id=${u.id}" style="color:var(--accent)">${esc(userName(u))}</a>` : '<span class="meta">-</span>';
     const where = l
       ? `<a href="shop.html?id=${l.shop_id}&listing=${l.id}" style="color:var(--accent)">${esc(listingText(l))}</a>`
       : shop ? `<a href="shop.html?id=${shop.id}" style="color:var(--accent)">${esc(shop.name)}</a>` : "";
@@ -211,18 +211,18 @@ function render() {
   }).join("") : '<p class="meta">No tip-jar brigading patterns right now.</p>';
 
   document.getElementById("users").innerHTML = data.users
-    .filter(u => !u.is_head && (!u.is_admin || me.is_head) && hit(u.mc_username))
+    .filter(u => !u.is_head && (!u.is_admin || me.is_head) && hit(userName(u), u.mc_username))
     .map(u => `<div class="listing">
-      <div>${esc(u.mc_username)} ${u.is_admin ? '<span class="tag">admin</span>' : ""} ${u.is_mod ? '<span class="tag">mod</span>' : ""}
+      <div>${esc(userName(u))} ${u.is_admin ? '<span class="tag">admin</span>' : ""} ${u.is_mod ? '<span class="tag">mod</span>' : ""}
         ${!u.verified_at ? '<span class="tag warn">unverified</span>' : ""} ${stillTimedOut(u) ? `<span class="tag bad">timed out</span> <span class="meta">${esc(timeoutUntilLabel(u))}</span>` : ""}</div>
       ${canTimeoutUser(u) ? tbtn("user", u.id, !stillTimedOut(u)) : ""}
     </div>`).join("") || '<p class="meta">None.</p>';
 
   document.getElementById("shops").innerHTML = data.shops
-    .filter(s => hit(s.name, s.city, s.nation, s.profiles && s.profiles.mc_username))
+    .filter(s => hit(s.name, s.city, s.nation, s.profiles && userName(s.profiles), s.profiles && s.profiles.mc_username))
     .map(s => `<div class="listing">
       <div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
-        <span class="meta">\u00b7 ${esc(s.profiles ? s.profiles.mc_username : "?")}${placeHtml(s) ? " \u00b7 " + placeHtml(s) : ""}</span> ${stillTimedOut(s) ? `<span class="tag bad">timed out</span> <span class="meta">${esc(timeoutUntilLabel(s))}</span>` : ""}</div>
+        <span class="meta">\u00b7 ${esc(s.profiles ? userName(s.profiles) : "?")}${placeHtml(s) ? " \u00b7 " + placeHtml(s) : ""}</span> ${stillTimedOut(s) ? `<span class="tag bad">timed out</span> <span class="meta">${esc(timeoutUntilLabel(s))}</span>` : ""}</div>
       ${tbtn("shop", s.id, !stillTimedOut(s))}
     </div>`).join("") || '<p class="meta">None.</p>';
 

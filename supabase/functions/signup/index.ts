@@ -15,8 +15,9 @@ const json = (body: unknown, status = 200) =>
 // Unverified accounts are deleted 24 hours after signup (staff accounts are never touched).
 async function purgeExpired(admin: ReturnType<typeof createClient>) {
   const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const { data: old } = await admin.from("profiles").select("id")
+  const { data: old, error } = await admin.from("profiles").select("id")
     .is("verified_at", null).eq("is_admin", false).eq("is_mod", false).eq("is_head", false).lt("created_at", cutoff);
+  if (error) return;
   for (const o of old || []) await admin.auth.admin.deleteUser(o.id);   // cascades to their profile + comments
 }
 
@@ -45,7 +46,7 @@ Deno.serve(async (req) => {
   }
 
   const { error: pErr } = await admin.from("profiles").insert({
-    id: created.user.id, mc_username: mc, discord_username: discord,
+    id: created.user.id, username, mc_username: mc, discord_username: discord,
     verified_at: null, must_change_password: false,   // picked their own password, no popup
   });
   if (pErr) {

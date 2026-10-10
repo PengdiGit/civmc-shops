@@ -21,7 +21,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=7"></script>
 <script>
 const msg = document.getElementById("msg");
 let me = null;
@@ -31,7 +31,7 @@ async function load() {
   if (!ctx) return;
   me = ctx.session.user.id;
   const { data, error } = await sb.from("favorites")
-    .select("id, shop_id, created_at, shops(id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(mc_username, discord_username, avatar_path, timed_out), listings(id, updated_at, stock, in_stock, timed_out), reviews(rating, traded, timed_out))")
+    .select("id, shop_id, created_at, shops(id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out), listings(id, updated_at, stock, in_stock, timed_out), reviews(rating, traded, timed_out))")
     .eq("user_id", me).order("created_at", { ascending: false });
   if (error) { setMsg(msg, error.message, "err"); return; }
   const rows = (data || []).filter(f => f.shops && shopListedPublicly(f.shops, f.shops.profiles));

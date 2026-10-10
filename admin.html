@@ -215,7 +215,7 @@
 <script src="mock.js"></script>
 <script src="places.js"></script>
 <script src="place-picker.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 <script>
 const msg = document.getElementById("msg");
 const usermsg = document.getElementById("usermsg");
@@ -305,7 +305,7 @@ async function paintAdminSales() {
 async function findAliasHits(from, field) {
   const needle = from.trim();
   if (!needle) return [];
-  const { data } = await sb.from("shops").select("id, name, city, nation, profiles(mc_username)").order("name");
+  const { data } = await sb.from("shops").select("id, name, city, nation, profiles(username, mc_username)").order("name");
   return (data || []).filter(s => {
     const cityExact = norm(s.city || "") === norm(needle);
     const nationExact = norm(s.nation || "") === norm(needle);
@@ -351,28 +351,28 @@ function paintLists() {
 
   if (me.is_head) {
     document.getElementById("users").innerHTML = accounts
-      .filter(a => hit(a.mc_username, a.discord_username, a.login_username))
+      .filter(a => hit(userName(a), a.mc_username, a.discord_username, a.login_username))
       .map(a => `<div class="listing">
-        <div><a href="profile.html?id=${a.id}" style="color:inherit">${esc(a.mc_username)}</a>
+        <div><a href="profile.html?id=${a.id}" style="color:inherit">${esc(userName(a))}</a>
           ${roleBadge(a)} ${statusBadge(a)}
-          <span class="meta">\u00b7 ${esc(a.discord_username || "-")} \u00b7 ${esc(a.login_username)} \u00b7 made ${fmtDate(a.created_at)} \u00b7 last ${fmtDate(a.last_sign_in_at)}</span></div>
+          <span class="meta">\u00b7 MC ${esc(a.mc_username)} \u00b7 ${esc(a.discord_username || "-")} \u00b7 made ${fmtDate(a.created_at)} \u00b7 last ${fmtDate(a.last_sign_in_at)}</span></div>
         <div class="acct-actions">${roleButtons(a)}</div>
       </div>`).join("") || '<p class="meta">None.</p>';
   } else {
     document.getElementById("users").innerHTML = viewUsers
-      .filter(u => hit(u.mc_username, u.discord_username, u.login_username))
-      .map(u => `<div class="listing"><div>${esc(u.mc_username)}
+      .filter(u => hit(userName(u), u.mc_username, u.discord_username, u.login_username))
+      .map(u => `<div class="listing"><div>${esc(userName(u))}
         ${roleBadge(u)}
         ${u.verified_at ? '<span class="tag ok">verified</span>' : '<span class="tag warn">unverified</span>'}
         ${u.timed_out ? '<span class="tag bad">timed out</span>' : ""}</div></div>`).join("") || '<p class="meta">None.</p>';
   }
 
   document.getElementById("shops").innerHTML = shopRows
-    .filter(s => hit(s.name, s.city, s.nation, s.profiles && s.profiles.mc_username))
+    .filter(s => hit(s.name, s.city, s.nation, s.profiles && userName(s.profiles), s.profiles && s.profiles.mc_username))
     .map(s =>
       `<div class="listing" data-id="${s.id}">
         <div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
-          <span class="meta">\u00b7 ${esc(s.profiles?.mc_username)} \u00b7 ${placeHtml(s) || "no place"} \u00b7 ${(s.listings || []).length} listings</span></div>
+          <span class="meta">\u00b7 ${esc(s.profiles ? userName(s.profiles) : "?")} \u00b7 ${placeHtml(s) || "no place"} \u00b7 ${(s.listings || []).length} listings</span></div>
         <div class="inline-actions">
           ${me.is_head ? `<button class="small" data-act="transfer" data-id="${s.id}" title="Reassign this shop to another account">Transfer</button>` : ""}
           ${iconBtn("trash", { danger: true, cls: "btn-report", title: "Delete shop", attrs: 'data-act="del"' })}
@@ -392,14 +392,18 @@ async function render() {
   if (me.is_head) {
     const r = await callFn("review-signup", { action: "list" });
     if (!r.ok) { setMsg(usermsg, r.message, "err"); }
-    else accounts = r.data.accounts;
+    else {
+      accounts = r.data.accounts;
+      const ap = r.data.auto_purged || 0;
+      if (ap > 0) setMsg(purgemsg, "Auto-purged " + ap + " expired unverified account" + (ap === 1 ? "" : "s") + " on load.", "ok");
+    }
 
     const pending = accounts.filter(a => !a.verified_at && !a.is_admin && !a.is_mod && !a.is_head)
       .sort((a, b) => a.created_at < b.created_at ? -1 : 1);
     document.getElementById("pending").innerHTML = pending.map(a => `
       <div class="card admin-card">
         <div class="top">
-          <div><b>${esc(a.mc_username)}</b> <span class="meta">Discord: ${esc(a.discord_username || "?")} \u00b7 login: ${esc(a.login_username)} \u00b7 signed up ${fmtDate(a.created_at)} \u00b7 <b>${timeLeft(a.created_at)}</b> left</span></div>
+          <div><b>${esc(userName(a))}</b> <span class="meta">MC ${esc(a.mc_username)} \u00b7 Discord: ${esc(a.discord_username || "?")} \u00b7 signed up ${fmtDate(a.created_at)} \u00b7 <b>${timeLeft(a.created_at)}</b> left</span></div>
           <div class="inline-actions">
             <button class="small primary" data-act="accept" data-id="${a.id}">Accept</button>
             <button class="small btn-report" data-act="deny" data-id="${a.id}">Deny</button>
@@ -407,12 +411,12 @@ async function render() {
         </div>
       </div>`).join("") || '<p class="meta">No pending signups.</p>';
   } else {
-    const { data: users } = await sb.from("profiles").select("*").order("mc_username");
+    const { data: users } = await sb.from("profiles").select("*").order("username");
     viewUsers = users || [];
   }
 
   const [{ data: shops }, { data: listings }] = await Promise.all([
-    sb.from("shops").select("id, owner_id, name, city, nation, profiles(mc_username), listings(id, updated_at, in_stock, timed_out)").order("created_at", { ascending: false }),
+    sb.from("shops").select("id, owner_id, name, city, nation, profiles(username, mc_username), listings(id, updated_at, in_stock, timed_out)").order("created_at", { ascending: false }),
     sb.from("listings").select("*, shops(name)").order("id")
   ]);
   shopRows = shops || [];
@@ -430,7 +434,7 @@ async function render() {
     ? stale.map(({ s, newest, days, n }) =>
       `<div class="listing">
         <div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
-          <span class="meta">\u00b7 ${esc(s.profiles?.mc_username || "?")} \u00b7 ${n} in-stock \u00b7 quiet ${days}d \u00b7 last ${updatedHtml(newest, { prefix: false })}</span>
+          <span class="meta">\u00b7 ${esc(s.profiles ? userName(s.profiles) : "?")} \u00b7 ${n} in-stock \u00b7 quiet ${days}d \u00b7 last ${updatedHtml(newest, { prefix: false })}</span>
         </div>
       </div>`).join("")
     : '<p class="meta">Nothing stale right now.</p>';
@@ -449,7 +453,7 @@ document.querySelector("main").addEventListener("click", async e => {
     if (!me.is_head) { setMsg(purgemsg, "Only the head admin can purge.", "err"); return; }
     if (!await confirmModal({
       title: "Purge unverified",
-      body: "Delete every unverified non-staff account older than 24 hours? This can't be undone.",
+      body: "Delete every unverified non-staff account older than 24 hours? Pending signups under 24 hours are left alone. This can't be undone.",
       confirmLabel: "Purge now",
       danger: true
     })) return;
@@ -457,7 +461,11 @@ document.querySelector("main").addEventListener("click", async e => {
     const r = await callFn("review-signup", { action: "purge_unverified" });
     if (!r.ok) { setMsg(purgemsg, r.message, "err"); return; }
     const n = (r.data && r.data.purged) || 0;
-    setMsg(purgemsg, "Purged " + n + " account" + (n === 1 ? "" : "s") + ".", "ok");
+    if (n === 0) {
+      setMsg(purgemsg, "No unverified accounts older than 24 hours to purge.", "ok");
+    } else {
+      setMsg(purgemsg, "Purged " + n + " account" + (n === 1 ? "" : "s") + ".", "ok");
+    }
     render();
     return;
   }
@@ -472,7 +480,7 @@ document.querySelector("main").addEventListener("click", async e => {
     aliasPreviewRows = await findAliasHits(from, field);
     document.getElementById("alias-hits").innerHTML = aliasPreviewRows.length
       ? aliasPreviewRows.map(s => `<div class="listing"><div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
-          <span class="meta">\u00b7 ${esc(s.profiles?.mc_username || "?")} \u00b7 city: ${esc(s.city || "-")} \u00b7 nation: ${esc(s.nation || "-")}</span></div></div>`).join("")
+          <span class="meta">\u00b7 ${esc(s.profiles ? userName(s.profiles) : "?")} \u00b7 city: ${esc(s.city || "-")} \u00b7 nation: ${esc(s.nation || "-")}</span></div></div>`).join("")
       : '<p class="meta">No shops store that exact text.</p>';
     if (act === "alias-preview") {
       setMsg(aliasmsg, aliasPreviewRows.length + " shop" + (aliasPreviewRows.length === 1 ? "" : "s") + " would change.", aliasPreviewRows.length ? "ok" : "err");
@@ -510,31 +518,37 @@ document.querySelector("main").addEventListener("click", async e => {
     if (!shop) return;
     const nameIn = await promptModal({
       title: "Transfer shop",
-      body: "Move \"" + shop.name + "\" (currently " + (shop.profiles?.mc_username || "?") + ") to another verified account.",
-      label: "New owner Minecraft name",
-      placeholder: "Exact MC username",
+      body: "Move \"" + shop.name + "\" (currently " + userName(shop.profiles) + ") to another verified account.",
+      label: "New owner username",
+      placeholder: "Exact login username",
       maxLength: 60,
       confirmLabel: "Continue"
     });
     if (nameIn === null) return;
     const targetName = nameIn.trim();
-    if (!targetName) { setMsg(msg, "Enter a Minecraft name.", "err"); return; }
-    const { data: hits } = await sb.from("profiles").select("id, mc_username, verified_at, timed_out")
-      .ilike("mc_username", targetName).limit(10);
-    const target = (hits || []).find(p => (p.mc_username || "").toLowerCase() === targetName.toLowerCase()) || null;
+    if (!targetName) { setMsg(msg, "Enter a username.", "err"); return; }
+    const needle = targetName.toLowerCase();
+    let { data: hits } = await sb.from("profiles").select("id, username, mc_username, verified_at, timed_out")
+      .ilike("username", targetName).limit(10);
+    let target = (hits || []).find(p => (p.username || "").toLowerCase() === needle) || null;
+    if (!target) {
+      ({ data: hits } = await sb.from("profiles").select("id, username, mc_username, verified_at, timed_out")
+        .ilike("mc_username", targetName).limit(10));
+      target = (hits || []).find(p => (p.mc_username || "").toLowerCase() === needle) || null;
+    }
     if (!target) { setMsg(msg, "No account named \"" + targetName + "\".", "err"); return; }
     if (String(target.id) === String(shop.owner_id)) { setMsg(msg, "That player already owns this shop.", "err"); return; }
     if (target.timed_out) { setMsg(msg, "That account is timed out.", "err"); return; }
     if (!target.verified_at) { setMsg(msg, "That account is not verified yet.", "err"); return; }
     if (!await confirmModal({
       title: "Confirm transfer",
-      body: "Transfer \"" + shop.name + "\" to " + target.mc_username + "? The previous owner loses edit access immediately.",
+      body: "Transfer \"" + shop.name + "\" to " + userName(target) + "? The previous owner loses edit access immediately.",
       confirmLabel: "Transfer shop",
       danger: true
     })) return;
     const { error } = await sb.from("shops").update({ owner_id: target.id }).eq("id", shop.id);
     if (error) { setMsg(msg, error.message, "err"); return; }
-    setMsg(msg, "Transferred to " + target.mc_username + ".", "ok");
+    setMsg(msg, "Transferred to " + userName(target) + ".", "ok");
     render();
     return;
   }
@@ -548,7 +562,7 @@ document.querySelector("main").addEventListener("click", async e => {
   }
   if (act === "impersonate") {
     const a = accounts.find(x => x.id === btn.dataset.id);
-    const name = a ? a.mc_username : "this user";
+    const name = a ? userName(a) : "this user";
     if (!await confirmModal({
       title: "Log in as user",
       body: "Log into " + name + "? You'll see the site as them until you press Exit on the yellow bar.",
@@ -564,7 +578,7 @@ document.querySelector("main").addEventListener("click", async e => {
     const a = accounts.find(x => x.id === btn.dataset.id);
     if (!await confirmModal({
       title: "Delete account",
-      body: "Delete " + (a ? a.mc_username : "this account") + " and EVERYTHING they made (shops, listings, comments, reviews)? This can't be undone.",
+      body: "Delete " + (a ? userName(a) : "this account") + " and EVERYTHING they made (shops, listings, comments, reviews)? This can't be undone.",
       confirmLabel: "Delete account",
       danger: true
     })) return;
