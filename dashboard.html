@@ -344,11 +344,6 @@ function panelHtml(s) {
     <label>Find me (optional)</label>
     <input type="text" class="p-find" maxlength="120" value="${esc(s.find_note || "")}" placeholder="e.g. 2nd floor, blue wool" style="width:100%">
 
-    <label>Paste sign dump (optional helper)</label>
-    <textarea class="p-signs" rows="3" placeholder="One trade per line, e.g.&#10;64 blaze rod for 1 diamond [24]&#10;B 8 ender pearl : S 1 diamond"></textarea>
-    <div class="row" style="margin-top:4px"><button type="button" class="small" data-act="parse-signs">Parse into draft listings</button></div>
-    <p class="meta" style="margin:4px 0 0">Adds parsed rows below - optional <code>[64]</code> stock suffix. Review amounts, then save each listing.</p>
-
     <label>Shop picture</label>
     <div class="row">
       <span class="p-iconprev">${iconPrev}</span>
@@ -1136,39 +1131,6 @@ document.getElementById("shops").addEventListener("click", async e => {
     panel.dataset.removePic = "1";
     panel.querySelector(".p-iconprev").innerHTML = shopIcon({ icon_item: panel.dataset.iconItem, icon_path: null }, "card");
     btn.remove();
-    return;
-  }
-  if (act === "parse-signs") {
-    const raw = panel.querySelector(".p-signs").value;
-    const drafts = parseSignDump(raw);
-    if (!drafts.length) { setMsg(msg, "Couldn't parse any lines. Try: 64 blaze rod for 1 diamond", "err"); return; }
-    const add = shopEl.querySelector(".addform");
-    // Apply first draft into the add form; queue the rest as stacked adds
-    const applyDraft = (d) => {
-      add.querySelector(".l-wa").value = d.want_amount;
-      add.querySelector(".l-sa").value = d.sell_amount;
-      add.querySelector(".l-wu").value = d.want_unit || "";
-      add.querySelector(".l-su").value = d.sell_unit || "";
-      add.querySelector(".l-stock").value = d.stock == null ? "" : String(d.stock);
-      setPick(add.querySelector('[data-pick="want"]'), d.want_item);
-      setPick(add.querySelector('[data-pick="sell"]'), d.sell_item);
-    };
-    applyDraft(drafts[0]);
-    for (let i = 1; i < drafts.length; i++) {
-      const d = drafts[i];
-      const stock = d.stock == null ? null : d.stock;
-      await sb.from("listings").insert({
-        shop_id: shopId,
-        sell_item: d.sell_item, sell_amount: d.sell_amount, sell_unit: d.sell_unit || "",
-        want_item: d.want_item, want_amount: d.want_amount, want_unit: d.want_unit || "",
-        stock, in_stock: inStockFromStock(stock)
-      });
-    }
-    panel.querySelector(".p-signs").value = "";
-    setMsg(msg, drafts.length === 1
-      ? "Parsed 1 listing into the add form - click Add listing."
-      : "Added " + (drafts.length - 1) + " listing(s); first is in the add form.", "ok");
-    if (drafts.length > 1) render();
     return;
   }
   if (act === "bulk-toggle") {

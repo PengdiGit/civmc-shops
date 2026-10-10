@@ -624,41 +624,6 @@ function wireCompareTray(getPins, setPins, opts) {
   }
 }
 
-// Pragmatic ChestShop / exchange paste → draft listing rows
-// Optional trailing stock: "... [64]" → exchanges left
-function parseSignDump(text) {
-  const out = [];
-  const lines = String(text || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  const unitOf = u => (/^cs$/i.test(u) ? "cs" : /^ci$/i.test(u) ? "ci" : "");
-  // "64 blaze rod for 1 diamond" / "8 blaze rod → 1 diamond"
-  const reFor = /^(\d+)\s*(ci|cs)?\s+([a-z0-9_ ]+?)\s+(?:for|→|->|=)\s+(\d+)\s*(ci|cs)?\s+([a-z0-9_ ]+)$/i;
-  // "B 8 blaze rod : S 1 diamond" / "B 64 Diamond S 2 Emerald"
-  const reBS = /^b\s+(\d+)\s*(ci|cs)?\s+([a-z0-9_ ]+?)\s*[:|]?\s*s\s+(\d+)\s*(ci|cs)?\s+([a-z0-9_ ]+)$/i;
-  const reStock = /\s*\[(\d+)\]\s*$/;
-  lines.forEach(line => {
-    let stock = null;
-    let raw = line;
-    const sm = raw.match(reStock);
-    if (sm) {
-      stock = parseInt(sm[1], 10);
-      raw = raw.slice(0, sm.index).trim();
-    }
-    let m = raw.match(reBS) || raw.match(reFor);
-    if (!m) return;
-    // ChestShop B = what shop buys (want), S = what shop sells
-    out.push({
-      want_amount: parseInt(m[1], 10),
-      want_unit: unitOf(m[2]),
-      want_item: norm(m[3]),
-      sell_amount: parseInt(m[4], 10),
-      sell_unit: unitOf(m[5]),
-      sell_item: norm(m[6]),
-      stock
-    });
-  });
-  return out;
-}
-
 // Stock honesty: reward fresh numeric stock; penalise quiet + still claiming in stock
 function honestyInfo(listings) {
   const ls = (listings || []).filter(l => !l.timed_out && ("updated_at" in l || "stock" in l || "in_stock" in l));
