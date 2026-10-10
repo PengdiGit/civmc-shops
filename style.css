@@ -1456,13 +1456,12 @@ a.find-discord-embed:hover .find-discord-join {
   min-height: 112px;
 }
 .find-page .shop-card .grow {
-  justify-content: space-between;
+  justify-content: center;
   gap: 6px;
 }
 .find-page .shop-card .title {
   font-size: 1.18rem;
   line-height: 1.25;
-  min-height: calc(1.25em * 2);
 }
 .find-page .shop-card .meta-line {
   font-size: .92rem;
