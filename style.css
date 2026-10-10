@@ -1559,7 +1559,17 @@ body.find-page > main {
 }
 .profile-hero img.avatar { width: 128px; height: 128px; border-radius: 8px; }
 .profile-hero h1 { margin: 0 0 6px; }
-.profile-hero .bio { margin: 0; padding: 0; max-width: none; line-height: 1.55; }
+.profile-hero .bio {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  max-height: calc(1.55em * 3);
+}
 .profile-hero .inline-actions { margin-top: 12px; }
 .profile-meta-facts { margin-top: 10px; }
 .facts { margin: 8px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; align-items: center; }
@@ -1578,6 +1588,18 @@ body.find-page > main {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 .bio { white-space: pre-wrap; word-break: break-word; }
+#bioedit.mcfield {
+  min-height: calc(1.4em * 3 + 18px);
+  max-height: calc(1.4em * 3 + 18px);
+  resize: none;
+}
+#bioprev {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  max-height: calc(1.55em * 3);
+}
 .stats {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px; margin: 0 0 20px;

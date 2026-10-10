@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=13">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
@@ -35,7 +35,7 @@
 
       <label for="bioedit">Bio (Minecraft colour codes work here)</label>
       <div class="palette" id="palette-bio"></div>
-      <textarea class="mcfield" id="bioedit" maxlength="300" placeholder="&7Tell people what you trade... (300 characters max)"></textarea>
+      <textarea class="mcfield" id="bioedit" rows="3" maxlength="300" placeholder="&7Tell people what you trade... (3 lines, 300 characters max)"></textarea>
       <div class="preview" id="bioprev"></div>
       <div class="row" style="margin-top:6px"><button id="savebio">Save bio</button></div>
 
@@ -194,6 +194,28 @@ document.getElementById("hl-swatches").onclick = e => {
   applyHighlight(c || null);
 };
 
+const BIO_MAX_LINES = 3;
+
+function clampBioLines(text) {
+  const normalized = String(text ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const lines = normalized.split("\n");
+  if (lines.length <= BIO_MAX_LINES) return normalized;
+  return lines.slice(0, BIO_MAX_LINES).join("\n");
+}
+
+function enforceBioEdit(field) {
+  if (!field || field.id !== "bioedit") return;
+  const start = field.selectionStart;
+  const end = field.selectionEnd;
+  const next = clampBioLines(field.value).slice(0, field.maxLength || 300);
+  if (next === field.value) return;
+  field.value = next;
+  if (typeof start === "number") {
+    const pos = Math.min(start, next.length);
+    field.setSelectionRange(pos, Math.min(typeof end === "number" ? end : pos, next.length));
+  }
+}
+
 function updatePrev(field, prevId) {
   const prev = document.getElementById(prevId);
   const v = field.value;
@@ -205,7 +227,10 @@ document.getElementById("own").addEventListener("focusin", e => {
   if (e.target.classList.contains("mcfield")) lastField = e.target;
 });
 document.getElementById("own").addEventListener("input", e => {
-  if (e.target.id === "bioedit") updatePrev(e.target, "bioprev");
+  if (e.target.id === "bioedit") {
+    enforceBioEdit(e.target);
+    updatePrev(e.target, "bioprev");
+  }
 });
 document.getElementById("own").addEventListener("click", e => {
   const cb = e.target.closest("button[data-code]");
@@ -215,6 +240,7 @@ document.getElementById("own").addEventListener("click", e => {
     : document.getElementById("bioedit");
   insertMcCode(field, cb.dataset.code);
   if (field.value.length > field.maxLength) field.value = field.value.slice(0, field.maxLength);
+  enforceBioEdit(field);
   updatePrev(field, "bioprev");
 });
 
@@ -257,12 +283,14 @@ async function load() {
   const login = userName(p);
   const mcName = p.mc_username || "";
   const dcName = p.discord_username || "";
+  const pronouns = (p.pronouns || "").trim();
+  const timezone = (p.timezone || "").trim();
   document.getElementById("facts").innerHTML =
     `<dt>Username</dt><dd class="fact-copy" data-copy="${esc(login)}" title="Click to copy" role="button" tabindex="0"><b>${esc(primary)}</b></dd>
      <dt>Minecraft</dt><dd${mcName ? ` class="fact-copy" data-copy="${esc(mcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${esc(mcName || "—")}</dd>
      <dt>Discord</dt><dd${dcName ? ` class="fact-copy" data-copy="${esc(dcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${dcName ? `<b>${esc(dcName)}</b>` : '<span class="meta">not set</span>'}</dd>
-     ${p.pronouns ? `<dt>Pronouns</dt><dd>${esc(p.pronouns)}</dd>` : ""}
-     ${p.timezone ? `<dt>Timezone</dt><dd>${esc(p.timezone)}</dd>` : ""}`;
+     <dt>Pronouns</dt><dd>${pronouns ? esc(pronouns) : '<span class="meta">N/A</span>'}</dd>
+     <dt>Timezone</dt><dd>${timezone ? esc(timezone) : '<span class="meta">N/A</span>'}</dd>`;
   document.getElementById("meta-facts").innerHTML =
     `<dt>Member since</dt><dd title="${esc(p.created_at ? new Date(p.created_at).toLocaleString() : "")}">${esc(since)}</dd>
      <dt>Last seen</dt><dd>${lastSeenHtml(p.last_seen_at)}</dd>`;
@@ -285,8 +313,9 @@ async function load() {
   document.getElementById("toggledit").hidden = !own;
   document.getElementById("edit-wrap").hidden = !own;
   if (own) {
-    document.getElementById("bioedit").value = p.bio || "";
-    updatePrev(document.getElementById("bioedit"), "bioprev");
+    const bioEdit = document.getElementById("bioedit");
+    bioEdit.value = clampBioLines(p.bio || "");
+    updatePrev(bioEdit, "bioprev");
     document.getElementById("pronounsedit").value = p.pronouns || "";
     document.getElementById("timezoneedit").value = p.timezone || "";
     syncHlUi(p.highlight_color || null);
@@ -396,7 +425,9 @@ document.getElementById("toggledit").onclick = () => {
 };
 
 document.getElementById("savebio").onclick = async () => {
-  const v = document.getElementById("bioedit").value.trim().slice(0, 300);
+  const bioEdit = document.getElementById("bioedit");
+  enforceBioEdit(bioEdit);
+  const v = clampBioLines(bioEdit.value).trim().slice(0, 300);
   const { error } = await sb.from("profiles").update({ bio: v || null }).eq("id", shown.id);
   if (error) { setMsg(msg, error.message, "err"); return; }
   setMsg(msg, "Bio saved.", "ok");
