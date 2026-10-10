@@ -2283,23 +2283,27 @@ body.fav-page .fav-person-name {
   text-overflow: ellipsis;
 }
 body.fav-page .fav-person .icon-btn { margin-left: auto; }
-/* Profile favourite: yellow hollow (off) / solid (on) */
-body.profile-page #favprof {
+/* Favourite stars: yellow hollow (off) / solid (on) */
+body.profile-page #favprof,
+body.shop-page #favbtn {
   color: #e0b45a;
   border-color: color-mix(in srgb, #e0b45a 55%, var(--line));
   background: color-mix(in srgb, #e0b45a 12%, var(--panel));
 }
-body.profile-page #favprof:hover {
+body.profile-page #favprof:hover,
+body.shop-page #favbtn:hover {
   color: #f0c96a;
   border-color: #e0b45a;
   background: color-mix(in srgb, #e0b45a 20%, var(--panel));
 }
-body.profile-page #favprof.on {
+body.profile-page #favprof.on,
+body.shop-page #favbtn.on {
   color: #e8bc4a;
   border-color: color-mix(in srgb, #e0b45a 75%, var(--line));
   background: color-mix(in srgb, #e0b45a 26%, var(--panel));
 }
-body.profile-page #favprof.on:hover {
+body.profile-page #favprof.on:hover,
+body.shop-page #favbtn.on:hover {
   color: #f0c96a;
   border-color: #e0b45a;
   background: color-mix(in srgb, #e0b45a 32%, var(--panel));

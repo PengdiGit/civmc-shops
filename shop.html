@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shop - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=17">
 </head>
 <body class="shop-page">
 <nav id="nav"></nav>
@@ -12,7 +12,7 @@
   <header class="page-hero shop-storefront">
     <a class="back" href="index.html">&larr; Back to search</a>
     <div class="action-cluster shop-hero-actions" id="shop-actions">
-      <button type="button" id="favbtn" data-act="fav" hidden></button>
+      <button type="button" id="favbtn" class="icon-btn" data-act="fav" hidden title="Favourite this shop" aria-label="Favourite this shop" data-ico="star"></button>
       <button type="button" id="sharebtn" data-act="share" data-ico="share" title="Copy link to this shop" aria-label="Share shop"></button>
       <span id="shop-mod-actions"></span>
     </div>
@@ -98,6 +98,19 @@ let reviewCache = [];
 let reviewSort = "newest";
 
 const verifyHelp = () => `Verified accounts only. <a href="verify.html">Verify here</a> (${PFA_HELP}).`;
+
+function paintFavBtn() {
+  const fb = document.getElementById("favbtn");
+  if (!fb) return;
+  // Always show once a shop is loaded — owners can favourite their own shop too.
+  fb.hidden = !shop;
+  if (!shop) return;
+  fb.className = "icon-btn" + (isFav ? " on" : "");
+  fb.title = isFav ? "Remove from favourites" : "Favourite this shop";
+  fb.setAttribute("aria-label", fb.title);
+  fb.setAttribute("data-ico", isFav ? "starFill" : "star");
+  fb.innerHTML = uiIcon(isFav ? "starFill" : "star");
+}
 
 function listingMatchesFind(l) {
   if (!findQ) return false;
@@ -313,13 +326,10 @@ async function load() {
   if (me) {
     const { data: f } = await sb.from("favorites").select("id").eq("user_id", me.id).eq("shop_id", shopId);
     isFav = !!(f && f.length);
+  } else {
+    isFav = false;
   }
-  const fb = document.getElementById("favbtn");
-  fb.hidden = !!isOwner;
-  fb.className = "icon-btn" + (isFav ? " on" : "");
-  fb.title = isFav ? "Remove from favourites" : "Favourite this shop";
-  fb.setAttribute("aria-label", fb.title);
-  fb.innerHTML = uiIcon(isFav ? "starFill" : "star");
+  paintFavBtn();
 
   const p = s.profiles || {};
   let banner = "";
