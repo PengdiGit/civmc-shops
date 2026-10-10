@@ -138,7 +138,7 @@ function navPageKey() {
   return "";
 }
 function brandHtml() {
-  return '<a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">CivMC Shops</span></a>';
+  return '<a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">CivShops</span></a>';
 }
 function navLeftHtml() {
   const k = navPageKey();
