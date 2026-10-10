@@ -9,3 +9,13 @@ Thumbs.db
 .mig1.sql
 .mig2.sql
 .mig3.sql
+
+# Local / agent-only — keep on disk, do not publish to GitHub Pages
+HANDOFF_PROMPT.md
+PROJECT_CONTEXT.md
+IDEAS.md
+mock.js
+make_items.py
+setup.sql
+market-snapshot.sql
+purge-unverified.sql
