@@ -222,7 +222,7 @@ async function load() {
   shown = p;
   own = myId === p.id;
 
-  const primary = userName(p);
+  const primary = profileDisplayName(p);
   document.title = primary + " - CivMC Shops";
   document.getElementById("name").textContent = primary;
   document.getElementById("avatar").innerHTML = avatarImg(p, 128);

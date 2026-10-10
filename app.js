@@ -379,6 +379,18 @@ function userName(p) {
   if (!p) return "?";
   return p.username || p.login_username || p.mc_username || "?";
 }
+/** Profile-hero display casing only — does not change stored login usernames. */
+function profileDisplayName(p) {
+  if (!p) return "?";
+  const login = String(p.username || p.login_username || "").trim();
+  const mc = String(p.mc_username || "").trim();
+  // Prefer MC casing when it is the same identity (case-insensitive match).
+  if (mc && login && mc.toLowerCase() === login.toLowerCase()) return mc;
+  if (mc && !login) return mc;
+  if (!login) return mc || "?";
+  // Login is stored lowercase; capitalize for profile display.
+  return login.replace(/(^|_)([a-z])/g, (_, sep, ch) => sep + ch.toUpperCase());
+}
 
 function mapUrl(x, z) {
   // CivInfo map: https://map.civinfo.net/#c=x,z
