@@ -524,7 +524,11 @@ function dashListingRow(l) {
       <div class="dash-alt-wants">
         <div class="dash-alt-wants-list">${alts.map(dashAltWantRowHtml).join("")}</div>
         <button type="button" class="small" data-act="add-alt-want" ${alts.length >= 2 ? "hidden" : ""}>+ Alt price (up to 3 total)</button>
+<<<<<<< Updated upstream
         <p class="meta" style="margin:4px 0 0">Alt prices show as a fork into the item you sell (e.g. diamonds or ender eye).</p>
+=======
+        <p class="meta" style="margin:4px 0 0">Alt prices are OR options — buyers pay any one (shown as a fork into the item you sell).</p>
+>>>>>>> Stashed changes
       </div>
       <div class="dash-listing-extra">
         <label class="dash-enchants-label" ${showEnchants ? "" : "hidden"}>Enchants
@@ -576,10 +580,14 @@ function shopGroupSections(listings, shop) {
 
 function dashGroupHeadHtml(shop, groupKey, label) {
   const hasIcon = !!groupIconEntry(shop, groupKey);
+  const renameBtn = groupKey
+    ? iconBtn("pen", { title: "Rename group", attrs: `data-act="rename-group" data-group="${esc(groupKey)}"` })
+    : "";
   return `<div class="dash-group-head">
     ${groupIconHtml(shop, groupKey, "sm")}
     <span class="meta dash-group-title">${esc(label)}</span>
     <div class="action-cluster dash-group-icon-actions">
+      ${renameBtn}
       ${iconBtn("image", { title: "Set group icon", attrs: `data-act="pick-group-icon" data-group="${esc(groupKey)}"` })}
       ${iconBtn("x", { title: "Clear group icon", attrs: `data-act="clear-group-icon" data-group="${esc(groupKey)}"${hasIcon ? "" : " hidden"}` })}
     </div>
@@ -1127,6 +1135,58 @@ document.getElementById("shops").addEventListener("click", async e => {
       setMsg(msg, "Group added.", "ok");
       render();
     });
+    return;
+  }
+  if (act === "rename-group" && shopElEarly) {
+    const shopId = shopElEarly.dataset.shop;
+    const shop = shopsData[shopId];
+    const oldName = String(btn.dataset.group || "").trim();
+    if (!oldName) return;
+    const name = await promptModal({
+      title: "Rename group",
+      body: "Updates this section label for all listings in the group.",
+      label: "Group name",
+      maxLength: 60,
+      defaultValue: oldName,
+      confirmLabel: "Rename"
+    });
+    if (name == null) return;
+    const trimmed = name.trim().slice(0, 60);
+    if (!trimmed) { setMsg(msg, "Group name can't be empty.", "err"); return; }
+    if (trimmed === oldName) return;
+    if (shopGroupSections(shop.listings, shop).some(s => s.key === trimmed)) {
+      setMsg(msg, "That group already exists.", "err");
+      return;
+    }
+    btn.disabled = true;
+    const listRes = await sb.from("listings")
+      .update({ group_name: trimmed })
+      .eq("shop_id", shopId)
+      .eq("group_name", oldName);
+    if (listRes.error) {
+      btn.disabled = false;
+      setMsg(msg, listRes.error.message, "err");
+      return;
+    }
+    const icons = { ...normalizeGroupIcons(shop.group_icons) };
+    if (Object.prototype.hasOwnProperty.call(icons, oldName)) {
+      icons[trimmed] = icons[oldName];
+      delete icons[oldName];
+    }
+    const shopRes = await sb.from("shops").update({ group_icons: icons }).eq("id", shopId);
+    btn.disabled = false;
+    if (shopRes.error) { setMsg(msg, shopRes.error.message, "err"); return; }
+    shop.group_icons = icons;
+    (shop.listings || []).forEach(l => {
+      if (String(l.group_name || "").trim() === oldName) l.group_name = trimmed;
+    });
+    if (addingListingSlot
+      && String(addingListingSlot.shopId) === String(shopId)
+      && addingListingSlot.groupKey === oldName) {
+      addingListingSlot = { shopId, groupKey: trimmed };
+    }
+    setMsg(msg, "Group renamed.", "ok");
+    render();
     return;
   }
 
