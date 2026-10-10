@@ -1109,23 +1109,18 @@ body.find-page > main {
 }
 .find-page .find-board .sub { margin: 0; max-width: 56ch; }
 
-/* Discord invite — compact card left of Favourites */
-.find-board-side-top {
-  display: flex;
-  align-items: stretch;
-  justify-content: flex-end;
-  gap: 10px;
-  width: 100%;
-}
+/* Discord invite — same olive family as .find-loc (not Discord slate) */
 .find-discord-invite {
-  flex: 0 1 auto;
-  width: max-content;
-  max-width: 220px;
-  min-width: 0;
+  grid-column: 2;
+  justify-self: center;
+  min-width: min(100%, 280px);
+  max-width: 440px;
+  width: min(100%, 440px);
+  align-self: center;
 }
 a.find-discord-embed {
   display: block;
-  padding: 10px;
+  padding: 12px 12px 14px;
   text-decoration: none;
   color: inherit;
   /* Match .find-loc panel: translucent olive over board, muted line border */
@@ -1145,13 +1140,14 @@ a.find-discord-embed:focus-visible {
 }
 .find-discord-row {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 .find-discord-icon {
   flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   border-radius: 8px;
   object-fit: cover;
   image-rendering: auto;
@@ -1159,44 +1155,39 @@ a.find-discord-embed:focus-visible {
   border: 1px solid var(--line);
   box-shadow: none;
 }
-.find-discord-main {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-}
 .find-discord-copy {
+  flex: 1 1 140px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
 }
 .find-discord-name {
-  font-size: .98rem;
+  font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: -.02em;
   color: var(--text);
   line-height: 1.25;
 }
 .find-discord-blurb {
-  font-size: .84rem;
+  font-size: .9rem;
   color: color-mix(in srgb, var(--text) 78%, var(--dim));
   line-height: 1.3;
 }
 .find-discord-status {
-  font-size: .74rem;
+  font-size: .78rem;
   color: var(--dim);
 }
 .find-discord-join {
+  flex-shrink: 0;
+  align-self: center;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  padding: 7px 12px;
+  margin-left: auto;
+  padding: 8px 16px;
   border-radius: 4px;
-  font-size: .84rem;
+  font-size: .88rem;
   font-weight: 600;
   color: var(--btn-on-accent);
   /* Site lime accent (Search), not stock Discord green */
@@ -1217,15 +1208,9 @@ a.find-discord-embed:hover .find-discord-join {
 
 .find-board-side {
   display: flex; flex-direction: column; align-items: stretch; gap: 10px;
-  grid-column: 2;
+  grid-column: 3;
   justify-self: end;
-  width: max-content;
-  max-width: min(100%, 420px);
-}
-.find-board-side .btn-favourites {
-  flex: 0 0 auto;
-  align-self: stretch;
-  white-space: nowrap;
+  width: min(100%, 220px);
 }
 .find-page .find-board .btn-favourites {
   text-align: center;
@@ -1556,17 +1541,16 @@ a.find-discord-embed:hover .find-discord-join {
     grid-column: 1;
     justify-self: stretch;
     width: 100%;
-    max-width: none;
     order: 2;
   }
-  .find-board-side-top {
-    flex-direction: column;
-    align-items: stretch;
-  }
   .find-discord-invite {
+    grid-column: 1;
     max-width: none;
     width: 100%;
+    order: 3;
   }
+  .find-discord-join { width: 100%; margin-left: 0; align-self: stretch; }
+  .find-discord-row { align-items: center; flex-wrap: wrap; }
   .find-sort { margin-left: 0; }
 }
 
