@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
@@ -22,6 +22,7 @@
     </div>
     <div class="inline-actions" id="actions"></div>
     <div class="action-cluster profile-hero-actions" id="hero-actions">
+      <button type="button" id="favprof" hidden title="Favourite this profile" aria-label="Favourite this profile"></button>
       <button type="button" id="shareprof" class="primary" data-ico="share" title="Copy profile link" aria-label="Share profile"></button>
       <button type="button" id="toggledit" data-ico="pen" title="Edit profile" aria-label="Edit profile" hidden></button>
     </div>
@@ -103,8 +104,20 @@ const nameParam = params.get("name");
 const msg = document.getElementById("msg");
 const factsEl = document.getElementById("facts");
 let own = false, myId = null, shown = null, myProfile = null;
+let isFavProf = false;
 let lastField = null;
 let activeTab = "shops";
+
+function paintFavProfBtn() {
+  const fb = document.getElementById("favprof");
+  if (!fb) return;
+  fb.hidden = !!own;
+  if (own) return;
+  fb.className = "icon-btn" + (isFavProf ? " on" : "");
+  fb.title = isFavProf ? "Remove from favourites" : "Favourite this profile";
+  fb.setAttribute("aria-label", fb.title);
+  fb.innerHTML = uiIcon(isFavProf ? "starFill" : "star");
+}
 
 async function copyFactValue(el) {
   const text = el && el.getAttribute("data-copy");
@@ -312,6 +325,12 @@ async function load() {
 
   document.getElementById("toggledit").hidden = !own;
   document.getElementById("edit-wrap").hidden = !own;
+  isFavProf = false;
+  if (!own && myId) {
+    const { data: f } = await sb.from("profile_favorites").select("id").eq("user_id", myId).eq("profile_id", p.id);
+    isFavProf = !!(f && f.length);
+  }
+  paintFavProfBtn();
   if (own) {
     const bioEdit = document.getElementById("bioedit");
     bioEdit.value = clampBioLines(p.bio || "");
@@ -407,6 +426,18 @@ async function load() {
     : '<p class="meta">No public reviews written yet.</p>';
   switchTab(activeTab);
 }
+
+document.getElementById("favprof").onclick = async () => {
+  if (!shown || own) return;
+  if (!myId) { location.href = loginHref(); return; }
+  const res = isFavProf
+    ? await sb.from("profile_favorites").delete().eq("user_id", myId).eq("profile_id", shown.id)
+    : await sb.from("profile_favorites").insert({ user_id: myId, profile_id: shown.id });
+  if (res.error) { setMsg(msg, res.error.message, "err"); return; }
+  isFavProf = !isFavProf;
+  paintFavProfBtn();
+  setMsg(msg, isFavProf ? "Saved to favourites." : "Removed from favourites.", "ok");
+};
 
 document.getElementById("shareprof").onclick = async () => {
   const ok = await copyText(location.href.split("#")[0]);
