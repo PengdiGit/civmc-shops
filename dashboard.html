@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>My shops - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body class="dash-page">
 <nav id="nav"></nav>
@@ -42,7 +42,7 @@
     <div class="preview" id="s-desc-prev"></div>
 
     <label for="s-find">Find me (optional)</label>
-    <input type="text" id="s-find" maxlength="120" placeholder="e.g. 2nd floor, blue wool Â· underground entrance" style="width:100%">
+    <input type="text" id="s-find" maxlength="120" placeholder="e.g. 2nd floor, blue wool Ã‚Â· underground entrance" style="width:100%">
 
     <label>Shop picture</label>
     <div class="row">
@@ -70,7 +70,7 @@
 <script src="mock.js"></script>
 <script src="items.js"></script>
 <script src="item-picker.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 <script>
 let me = null;
 let shopsData = {};                 // shop id -> shop (with listings), from the last load
@@ -120,7 +120,7 @@ document.addEventListener("click", async e => {
 const unitSelect = (cls, sel) => `<select class="unit ${cls}" title="unit (blank = single items)">
   <option value=""></option><option value="ci"${sel === "ci" ? " selected" : ""}>CI</option><option value="cs"${sel === "cs" ? " selected" : ""}>CS</option></select>`;
 const unitText = u => u ? " " + u.toUpperCase() : "";
-const fmtListing = l => `${l.want_amount}${unitText(l.want_unit)} ${l.want_item} â†’ ${l.sell_amount}${unitText(l.sell_unit)} ${l.sell_item}`;
+const fmtListing = l => `${l.want_amount}${unitText(l.want_unit)} ${l.want_item} Ã¢â€ â€™ ${l.sell_amount}${unitText(l.sell_unit)} ${l.sell_item}`;
 
 async function loadMarketForAlerts() {
   marketByItem = {};
@@ -158,7 +158,7 @@ function paintOwnerAlerts(shops) {
     ownerAlertList.map((a, i) => `<div class="owner-alert" data-alert="${i}">
       <span class="tag ${kindTag(a.kind)}">${kindLabel(a.kind)}</span>
       <span class="owner-alert-body"><a href="shop.html?id=${a.shop.id}&listing=${a.listing.id}">${esc(a.shop.name)}</a>
-        Â· ${esc(a.text)}</span>
+        Ã‚Â· ${esc(a.text)}</span>
       <button type="button" class="small" data-act="ignore-alert" data-i="${i}">Ignore</button>
     </div>`).join("");
 }
@@ -184,7 +184,7 @@ async function paintNotifications() {
     const pct = p.percent_off != null ? (p.percent_off + "% off") : (p.label || "sale");
     html += `<div class="owner-alert" data-note="${n.id}">
       <span class="tag sale">sale</span>
-      <span class="owner-alert-body"><b>${esc(p.name || "Sale")}</b> (${esc(scope)}, ${esc(String(pct))}) â€”
+      <span class="owner-alert-body"><b>${esc(p.name || "Sale")}</b> (${esc(scope)}, ${esc(String(pct))}) Ã¢â‚¬â€
         There is a sale happening, want to participate?</span>
       <button type="button" class="small primary" data-act="sale-yes" data-note="${n.id}">Yes</button>
       <button type="button" class="small" data-act="sale-no" data-note="${n.id}">No</button>
@@ -204,7 +204,7 @@ async function paintNotifications() {
 function salePanelHtml(s) {
   if (shopSaleActive(s)) {
     const until = s.sale_ends_at ? (" until " + new Date(s.sale_ends_at).toLocaleString()) : " (until cancelled)";
-    const pct = s.sale_percent != null ? (s.sale_percent + "% off Â· ") : "";
+    const pct = s.sale_percent != null ? (s.sale_percent + "% off Ã‚Â· ") : "";
     return `<div class="sale-panel">
       ${saleBadgeHtml(s)} <span class="meta">${esc(pct)}active${esc(until)}</span>
       <button type="button" class="small" data-act="end-sale">End sale</button>
@@ -216,10 +216,10 @@ function salePanelHtml(s) {
       <div class="row" style="margin-top:8px;flex-wrap:wrap">
         <input type="text" class="sale-name" maxlength="60" placeholder="Sale name" style="width:140px">
         <input type="number" class="sale-pct" min="1" max="99" step="1" placeholder="% off" style="width:72px" title="Optional percent off diamond prices">
-        <input type="datetime-local" class="sale-end" title="End time (optional â€” leave blank until cancelled)">
+        <input type="datetime-local" class="sale-end" title="End time (optional Ã¢â‚¬â€ leave blank until cancelled)">
         <button type="button" class="small primary" data-act="start-sale">Start sale</button>
       </div>
-      <p class="meta" style="margin:4px 0 0">Diamond listings get % off (original prices stored for restore). Public cards show â€œ(Name) sale!â€.</p>
+      <p class="meta" style="margin:4px 0 0">Diamond listings get % off (original prices stored for restore). Public cards show Ã¢â‚¬Å“(Name) sale!Ã¢â‚¬Â.</p>
     </details>
   </div>`;
 }
@@ -248,7 +248,7 @@ async function load() {
   if (!isVerified(ctx.profile)) {
     document.getElementById("verify").innerHTML = `
       <div class="banner"><b>Your account isn't verified yet.</b> Until you're verified you can browse, favourite and report, but you can't create shops, comment, review or upload pictures.
-      <a href="verify.html">Verify here</a> â€” ${PFA_HELP}, fill out the information, and wait (can take up to 24 hours).</div>`;
+      <a href="verify.html">Verify here</a> Ã¢â‚¬â€ ${PFA_HELP}, fill out the information, and wait (can take up to 24 hours).</div>`;
     document.querySelectorAll("#newshop input, #newshop textarea, #newshop button").forEach(el => el.disabled = true);
   }
   setupNewShopForm();
@@ -346,7 +346,7 @@ function panelHtml(s) {
     <label>Paste sign dump (optional helper)</label>
     <textarea class="p-signs" rows="3" placeholder="One trade per line, e.g.&#10;64 blaze rod for 1 diamond [24]&#10;B 8 ender pearl : S 1 diamond"></textarea>
     <div class="row" style="margin-top:4px"><button type="button" class="small" data-act="parse-signs">Parse into draft listings</button></div>
-    <p class="meta" style="margin:4px 0 0">Adds parsed rows below â€” optional <code>[64]</code> stock suffix. Review amounts, then save each listing.</p>
+    <p class="meta" style="margin:4px 0 0">Adds parsed rows below Ã¢â‚¬â€ optional <code>[64]</code> stock suffix. Review amounts, then save each listing.</p>
 
     <label>Shop picture</label>
     <div class="row">
@@ -452,7 +452,7 @@ function dashListingRow(l) {
     <div class="dash-listing-stock-col">
       ${stockToggle}${timed}
       <label class="dash-stock-label meta">Stock left</label>
-      <input type="number" min="0" class="dash-stock-amt" placeholder="âˆž" value="${stockVal}" title="Exchanges left (blank = unlimited)">
+      <input type="number" min="0" class="dash-stock-amt" placeholder="Ã¢Ë†Å¾" value="${stockVal}" title="Exchanges left (blank = unlimited)">
       <span class="meta dash-stock-hint">blank = unlimited</span>
     </div>
   </div>`;
@@ -597,7 +597,7 @@ async function render(resetShop) {
             ${saleBadgeHtml(s)}
             ${s.is_open === false ? '<span class="tag warn">closed - hidden from public</span>' : ""}
             ${s.timed_out ? '<span class="tag bad">timed out - hidden</span>' : ""}
-            <div class="meta">${placeHtml(s) ? placeHtml(s) + " Â· " : ""}${coordsHtml(s.x, s.z)}${nList ? " Â· " + nList + " listing" + (nList === 1 ? "" : "s") : ""}</div></div>
+            <div class="meta">${placeHtml(s) ? placeHtml(s) + " Ã‚Â· " : ""}${coordsHtml(s.x, s.z)}${nList ? " Ã‚Â· " + nList + " listing" + (nList === 1 ? "" : "s") : ""}</div></div>
         </div>
         <div class="action-cluster dash-shop-actions">
           ${iconBtn("external", { tag: "a", title: "Preview shop", attrs: `href="shop.html?id=${s.id}" target="_blank" rel="noopener"` })}
@@ -619,7 +619,7 @@ async function render(resetShop) {
       <div class="bulk-panel" data-bulk="${s.id}" hidden>
         <div class="row" style="margin-bottom:8px">
           <button type="button" class="small" data-act="bulk-out">Mark all out</button>
-          <button type="button" class="small" data-act="bulk-stock">Set stock to Nâ€¦</button>
+          <button type="button" class="small" data-act="bulk-stock">Set stock to NÃ¢â‚¬Â¦</button>
           <button type="button" class="small primary" data-act="bulk-save">Save stock changes</button>
           ${iconBtn("x", { title: "Hide bulk edit", attrs: 'data-act="bulk-toggle"' })}
         </div>
@@ -628,8 +628,8 @@ async function render(resetShop) {
           <tbody>${s.listings.map(l => `<tr data-bulk-id="${l.id}">
             <td>${esc(l.want_amount + (l.want_unit ? " " + l.want_unit.toUpperCase() : "") + " " + l.want_item)}</td>
             <td>${esc(l.sell_amount + (l.sell_unit ? " " + l.sell_unit.toUpperCase() : "") + " " + l.sell_item)}</td>
-            <td><input type="number" min="0" class="b-stock" value="${l.stock == null ? "" : l.stock}" placeholder="âˆž" style="width:72px"></td>
-            <td><input type="text" class="b-group" maxlength="60" value="${esc(l.group_name || "")}" placeholder="â€”" style="width:90px"></td>
+            <td><input type="number" min="0" class="b-stock" value="${l.stock == null ? "" : l.stock}" placeholder="Ã¢Ë†Å¾" style="width:72px"></td>
+            <td><input type="text" class="b-group" maxlength="60" value="${esc(l.group_name || "")}" placeholder="Ã¢â‚¬â€" style="width:90px"></td>
             <td class="meta">${updatedHtml(l.updated_at, { prefix: false })}</td>
           </tr>`).join("")}</tbody>
         </table></div>
@@ -679,7 +679,7 @@ async function dupOk(shop, f, ignoreId, verb) {
     title: "Similar listing exists",
     body: exact
       ? `You already have this exact listing:\n${fmtListing(same[0])}\n\n${verb} anyway?`
-      : `You already have a listing for ${f.si} â†’ ${f.wi}:\n${same.map(fmtListing).join("\n")}\n\n${verb} this one anyway?`,
+      : `You already have a listing for ${f.si} Ã¢â€ â€™ ${f.wi}:\n${same.map(fmtListing).join("\n")}\n\n${verb} this one anyway?`,
     confirmLabel: verb
   });
 }
@@ -950,7 +950,7 @@ document.getElementById("owner-alerts").addEventListener("click", async e => {
   btn.disabled = true;
   const r = await ignoreOwnerAlert(a);
   if (r.error) { setMsg(msg, r.error, "err"); btn.disabled = false; return; }
-  setMsg(msg, a.kind === "stale" ? "Stale alert ignored â€” 7-day clock restarted." : "Alert ignored for 7 days (or until you edit the listing).", "ok");
+  setMsg(msg, a.kind === "stale" ? "Stale alert ignored Ã¢â‚¬â€ 7-day clock restarted." : "Alert ignored for 7 days (or until you edit the listing).", "ok");
   render();
 });
 
@@ -1154,7 +1154,7 @@ document.getElementById("shops").addEventListener("click", async e => {
     }
     panel.querySelector(".p-signs").value = "";
     setMsg(msg, drafts.length === 1
-      ? "Parsed 1 listing into the add form â€” click Add listing."
+      ? "Parsed 1 listing into the add form Ã¢â‚¬â€ click Add listing."
       : "Added " + (drafts.length - 1) + " listing(s); first is in the add form.", "ok");
     if (drafts.length > 1) render();
     return;

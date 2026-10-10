@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body class="admin-page">
 <nav id="nav"></nav>
@@ -213,7 +213,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 <script>
 const msg = document.getElementById("msg");
 const usermsg = document.getElementById("usermsg");
@@ -293,8 +293,8 @@ async function paintAdminSales() {
   if (!(data || []).length) { box.innerHTML = '<p class="meta">No admin sales yet.</p>'; return; }
   box.innerHTML = data.map(s => `<div class="listing" data-sale-id="${s.id}">
     <div><b>${esc(s.name)}</b> ${s.active ? '<span class="tag sale">active</span>' : '<span class="tag">inactive</span>'}
-      <span class="meta">Â· ${esc(s.scope)}${s.scope === "nation" ? " Â· " + esc(s.nation || "") : ""}
-      ${s.percent_off != null ? " Â· " + s.percent_off + "% off" : (s.label ? " Â· " + esc(s.label) : "")}</span></div>
+      <span class="meta">Ã‚Â· ${esc(s.scope)}${s.scope === "nation" ? " Ã‚Â· " + esc(s.nation || "") : ""}
+      ${s.percent_off != null ? " Ã‚Â· " + s.percent_off + "% off" : (s.label ? " Ã‚Â· " + esc(s.label) : "")}</span></div>
     ${s.active ? '<button type="button" class="small" data-sale-act="deactivate">Deactivate</button>' : ""}
   </div>`).join("");
 }
@@ -352,7 +352,7 @@ function paintLists() {
       .map(a => `<div class="listing">
         <div><a href="profile.html?id=${a.id}" style="color:inherit">${esc(a.mc_username)}</a>
           ${roleBadge(a)} ${statusBadge(a)}
-          <span class="meta">Â· ${esc(a.discord_username || "â€”")} Â· ${esc(a.login_username)} Â· made ${fmtDate(a.created_at)} Â· last ${fmtDate(a.last_sign_in_at)}</span></div>
+          <span class="meta">Ã‚Â· ${esc(a.discord_username || "Ã¢â‚¬â€")} Ã‚Â· ${esc(a.login_username)} Ã‚Â· made ${fmtDate(a.created_at)} Ã‚Â· last ${fmtDate(a.last_sign_in_at)}</span></div>
         <div class="acct-actions">${roleButtons(a)}</div>
       </div>`).join("") || '<p class="meta">None.</p>';
   } else {
@@ -369,7 +369,7 @@ function paintLists() {
     .map(s =>
       `<div class="listing" data-id="${s.id}">
         <div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
-          <span class="meta">Â· ${esc(s.profiles?.mc_username)} Â· ${placeHtml(s) || "no place"} Â· ${(s.listings || []).length} listings</span></div>
+          <span class="meta">Ã‚Â· ${esc(s.profiles?.mc_username)} Ã‚Â· ${placeHtml(s) || "no place"} Ã‚Â· ${(s.listings || []).length} listings</span></div>
         <div class="inline-actions">
           ${me.is_head ? `<button class="small" data-act="transfer" data-id="${s.id}" title="Reassign this shop to another account">Transfer</button>` : ""}
           ${iconBtn("trash", { danger: true, cls: "btn-report", title: "Delete shop", attrs: 'data-act="del"' })}
@@ -380,7 +380,7 @@ function paintLists() {
     .filter(l => hit(l.sell_item, l.want_item, l.shops && l.shops.name))
     .map(l => `<div class="listing">
       <div>${itemText(l.want_amount, l.want_item, l.want_unit)} <span class="arrow">&rarr;</span> ${itemText(l.sell_amount, l.sell_item, l.sell_unit)}
-        <span class="meta">Â· <a href="shop.html?id=${l.shop_id}&listing=${l.id}">${esc(l.shops ? l.shops.name : "?")}</a></span>
+        <span class="meta">Ã‚Â· <a href="shop.html?id=${l.shop_id}&listing=${l.id}">${esc(l.shops ? l.shops.name : "?")}</a></span>
         ${l.timed_out ? '<span class="tag bad">timed out</span>' : ""}</div>
     </div>`).join("") || '<p class="meta">None.</p>';
 }
@@ -396,7 +396,7 @@ async function render() {
     document.getElementById("pending").innerHTML = pending.map(a => `
       <div class="card admin-card">
         <div class="top">
-          <div><b>${esc(a.mc_username)}</b> <span class="meta">Discord: ${esc(a.discord_username || "?")} Â· login: ${esc(a.login_username)} Â· signed up ${fmtDate(a.created_at)} Â· <b>${timeLeft(a.created_at)}</b> left</span></div>
+          <div><b>${esc(a.mc_username)}</b> <span class="meta">Discord: ${esc(a.discord_username || "?")} Ã‚Â· login: ${esc(a.login_username)} Ã‚Â· signed up ${fmtDate(a.created_at)} Ã‚Â· <b>${timeLeft(a.created_at)}</b> left</span></div>
           <div class="inline-actions">
             <button class="small primary" data-act="accept" data-id="${a.id}">Accept</button>
             <button class="small btn-report" data-act="deny" data-id="${a.id}">Deny</button>
@@ -427,7 +427,7 @@ async function render() {
     ? stale.map(({ s, newest, days, n }) =>
       `<div class="listing">
         <div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
-          <span class="meta">Â· ${esc(s.profiles?.mc_username || "?")} Â· ${n} in-stock Â· quiet ${days}d Â· last ${updatedHtml(newest, { prefix: false })}</span>
+          <span class="meta">Ã‚Â· ${esc(s.profiles?.mc_username || "?")} Ã‚Â· ${n} in-stock Ã‚Â· quiet ${days}d Ã‚Â· last ${updatedHtml(newest, { prefix: false })}</span>
         </div>
       </div>`).join("")
     : '<p class="meta">Nothing stale right now.</p>';
@@ -469,7 +469,7 @@ document.querySelector("main").addEventListener("click", async e => {
     aliasPreviewRows = await findAliasHits(from, field);
     document.getElementById("alias-hits").innerHTML = aliasPreviewRows.length
       ? aliasPreviewRows.map(s => `<div class="listing"><div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
-          <span class="meta">Â· ${esc(s.profiles?.mc_username || "?")} Â· city: ${esc(s.city || "â€”")} Â· nation: ${esc(s.nation || "â€”")}</span></div></div>`).join("")
+          <span class="meta">Ã‚Â· ${esc(s.profiles?.mc_username || "?")} Ã‚Â· city: ${esc(s.city || "Ã¢â‚¬â€")} Ã‚Â· nation: ${esc(s.nation || "Ã¢â‚¬â€")}</span></div></div>`).join("")
       : '<p class="meta">No shops store that exact text.</p>';
     if (act === "alias-preview") {
       setMsg(aliasmsg, aliasPreviewRows.length + " shop" + (aliasPreviewRows.length === 1 ? "" : "s") + " would change.", aliasPreviewRows.length ? "ok" : "err");

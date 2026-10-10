@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body class="find-page">
 <nav id="nav"></nav>
@@ -24,7 +24,7 @@
             <div class="find-discord-copy">
               <strong class="find-discord-name">PFA Discord</strong>
               <span class="find-discord-blurb">Join the PFA discord server</span>
-              <span class="find-discord-status meta">Community Â· verification &amp; shop help</span>
+              <span class="find-discord-status meta">Community Ã‚Â· verification &amp; shop help</span>
             </div>
             <span class="find-discord-join">Join Server</span>
           </div>
@@ -165,7 +165,7 @@
 <script src="config.js"></script>
 <script src="mock.js"></script>
 <script src="items.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 <script>
 const q = document.getElementById("q");
 const mode = document.getElementById("mode");
@@ -242,7 +242,7 @@ function medianTip(l, buying) {
 
 const SORTS = {
   item: [["deal", "Best deal"], ["new", "Newest"], ["close", "Closest"]],
-  shop: [["featured", "Featured"], ["name", "Aâ€“Z"], ["close", "Closest"]]
+  shop: [["featured", "Featured"], ["name", "AÃ¢â‚¬â€œZ"], ["close", "Closest"]]
 };
 
 function cleanTerm(s) {
@@ -269,7 +269,7 @@ function distTo(s, h) {
 }
 function distText(s, h) {
   const d = distTo(s, h);
-  return d === Infinity ? "" : " Â· ~" + Math.round(d) + " blocks away";
+  return d === Infinity ? "" : " Ã‚Â· ~" + Math.round(d) + " blocks away";
 }
 
 function fillSorts(preferClose, kind) {
@@ -364,7 +364,7 @@ function updateFilterChrome() {
   if (nationFilter) bits.push("Nation: " + nationFilter);
   if (cityFilter) bits.push("City: " + cityFilter);
   if (trustedOnly) bits.push("Trusted");
-  if (minRating) bits.push(minRating + "+ â˜…");
+  if (minRating) bits.push(minRating + "+ Ã¢Ëœâ€¦");
   if (inStockOnly) bits.push("In stock");
   if (updatedThisWeek) bits.push("Updated this week");
   if (hasLocationOnly) bits.push("Has location");
@@ -374,7 +374,7 @@ function updateFilterChrome() {
   if (mode.value !== "shop" && unitFilter) bits.push("Unit: " + (unitFilter === "each" ? "each" : unitFilter.toUpperCase()));
   if (bits.length) {
     activeFiltersEl.hidden = false;
-    activeFiltersEl.textContent = bits.join(" Â· ") + " â€” open Filters to change";
+    activeFiltersEl.textContent = bits.join(" Ã‚Â· ") + " Ã¢â‚¬â€ open Filters to change";
   } else {
     activeFiltersEl.hidden = true;
     activeFiltersEl.textContent = "";
@@ -440,7 +440,7 @@ function syncUrl() {
   if (cityFilter) sp.set("city", cityFilter);
   if (trustedOnly) sp.set("trusted", "1");
   if (minRating) sp.set("min_rating", String(minRating));
-  // in_stock default is on â€” write 0 when off so shared links stay accurate
+  // in_stock default is on Ã¢â‚¬â€ write 0 when off so shared links stay accurate
   if (inStockOnly) sp.set("in_stock", "1");
   else sp.set("in_stock", "0");
   if (updatedThisWeek) sp.set("updated_week", "1");
@@ -555,7 +555,7 @@ function onFilterClick(e) {
   if (!nb && !cb) return;
   if (nb) {
     nationFilter = nb.dataset.nation || "";
-    // city may no longer belong to this nation â€” clear if mismatch after re-render
+    // city may no longer belong to this nation Ã¢â‚¬â€ clear if mismatch after re-render
   }
   if (cb) cityFilter = cb.dataset.city || "";
   reapplyFindFilters();
@@ -575,7 +575,7 @@ fMinRating.addEventListener("change", () => {
 });
 fInStock.addEventListener("change", () => {
   inStockOnly = fInStock.checked;
-  // Item search may have fetched only in-stock rows â€” refetch when toggled
+  // Item search may have fetched only in-stock rows Ã¢â‚¬â€ refetch when toggled
   reapplyFindFilters({ refetchItems: true });
 });
 fHasLoc.addEventListener("change", () => {
@@ -751,7 +751,7 @@ async function restoreCompareFromHash() {
 async function paintShopResults(all) {
   lastShopRows = all;
   lastResultFocus = -1;
-  // Default: hide empty shops (0 listings) on shop browse â€” not a user toggle
+  // Default: hide empty shops (0 listings) on shop browse Ã¢â‚¬â€ not a user toggle
   const withListings = all.filter(s => ((s.listings || []).length > 0));
   renderPlaceFilters(withListings, s => s);
   let data = applyFindFilters(withListings, s => s, "shop");
@@ -897,7 +897,7 @@ function paintItemResults(data) {
       stale,
       href: "shop.html?id=" + l.shop_id + "&listing=" + l.id + (q.value.trim() ? "&q=" + encodeURIComponent(q.value.trim()) : ""),
       tags,
-      meta: `${shopName(s)}${place ? " Â· " + place : ""} Â· ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} Â· ${updatedHtml(l.updated_at)}`,
+      meta: `${shopName(s)}${place ? " Ã‚Â· " + place : ""} Ã‚Â· ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} Ã‚Â· ${updatedHtml(l.updated_at)}`,
       btns: iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` })
     });
   }).join("");

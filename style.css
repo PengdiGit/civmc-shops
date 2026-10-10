@@ -32,10 +32,10 @@
   --hero-tint-b: var(--warn);
   --hero-rail: color-mix(in srgb, var(--accent) 80%, var(--warn));
   --hero-eyebrow: var(--accent);
-  /* Fixed top chrome (impersonate + verify) — JS syncs real heights */
+  /* Fixed top chrome = impersonate only. Verify banner is in-flow under nav. */
   --impersonate-h: 0px;
   --verify-h: 0px;
-  --top-chrome-h: calc(var(--impersonate-h) + var(--verify-h));
+  --top-chrome-h: var(--impersonate-h);
   --nav-h: 52px;
 }
 html[data-theme="light"] {
@@ -66,7 +66,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font: var(--font)/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
-  /* Space for fixed verify / impersonate only — nav stays in normal flow below */
+  /* Space for fixed impersonate bar only */
   padding-top: var(--top-chrome-h);
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -126,7 +126,6 @@ nav {
     0 1px 0 color-mix(in srgb, #fff 4%, transparent),
     0 8px 24px rgba(0, 0, 0, .18);
   backdrop-filter: blur(10px);
-  /* In-flow + sticky under fixed verify/impersonate (never position:fixed — that overlapped Find) */
   position: sticky; top: var(--top-chrome-h); z-index: 40;
   min-height: 52px;
   box-sizing: border-box;
@@ -439,15 +438,15 @@ kbd {
   background: var(--panel); border: 1px solid var(--warn); border-radius: var(--radius);
   padding: 10px 12px; margin-bottom: 14px; color: var(--text); font-size: .9rem;
 }
-/* Unverified account — fixed top; sits below impersonation bar when both show */
+/* Unverified account — in-flow under nav (not fixed; fixed chrome was overlapping Find) */
 .verify-banner {
-  position: fixed; top: var(--impersonate-h); left: 0; right: 0; z-index: 105;
+  position: relative;
+  z-index: 2;
   display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
   padding: 10px 14px;
   background: color-mix(in srgb, var(--accent) 16%, var(--panel));
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
   color: var(--text); font-size: .9rem;
-  box-shadow: 0 6px 20px color-mix(in srgb, #000 28%, transparent);
 }
 .verify-banner-text { text-align: center; max-width: 52ch; }
 .verify-banner-text b { color: var(--accent); }

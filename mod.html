@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Moderation - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body class="mod-page">
 <nav id="nav"></nav>
@@ -43,7 +43,7 @@
           <span class="collapse-chevron" aria-hidden="true"></span>
           <span class="mod-section-head-text">
             <span class="mod-section-title">Tip-jar brigading</span>
-            <span class="meta">Suspicious Fair/High/Low vote bursts. Timeout the account or clear votes on a listing â€” nothing is deleted from shops.</span>
+            <span class="meta">Suspicious Fair/High/Low vote bursts. Timeout the account or clear votes on a listing Ã¢â‚¬â€ nothing is deleted from shops.</span>
           </span>
         </button>
       </h2>
@@ -106,7 +106,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 <script>
 const msg = document.getElementById("msg");
 const filter = document.getElementById("filter");
@@ -134,7 +134,7 @@ async function load() {
 const canTimeoutUser = u => !u.is_head && (!u.is_admin || me.is_head) && (!u.is_mod || me.is_admin);
 const tbtn = (kind, id, on) =>
   `<button class="small ico-label btn-timeout" data-kind="${kind}" data-id="${id}" data-to="${on ? 1 : 0}">${uiIcon("clock")} ${on ? "Timeout" : "Remove timeout"}</button>`;
-const listingText = l => `${l.want_amount}${l.want_unit ? " " + l.want_unit.toUpperCase() : ""} ${l.want_item} â†’ ${l.sell_amount}${l.sell_unit ? " " + l.sell_unit.toUpperCase() : ""} ${l.sell_item}`;
+const listingText = l => `${l.want_amount}${l.want_unit ? " " + l.want_unit.toUpperCase() : ""} ${l.want_item} Ã¢â€ â€™ ${l.sell_amount}${l.sell_unit ? " " + l.sell_unit.toUpperCase() : ""} ${l.sell_item}`;
 
 function targetInfo(r) {
   if (r.target_type === "shop") {
@@ -173,7 +173,7 @@ function render() {
         <div>${t ? `<a ${href} style="color:var(--accent)">${esc(t.label)}</a>` : '<span class="meta">(already deleted)</span>'}
           ${t && t.out ? '<span class="tag bad">timed out</span>' : ""}
           <span class="tag bad">${esc(r.target_type)}</span></div>
-        <span class="meta">by ${esc(who ? who.mc_username : "?")} Â· ${agoText(r.created_at)}</span>
+        <span class="meta">by ${esc(who ? who.mc_username : "?")} Ã‚Â· ${agoText(r.created_at)}</span>
       </div>
       <div class="mod-report-reason">
         <span class="tag warn">${esc(parsed.label)}</span>
@@ -191,7 +191,7 @@ function render() {
     const u = f.user_id ? data.users.find(x => same(x.id, f.user_id)) : null;
     const l = f.listing_id != null ? data.listings.find(x => same(x.id, f.listing_id)) : null;
     const shop = f.shop_id != null ? data.shops.find(x => same(x.id, f.shop_id)) : (l ? data.shops.find(x => same(x.id, l.shop_id)) : null);
-    const who = u ? `<a href="profile.html?id=${u.id}" style="color:var(--accent)">${esc(u.mc_username)}</a>` : '<span class="meta">â€”</span>';
+    const who = u ? `<a href="profile.html?id=${u.id}" style="color:var(--accent)">${esc(u.mc_username)}</a>` : '<span class="meta">Ã¢â‚¬â€</span>';
     const where = l
       ? `<a href="shop.html?id=${l.shop_id}&listing=${l.id}" style="color:var(--accent)">${esc(listingText(l))}</a>`
       : shop ? `<a href="shop.html?id=${shop.id}" style="color:var(--accent)">${esc(shop.name)}</a>` : "";
@@ -203,7 +203,7 @@ function render() {
     return `<div class="card">
       <div class="top">
         <div><span class="tag ${f.severity === "bad" ? "bad" : "warn"}">${esc(f.kind.replace(/_/g, " "))}</span> ${who}
-          ${where ? '<span class="meta"> Â· </span>' + where : ""}</div>
+          ${where ? '<span class="meta"> Ã‚Â· </span>' + where : ""}</div>
         <span class="meta">${esc(f.tip)}</span>
       </div>
       <div class="inline-actions" style="margin-top:8px">${acts}</div>
@@ -222,7 +222,7 @@ function render() {
     .filter(s => hit(s.name, s.city, s.nation, s.profiles && s.profiles.mc_username))
     .map(s => `<div class="listing">
       <div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
-        <span class="meta">Â· ${esc(s.profiles ? s.profiles.mc_username : "?")}${placeHtml(s) ? " Â· " + placeHtml(s) : ""}</span> ${stillTimedOut(s) ? `<span class="tag bad">timed out</span> <span class="meta">${esc(timeoutUntilLabel(s))}</span>` : ""}</div>
+        <span class="meta">Ã‚Â· ${esc(s.profiles ? s.profiles.mc_username : "?")}${placeHtml(s) ? " Ã‚Â· " + placeHtml(s) : ""}</span> ${stillTimedOut(s) ? `<span class="tag bad">timed out</span> <span class="meta">${esc(timeoutUntilLabel(s))}</span>` : ""}</div>
       ${tbtn("shop", s.id, !stillTimedOut(s))}
     </div>`).join("") || '<p class="meta">None.</p>';
 
@@ -230,7 +230,7 @@ function render() {
     .filter(l => hit(l.sell_item, l.want_item, l.shops && l.shops.name))
     .map(l => `<div class="listing">
       <div>${itemText(l.want_amount, l.want_item, l.want_unit)} <span class="arrow">&rarr;</span> ${itemText(l.sell_amount, l.sell_item, l.sell_unit)}
-        <span class="meta">Â· <a href="shop.html?id=${l.shop_id}&listing=${l.id}">${esc(l.shops ? l.shops.name : "?")}</a></span>
+        <span class="meta">Ã‚Â· <a href="shop.html?id=${l.shop_id}&listing=${l.id}">${esc(l.shops ? l.shops.name : "?")}</a></span>
         ${stillTimedOut(l) ? `<span class="tag bad">timed out</span> <span class="meta">${esc(timeoutUntilLabel(l))}</span>` : ""}</div>
       ${tbtn("listing", l.id, !stillTimedOut(l))}
     </div>`).join("") || '<p class="meta">None.</p>';
