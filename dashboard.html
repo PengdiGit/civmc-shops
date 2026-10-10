@@ -743,29 +743,34 @@ function dashGroupListEl(from) {
   return block ? block.querySelector(".dash-listing-list") : null;
 }
 
-async function applyListingDisplayOrder(shop, order) {
-  const before = new Map((shop.listings || []).map(l => [String(l.id), {
+function listingDisplaySnapshot(listings) {
+  // Capture sort/group BEFORE any drag mutate — shared refs would hide the patch.
+  return new Map((listings || []).map(l => [String(l.id), {
     sort_order: l.sort_order,
     group_name: l.group_name == null ? null : (String(l.group_name).trim() || null)
   }]));
+}
+
+function listingsOrderCopy(listings) {
+  return sortListingsOwnerOrder(listings || []).map(l => ({ ...l }));
+}
+
+async function applyListingDisplayOrder(shop, order, beforeSnap) {
+  const before = beforeSnap || listingDisplaySnapshot(shop.listings);
   for (let i = 0; i < order.length; i++) {
     const l = order[i];
     const was = before.get(String(l.id));
     if (!was) continue;
     const gn = l.group_name == null ? null : (String(l.group_name).trim() || null);
     const patch = {};
-    if (was.sort_order !== i) patch.sort_order = i;
+    const prevSort = was.sort_order == null ? null : Number(was.sort_order);
+    if (prevSort !== i) patch.sort_order = i;
     if ((was.group_name || null) !== (gn || null)) patch.group_name = gn;
+    l.sort_order = i;
+    l.group_name = gn;
     if (Object.keys(patch).length) {
       const r = await sb.from("listings").update(patch).eq("id", l.id);
       if (r.error) return r.error.message;
-      const prev = (shop.listings || []).find(x => listingIdEq(x.id, l.id));
-      if (prev) {
-        prev.sort_order = i;
-        prev.group_name = gn;
-      }
-    } else {
-      l.sort_order = i;
     }
   }
   shop.listings = order.slice();
@@ -773,29 +778,32 @@ async function applyListingDisplayOrder(shop, order) {
 }
 
 async function reorderListingDrag(shop, fromId, toId) {
-  const order = sortListingsOwnerOrder(shop.listings || []);
+  const before = listingDisplaySnapshot(shop.listings);
+  const order = listingsOrderCopy(shop.listings);
   const fromIdx = order.findIndex(l => listingIdEq(l.id, fromId));
   let toIdx = order.findIndex(l => listingIdEq(l.id, toId));
   if (fromIdx < 0 || toIdx < 0) return "Listing not found.";
   const targetGroup = order[toIdx].group_name;
   const [item] = order.splice(fromIdx, 1);
   toIdx = order.findIndex(l => listingIdEq(l.id, toId));
+  if (toIdx < 0) return "Listing not found.";
   item.group_name = normalizeListingGroup(targetGroup);
   order.splice(toIdx, 0, item);
-  return applyListingDisplayOrder(shop, order);
+  return applyListingDisplayOrder(shop, order, before);
 }
 
 async function moveListingToGroupEnd(shop, fromId, groupKeyRaw) {
+  const before = listingDisplaySnapshot(shop.listings);
   const newGroup = normalizeListingGroup(groupKeyRaw);
   const gKey = String(newGroup || "");
-  let order = sortListingsOwnerOrder(shop.listings || []);
+  const order = listingsOrderCopy(shop.listings);
   const fromIdx = order.findIndex(l => listingIdEq(l.id, fromId));
   if (fromIdx < 0) return "Listing not found.";
   const [item] = order.splice(fromIdx, 1);
   item.group_name = newGroup;
   let insertAt = -1;
   for (let i = order.length - 1; i >= 0; i--) {
-    if (String(order[i].group_name || "") === gKey) {
+    if (String(order[i].group_name || "").trim() === gKey) {
       insertAt = i + 1;
       break;
     }
@@ -804,7 +812,7 @@ async function moveListingToGroupEnd(shop, fromId, groupKeyRaw) {
     if (!gKey) insertAt = order.length;
     else {
       insertAt = order.findIndex(l => {
-        const ga = String(l.group_name || "").toLowerCase();
+        const ga = String(l.group_name || "").trim().toLowerCase();
         const gb = gKey.toLowerCase();
         if (!ga) return true;
         return gb.localeCompare(ga) < 0;
@@ -813,7 +821,7 @@ async function moveListingToGroupEnd(shop, fromId, groupKeyRaw) {
     }
   }
   order.splice(insertAt, 0, item);
-  return applyListingDisplayOrder(shop, order);
+  return applyListingDisplayOrder(shop, order, before);
 }
 
 function clearListingDragMarkers() {
@@ -823,18 +831,27 @@ function clearListingDragMarkers() {
 
 let dragListingId = null;
 let dragShopId = null;
+let dragPayload = null;
 const shopsRoot = document.getElementById("shops");
 const DND_MIME = "application/x-civmc-listing";
 
 function readListingDragPayload(e) {
   try {
     const raw = e.dataTransfer.getData(DND_MIME) || e.dataTransfer.getData("text/plain");
-    if (!raw) return null;
-    if (raw.startsWith("{")) return JSON.parse(raw);
-    return { listingId: raw, shopId: dragShopId };
-  } catch (err) {
-    return dragListingId ? { listingId: dragListingId, shopId: dragShopId } : null;
-  }
+    if (raw) {
+      if (raw.startsWith("{")) return JSON.parse(raw);
+      return { listingId: raw, shopId: dragShopId };
+    }
+  } catch (err) { /* fall through */ }
+  return dragPayload || (dragListingId ? { listingId: dragListingId, shopId: dragShopId } : null);
+}
+
+function clearListingDragState() {
+  shopsRoot.querySelectorAll(".dash-listing-card.is-dragging").forEach(c => c.classList.remove("is-dragging"));
+  clearListingDragMarkers();
+  dragListingId = null;
+  dragShopId = null;
+  dragPayload = null;
 }
 
 shopsRoot.addEventListener("dragstart", e => {
@@ -846,16 +863,14 @@ shopsRoot.addEventListener("dragstart", e => {
   const payload = { listingId: card.dataset.listing, shopId: shopEl.dataset.shop };
   dragListingId = payload.listingId;
   dragShopId = payload.shopId;
+  dragPayload = payload;
   e.dataTransfer.setData(DND_MIME, JSON.stringify(payload));
-  e.dataTransfer.setData("text/plain", String(payload.listingId));
+  e.dataTransfer.setData("text/plain", JSON.stringify(payload));
   e.dataTransfer.effectAllowed = "move";
   card.classList.add("is-dragging");
 });
 shopsRoot.addEventListener("dragend", () => {
-  shopsRoot.querySelectorAll(".dash-listing-card.is-dragging").forEach(c => c.classList.remove("is-dragging"));
-  clearListingDragMarkers();
-  dragListingId = null;
-  dragShopId = null;
+  clearListingDragState();
 });
 shopsRoot.addEventListener("dragenter", e => {
   if (!dragListingId) return;
@@ -882,9 +897,16 @@ shopsRoot.addEventListener("drop", async e => {
   e.preventDefault();
   e.stopPropagation();
   const payload = readListingDragPayload(e);
-  if (!payload || payload.listingId == null || payload.shopId == null) return;
+  clearListingDragMarkers();
+  if (!payload || payload.listingId == null || payload.shopId == null) {
+    clearListingDragState();
+    return;
+  }
   const shop = shopsData[payload.shopId] || shopsData[String(payload.shopId)];
-  if (!shop) return;
+  if (!shop) {
+    clearListingDragState();
+    return;
+  }
   let err = null;
   let didMove = false;
   const fromId = payload.listingId;
@@ -900,9 +922,7 @@ shopsRoot.addEventListener("drop", async e => {
       didMove = !err;
     }
   }
-  clearListingDragMarkers();
-  dragListingId = null;
-  dragShopId = null;
+  clearListingDragState();
   if (didMove) {
     setMsg(msg, "Listing moved.", "ok");
     render();
