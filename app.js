@@ -305,7 +305,7 @@ function fillItemList() {
 // ------------------------------------------------------------ items, units, deals
 // item textures: the item "oak boat" is Minecraft_Items/oak_boat.png (folder name must match EXACTLY, GitHub Pages is case-sensitive)
 const ITEM_DIR = "Minecraft_Items/";
-const ITEM_IMG_ALIAS = { essence: "experience bottle" }; // Civ custom; reuse XP bottle texture
+const ITEM_IMG_ALIAS = { essence: "ender eye" }; // Civ slang → eyes of ender
 const itemImg = name => {
   const key = norm(name || "");
   const file = ITEM_IMG_ALIAS[key] || key;

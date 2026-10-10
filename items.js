@@ -485,7 +485,6 @@ const ITEMS = [
  "endermite spawn egg",
  "evoker spawn egg",
  "experience bottle",
- "essence",
  "explorer pottery sherd",
  "exposed chiseled copper",
  "exposed copper",
