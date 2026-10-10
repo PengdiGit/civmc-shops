@@ -1359,7 +1359,11 @@ function renderVerifyBanner(profile) {
     bar.id = "verify-banner";
     bar.className = "verify-banner";
     bar.setAttribute("role", "status");
-    document.body.appendChild(bar);
+    const imp = document.getElementById("impersonate-bar");
+    const navEl = document.getElementById("nav");
+    if (imp) document.body.insertBefore(bar, imp.nextSibling);
+    else if (navEl) document.body.insertBefore(bar, navEl);
+    else document.body.insertBefore(bar, document.body.firstChild);
   }
   document.body.classList.add("has-verify-banner");
   const countdown = deleteCountdownText(profile.created_at);
@@ -1368,8 +1372,10 @@ function renderVerifyBanner(profile) {
     `<a class="primary small verify-banner-cta" href="verify.html">verify here</a>`;
   syncTopChromeOffset();
   observeTopChrome();
-  // Second pass after layout so --verify-h matches wrapped banner height.
-  requestAnimationFrame(() => syncTopChromeOffset());
+  requestAnimationFrame(() => {
+    syncTopChromeOffset();
+    requestAnimationFrame(syncTopChromeOffset);
+  });
 }
 
 // every 20s: if the account got timed out while the page is open, log out

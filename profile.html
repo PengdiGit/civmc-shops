@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
@@ -42,7 +42,7 @@
         </div>
         <div style="flex:1;min-width:160px">
           <label for="timezoneedit">Timezone (optional)</label>
-          <input type="text" id="timezoneedit" maxlength="60" placeholder="e.g. EST (UTC−5)" style="width:100%">
+          <input type="text" id="timezoneedit" maxlength="60" placeholder="e.g. EST (UTCâˆ’5)" style="width:100%">
         </div>
       </div>
       <div class="row" style="margin-top:6px"><button id="saveidentity">Save pronouns / timezone</button></div>
@@ -97,7 +97,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let id = params.get("id");
@@ -108,9 +108,9 @@ let lastField = null;
 let activeTab = "shops";
 
 function memberSinceText(ts) {
-  if (!ts) return "—";
+  if (!ts) return "â€”";
   const d = new Date(ts);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "â€”";
   return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
 }
 
@@ -305,12 +305,12 @@ async function load() {
   document.getElementById("stats").innerHTML = `
     <div class="stat"><div class="big">${full.length}</div><div class="lbl">Shops</div></div>
     <div class="stat"><div class="big">${totalListings}</div><div class="lbl">Listings</div></div>
-    <div class="stat"><div class="big">${rating ? rating.avg.toFixed(1) : "—"}</div><div class="lbl">${rating ? "Avg rating (" + rating.count + ")" : "No ratings"}</div></div>
+    <div class="stat"><div class="big">${rating ? rating.avg.toFixed(1) : "â€”"}</div><div class="lbl">${rating ? "Avg rating (" + rating.count + ")" : "No ratings"}</div></div>
     <div class="stat"><div class="big">${active ? "Active" : "Quiet"}</div><div class="lbl">${active ? "Updated in last 7 days" : "No recent listing updates"}</div></div>
     <div class="stat"><div class="big" style="font-size:1rem">${esc(since)}</div><div class="lbl">Member since</div></div>`;
 
   document.getElementById("shops-sub").textContent = full.length
-    ? full.length + " shop" + (full.length === 1 ? "" : "s") + " · " + totalListings + " listing" + (totalListings === 1 ? "" : "s")
+    ? full.length + " shop" + (full.length === 1 ? "" : "s") + " Â· " + totalListings + " listing" + (totalListings === 1 ? "" : "s")
     : "";
   document.getElementById("tab-shops").textContent = "Shops" + (full.length ? " (" + full.length + ")" : "");
 
@@ -347,7 +347,7 @@ async function load() {
             <span><span class="stars">${starsText(r.rating)}</span>
               <a href="shop.html?id=${r.shop_id}">${r.shops ? shopName(r.shops) : "shop"}</a>
               ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
-              <span class="meta">· ${agoText(r.created_at)}</span></span>
+              <span class="meta">Â· ${agoText(r.created_at)}</span></span>
           </div>
           ${r.body ? `<p class="body">${esc(r.body)}</p>` : ""}
           ${r.owner_reply ? `<div class="owner-reply"><span class="tag owner">owner reply</span>

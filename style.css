@@ -66,6 +66,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font: var(--font)/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Space for fixed verify / impersonate only — nav stays in normal flow below */
+  padding-top: var(--top-chrome-h);
 }
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
@@ -124,8 +126,8 @@ nav {
     0 1px 0 color-mix(in srgb, #fff 4%, transparent),
     0 8px 24px rgba(0, 0, 0, .18);
   backdrop-filter: blur(10px);
-  /* Fixed under verify/impersonate bars — body padding reserves the space */
-  position: fixed; top: var(--top-chrome-h); left: 0; right: 0; z-index: 40;
+  /* In-flow + sticky under fixed verify/impersonate (never position:fixed — that overlapped Find) */
+  position: sticky; top: var(--top-chrome-h); z-index: 40;
   min-height: 52px;
   box-sizing: border-box;
 }
@@ -482,10 +484,6 @@ a.primary.small { padding: 4px 12px; font-size: .85rem; }
   background: color-mix(in srgb, var(--warn) 12%, transparent);
 }
 .impersonate-bar button.small:hover { border-color: #f0d9a0; color: #fff; }
-/* Reserve space for fixed verify/impersonate + fixed nav */
-body {
-  padding-top: calc(var(--top-chrome-h) + var(--nav-h));
-}
 .note { color: var(--dim); font-size: .85rem; border-left: 3px solid var(--line); padding-left: 10px; margin: 8px 0 14px; }
 .inline-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .stars { color: var(--warn); letter-spacing: 1px; }

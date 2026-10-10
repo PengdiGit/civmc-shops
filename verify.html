@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Verify account - CivMC Shops</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body class="verify-page auth-page">
 <nav id="nav"></nav>
@@ -23,7 +23,7 @@
           <p class="meta">You need access to the server before you can open a ticket.</p>
           <a class="primary" id="join-discord" href="https://discord.com/invite/cNHvQb567c" target="_blank" rel="noopener noreferrer">Join</a>
         </div>
-        <div class="verify-step-arrow" aria-hidden="true">↓</div>
+        <div class="verify-step-arrow" aria-hidden="true">â†“</div>
       </li>
       <li class="verify-step">
         <div class="verify-step-body">
@@ -31,7 +31,7 @@
           <p class="meta">Use the contact channel and open a CivShop ticket so staff can match your Discord and Minecraft names.</p>
           <a class="primary" id="open-ticket" href="https://discord.com/channels/1547194944253460501/1547194946044305426" target="_blank" rel="noopener noreferrer">Click here</a>
         </div>
-        <div class="verify-step-arrow" aria-hidden="true">↓</div>
+        <div class="verify-step-arrow" aria-hidden="true">â†“</div>
       </li>
       <li class="verify-step">
         <div class="verify-step-body">
@@ -48,7 +48,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 <script>
 (function () {
   const join = document.getElementById("join-discord");
@@ -85,7 +85,7 @@
     countdown.hidden = true;
     status.hidden = false;
     status.className = "msg ok";
-    status.innerHTML = `<b>You're verified.</b> You can comment, review, upload pictures, and create shops. <a href="index.html">Go to Find</a> · <a href="dashboard.html">My shops</a>`;
+    status.innerHTML = `<b>You're verified.</b> You can comment, review, upload pictures, and create shops. <a href="index.html">Go to Find</a> Â· <a href="dashboard.html">My shops</a>`;
     foot.innerHTML = `<a href="index.html">Back to Find</a>`;
     return;
   }

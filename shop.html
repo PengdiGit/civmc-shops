@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shop - CivMC Shops</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body class="shop-page">
 <nav id="nav"></nav>
@@ -29,7 +29,7 @@
     <div class="shop-catalog-main">
       <div class="shop-filter" id="listingfilter" hidden>
         <div class="row">
-          <input type="search" id="lq" placeholder="Filter listings in this shop…" style="flex:1;min-width:160px">
+          <input type="search" id="lq" placeholder="Filter listings in this shopâ€¦" style="flex:1;min-width:160px">
           <select id="lstock">
             <option value="all" selected>All listings</option>
             <option value="in">In stock only</option>
@@ -77,7 +77,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const shopId = params.get("id");
@@ -96,7 +96,7 @@ let hlListingId = focusId ? String(focusId) : null;
 let reviewCache = [];
 let reviewSort = "newest";
 
-const verifyHelp = () => `Only verified accounts can comment, review or upload pictures. <a href="verify.html">Verify your account</a> — ${PFA_HELP}, fill out the information, and wait (can take up to 24 hours).`;
+const verifyHelp = () => `Only verified accounts can comment, review or upload pictures. <a href="verify.html">Verify your account</a> â€” ${PFA_HELP}, fill out the information, and wait (can take up to 24 hours).`;
 
 function listingMatchesFind(l) {
   if (!findQ) return false;
@@ -206,7 +206,7 @@ function paintListings(staff, isOwner) {
     if (l.timed_out) tags += ' <span class="tag bad">timed out</span>';
     if (stale) tags += ' <span class="tag warn">might be out of date</span>';
     const quietDays = daysAgo(l.updated_at);
-    if (l.in_stock && quietDays >= 14) tags += ' <span class="tag warn" title="Listing is old — stock may be stale">quiet + stock</span>';
+    if (l.in_stock && quietDays >= 14) tags += ' <span class="tag warn" title="Listing is old â€” stock may be stale">quiet + stock</span>';
     const tip = tipDisplayForListing(l.id, tipByListing[String(l.id)] || [], me);
     const pinned = comparePins.some(p => String(p.listing.id) === String(l.id));
     let end = `<span class="action-cluster">`;
@@ -222,7 +222,7 @@ function paintListings(staff, isOwner) {
       id: "listing-" + l.id,
       cls: (listingIsOut(l) || l.timed_out ? "out" : "") + (hl ? " find-hl" : ""),
       tags,
-      meta: updatedHtml(l.updated_at) + (g ? ` · <span class="meta">${esc(g)}</span>` : ""),
+      meta: updatedHtml(l.updated_at) + (g ? ` Â· <span class="meta">${esc(g)}</span>` : ""),
       btns: tipVotesHtml(l.id, tip.votes, tip.myVote),
       btnsEnd: end
     });
@@ -307,7 +307,7 @@ async function load() {
   if (newest) parts.push(updatedHtml(newest));
   const quiet = shopFreshnessHtml(allListings);
   if (quiet) parts.push(quiet);
-  document.getElementById("glance").innerHTML = parts.join('<span class="sep">·</span>');
+  document.getElementById("glance").innerHTML = parts.join('<span class="sep">Â·</span>');
 
   if (me) {
     const { data: f } = await sb.from("favorites").select("id").eq("user_id", me.id).eq("shop_id", shopId);
@@ -408,7 +408,7 @@ function paintReviewList(staff, isOwner) {
           <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${r.author_id}">${esc(pr ? pr.mc_username : "?")}</a>
             <span class="stars">${starsText(r.rating)}</span>
             ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
-            <span class="meta">· ${agoText(r.created_at)}</span> ${r.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
+            <span class="meta">Â· ${agoText(r.created_at)}</span> ${r.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
           <span class="action-cluster">${b}</span>
         </div>
         ${r.body ? `<p class="body">${linkMentions(r.body)}</p>` : ""}
@@ -441,8 +441,8 @@ async function loadReviews(staff, isOwner) {
       <div class="composer">
         <div class="row" style="margin-bottom:6px"><span class="meta">Your rating</span>
           <select class="rating" id="rrating">
-            <option value="5">★★★★★ (5)</option><option value="4">★★★★☆ (4)</option><option value="3">★★★☆☆ (3)</option>
-            <option value="2">★★☆☆☆ (2)</option><option value="1">★☆☆☆☆ (1)</option>
+            <option value="5">â˜…â˜…â˜…â˜…â˜… (5)</option><option value="4">â˜…â˜…â˜…â˜…â˜† (4)</option><option value="3">â˜…â˜…â˜…â˜†â˜† (3)</option>
+            <option value="2">â˜…â˜…â˜†â˜†â˜† (2)</option><option value="1">â˜…â˜†â˜†â˜†â˜† (1)</option>
           </select></div>
         <label class="meta" style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
           <input type="checkbox" id="rtraded"> I traded here
@@ -481,7 +481,7 @@ function commentHtml(c, rootId, staff) {
       <div class="head">
         <span class="cname">${avatarImg(pr, 24)}<a href="profile.html?id=${c.author_id}">${esc(pr ? pr.mc_username : "?")}</a>
           ${isOwnerAuthor ? '<span class="tag owner">owner</span>' : ""}
-          <span class="meta">· ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
+          <span class="meta">Â· ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
         <span class="action-cluster">${b}</span>
       </div>
       ${c.body ? `<p class="body">${linkMentions(c.body)}</p>` : ""}${img}
@@ -537,7 +537,7 @@ document.querySelector("main").addEventListener("click", async e => {
     const label = btn.textContent;
     btn.textContent = ok ? "Copied!" : "Copy failed";
     setTimeout(() => { btn.textContent = label; }, 1500);
-    setMsg(msg, ok ? "Shop link copied." : "Couldn't copy — copy the URL from the address bar.", ok ? "ok" : "err");
+    setMsg(msg, ok ? "Shop link copied." : "Couldn't copy â€” copy the URL from the address bar.", ok ? "ok" : "err");
     return;
   }
   if (act === "copy-coords") {
