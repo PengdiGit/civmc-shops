@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin - CivMC Shops</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="admin-page">
+<nav id="nav"></nav>
+<main>
+  <header class="mod-hero">
+    <div class="mod-hero-copy">
+      <span class="mod-eyebrow">Control room</span>
+      <h1>Admin</h1>
+      <p class="sub">Make accounts and clean up shops. Timeouts and reports are on the <a href="mod.html" style="color:var(--accent)">Moderation</a> page. <span id="headnote"></span></p>
+    </div>
+  </header>
+
+  <div id="pending-wrap" style="display:none">
+    <section class="mod-section mod-section--pending collapse-section admin-collapse" data-collapse="pending" aria-labelledby="admin-pending-h">
+      <div class="mod-section-head">
+        <h2 id="admin-pending-h">
+          <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-pending">
+            <span class="collapse-chevron" aria-hidden="true"></span>
+            <span class="mod-section-head-text">
+              <span class="mod-section-title">Signup requests</span>
+              <span class="meta">Match the Discord + Minecraft name to the CivShop ticket in contact PFA. Accept lets them comment, review and create shops. Deny deletes the account and everything it made. Accounts nobody accepts are deleted automatically 24 hours after signup.</span>
+            </span>
+          </button>
+        </h2>
+      </div>
+      <div class="collapse-body" id="collapse-pending">
+        <div class="msg" id="purgemsg"></div>
+        <button type="button" class="small btn-report" data-act="purge-unverified">Purge expired unverified now</button>
+        <div class="mod-stack" id="pending"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="mod-section mod-section--create collapse-section admin-collapse" data-collapse="create" aria-labelledby="admin-create-h">
+    <div class="mod-section-head">
+      <h2 id="admin-create-h">
+        <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-create">
+          <span class="collapse-chevron" aria-hidden="true"></span>
+          <span class="mod-section-head-text">
+            <span class="mod-section-title">Create account</span>
+            <span class="meta">For people you vouch for. These start verified, with a popup suggesting they pick their own password.</span>
+          </span>
+        </button>
+      </h2>
+    </div>
+    <div class="collapse-body" id="collapse-create">
+      <form class="stack" id="form">
+        <label for="mc">Minecraft username</label>
+        <input id="mc" type="text" required maxlength="32">
+        <label for="dc">Discord username (optional)</label>
+        <input id="dc" type="text" maxlength="40">
+        <label for="un">Login username</label>
+        <input id="un" type="text" required placeholder="3-20 letters, numbers or _">
+        <label for="pw">Temporary password</label>
+        <input id="pw" type="text" required minlength="8">
+        <label for="role">Account type</label>
+        <select id="role"><option value="user">User</option></select>
+        <div class="msg" id="msg"></div>
+        <button class="primary" type="submit">Create account</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="mod-section mod-section--alias collapse-section admin-collapse" data-collapse="alias" aria-labelledby="admin-alias-h">
+    <div class="mod-section-head">
+      <h2 id="admin-alias-h">
+        <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-alias">
+          <span class="collapse-chevron" aria-hidden="true"></span>
+          <span class="mod-section-head-text">
+            <span class="mod-section-title">Rewrite place aliases</span>
+            <span class="meta">Optional DB cleanup: rewrite city/nation text on shop rows to a canonical name. Soft aliases in search still work without this.</span>
+          </span>
+        </button>
+      </h2>
+    </div>
+    <div class="collapse-body" id="collapse-alias">
+      <div class="stack" style="max-width:420px">
+        <label for="alias-from">From (as stored)</label>
+        <input id="alias-from" type="text" maxlength="60" placeholder="e.g. mt augusta" list="alias-from-list">
+        <datalist id="alias-from-list"></datalist>
+        <label for="alias-to">To (canonical)</label>
+        <input id="alias-to" type="text" maxlength="60" placeholder="e.g. Mount Augusta">
+        <label for="alias-field">Field</label>
+        <select id="alias-field">
+          <option value="city">City</option>
+          <option value="nation">Nation</option>
+          <option value="both">Both</option>
+        </select>
+        <div class="row">
+          <button type="button" class="small" data-act="alias-preview">Preview</button>
+          <button type="button" class="small primary" data-act="alias-apply">Apply rewrite</button>
+        </div>
+        <div class="msg" id="aliasmsg"></div>
+        <div id="alias-hits"></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="sales-wrap" style="display:none">
+    <section class="mod-section mod-section--sales collapse-section admin-collapse" data-collapse="sales" aria-labelledby="admin-sales-h">
+      <div class="mod-section-head">
+        <h2 id="admin-sales-h">
+          <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-sales">
+            <span class="collapse-chevron" aria-hidden="true"></span>
+            <span class="mod-section-head-text">
+              <span class="mod-section-title">Server / nation sales</span>
+              <span class="meta">Head admin only. Creating an active sale notifies eligible shop owners so they can opt in. Prices adjust only if they say Yes.</span>
+            </span>
+          </button>
+        </h2>
+      </div>
+      <div class="collapse-body" id="collapse-sales">
+        <div class="stack" style="max-width:480px">
+          <label for="sale-name">Sale name</label>
+          <input id="sale-name" type="text" maxlength="60" placeholder="Spring Clearance">
+          <label for="sale-scope">Scope</label>
+          <select id="sale-scope">
+            <option value="server">Server-wide</option>
+            <option value="nation">Nation-wide</option>
+          </select>
+          <label for="sale-nation">Nation (if nation-wide)</label>
+          <input id="sale-nation" type="text" maxlength="60" placeholder="Mount Augusta" disabled>
+          <label for="sale-pct">Percent off (optional)</label>
+          <input id="sale-pct" type="number" min="1" max="99" step="1" placeholder="e.g. 15">
+          <label for="sale-label">Label (optional, if no %)</label>
+          <input id="sale-label" type="text" maxlength="40" placeholder="Weekend deals">
+          <label class="row" style="gap:8px;align-items:center">
+            <input type="checkbox" id="sale-active" checked> Active (send invites now)
+          </label>
+          <div class="msg" id="salemsg"></div>
+          <button type="button" class="primary" id="sale-create">Create sale &amp; notify owners</button>
+        </div>
+        <div class="mod-stack" id="sales-list" style="margin-top:16px"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="mod-section mod-section--stale collapse-section admin-collapse" data-collapse="stale" aria-labelledby="admin-stale-h">
+    <div class="mod-section-head">
+      <h2 id="admin-stale-h">
+        <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-stale">
+          <span class="collapse-chevron" aria-hidden="true"></span>
+          <span class="mod-section-head-text">
+            <span class="mod-section-title">Stale shops</span>
+            <span class="meta">Shops whose newest in-stock listing hasn't been touched in 30+ days. Nudge owners to refresh or update stock.</span>
+          </span>
+        </button>
+      </h2>
+    </div>
+    <div class="collapse-body" id="collapse-stale">
+      <div class="mod-stack" id="stale"></div>
+    </div>
+  </section>
+
+  <div class="mod-tools">
+    <div class="stickybar mod-filterbar">
+      <label class="mod-filter-label" for="filter">Filter tools</label>
+      <input type="search" id="filter" placeholder="Filter accounts, shops, listings by name or item">
+    </div>
+
+    <section class="mod-section mod-section--list collapse-section" data-collapse="accounts" aria-labelledby="admin-users-h">
+      <div class="mod-section-head">
+        <h2 id="admin-users-h">
+          <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-accounts">
+            <span class="collapse-chevron" aria-hidden="true"></span>
+            <span class="mod-section-title">Accounts</span>
+          </button>
+        </h2>
+      </div>
+      <div class="collapse-body" id="collapse-accounts">
+        <div class="msg" id="usermsg"></div>
+        <div class="mod-list" id="users"></div>
+      </div>
+    </section>
+
+    <section class="mod-section mod-section--list collapse-section" data-collapse="shops" aria-labelledby="admin-shops-h">
+      <div class="mod-section-head">
+        <h2 id="admin-shops-h">
+          <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-shops">
+            <span class="collapse-chevron" aria-hidden="true"></span>
+            <span class="mod-section-title">All shops</span>
+          </button>
+        </h2>
+      </div>
+      <div class="collapse-body" id="collapse-shops">
+        <div class="mod-list" id="shops"></div>
+      </div>
+    </section>
+
+    <section class="mod-section mod-section--list collapse-section" data-collapse="listings" aria-labelledby="admin-listings-h">
+      <div class="mod-section-head">
+        <h2 id="admin-listings-h">
+          <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-listings">
+            <span class="collapse-chevron" aria-hidden="true"></span>
+            <span class="mod-section-title">Listings</span>
+          </button>
+        </h2>
+      </div>
+      <div class="collapse-body" id="collapse-listings">
+        <div class="mod-list" id="listings"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="mock.js"></script>
+<script src="app.js"></script>
+<script>
+const msg = document.getElementById("msg");
+const usermsg = document.getElementById("usermsg");
+const aliasmsg = document.getElementById("aliasmsg");
+const purgemsg = document.getElementById("purgemsg");
+const filter = document.getElementById("filter");
+let me = null;
+let accounts = [];
+let viewUsers = [];
+let shopRows = [];
+let listingRows = [];
+let aliasPreviewRows = [];
+
+async function load() {
+  const ctx = await requireLogin("admin");
+  if (!ctx) return;
+  me = ctx.profile;
+  if (me.is_head) {
+    document.getElementById("role").innerHTML += '<option value="mod">Mod</option><option value="admin">Admin</option>';
+    document.getElementById("pending-wrap").style.display = "block";
+    document.getElementById("sales-wrap").style.display = "block";
+    setupSalesUi();
+  } else {
+    document.getElementById("headnote").textContent = "Only the head admin can review signups and make or remove mods and admins.";
+  }
+  const dl = document.getElementById("alias-from-list");
+  if (dl) dl.innerHTML = Object.keys(PLACE_ALIASES).map(k => `<option value="${esc(k)}">`).join("");
+  document.getElementById("alias-from").addEventListener("change", () => {
+    const from = document.getElementById("alias-from").value.trim();
+    const canon = canonicalPlace(from);
+    if (canon && canon !== from) document.getElementById("alias-to").value = canon;
+  });
+  render();
+}
+
+function setupSalesUi() {
+  const scope = document.getElementById("sale-scope");
+  const nation = document.getElementById("sale-nation");
+  const sync = () => { nation.disabled = scope.value !== "nation"; };
+  scope.onchange = sync;
+  sync();
+  document.getElementById("sale-create").onclick = async () => {
+    const salemsg = document.getElementById("salemsg");
+    const r = await createAdminSaleAndNotify({
+      name: document.getElementById("sale-name").value,
+      scope: scope.value,
+      nation: nation.value,
+      percent_off: document.getElementById("sale-pct").value,
+      label: document.getElementById("sale-label").value,
+      active: document.getElementById("sale-active").checked
+    });
+    if (r.error) { setMsg(salemsg, r.error, "err"); return; }
+    setMsg(salemsg, "Sale created. Notified " + (r.notified || 0) + " shop owner" + ((r.notified || 0) === 1 ? "" : "s") + ".", "ok");
+    document.getElementById("sale-name").value = "";
+    document.getElementById("sale-pct").value = "";
+    document.getElementById("sale-label").value = "";
+    paintAdminSales();
+  };
+  document.getElementById("sales-list").addEventListener("click", async e => {
+    const btn = e.target.closest("button[data-sale-act]");
+    if (!btn) return;
+    const id = btn.closest("[data-sale-id]").dataset.saleId;
+    if (btn.dataset.saleAct === "deactivate") {
+      const { error } = await sb.from("admin_sales").update({ active: false }).eq("id", id);
+      if (error) { setMsg(document.getElementById("salemsg"), error.message, "err"); return; }
+      paintAdminSales();
+    }
+  });
+  paintAdminSales();
+}
+
+async function paintAdminSales() {
+  const box = document.getElementById("sales-list");
+  if (!box) return;
+  const { data, error } = await sb.from("admin_sales").select("*").order("created_at", { ascending: false }).limit(20);
+  if (error) { box.innerHTML = `<p class="meta">${esc(error.message)}</p>`; return; }
+  if (!(data || []).length) { box.innerHTML = '<p class="meta">No admin sales yet.</p>'; return; }
+  box.innerHTML = data.map(s => `<div class="listing" data-sale-id="${s.id}">
+    <div><b>${esc(s.name)}</b> ${s.active ? '<span class="tag sale">active</span>' : '<span class="tag">inactive</span>'}
+      <span class="meta">· ${esc(s.scope)}${s.scope === "nation" ? " · " + esc(s.nation || "") : ""}
+      ${s.percent_off != null ? " · " + s.percent_off + "% off" : (s.label ? " · " + esc(s.label) : "")}</span></div>
+    ${s.active ? '<button type="button" class="small" data-sale-act="deactivate">Deactivate</button>' : ""}
+  </div>`).join("");
+}
+
+async function findAliasHits(from, field) {
+  const needle = from.trim();
+  if (!needle) return [];
+  const { data } = await sb.from("shops").select("id, name, city, nation, profiles(mc_username)").order("name");
+  return (data || []).filter(s => {
+    const cityExact = norm(s.city || "") === norm(needle);
+    const nationExact = norm(s.nation || "") === norm(needle);
+    if (field === "city") return cityExact;
+    if (field === "nation") return nationExact;
+    return cityExact || nationExact;
+  });
+}
+
+function roleLabel(a) { return a.is_head ? "head admin" : a.is_admin ? "admin" : a.is_mod ? "mod" : "user"; }
+
+function roleBadge(a) {
+  const cls = a.is_head ? "role-head" : a.is_admin ? "role-admin" : a.is_mod ? "role-mod" : "role-user";
+  return `<span class="tag ${cls}">${roleLabel(a)}</span>`;
+}
+
+function statusBadge(a) {
+  let s = a.verified_at
+    ? '<span class="tag ok">verified</span>'
+    : '<span class="tag warn">unverified</span>';
+  if (a.timed_out) s += ' <span class="tag bad">timed out</span>';
+  return s;
+}
+
+function impersonateBtn(u) {
+  if (!me.is_head || u.is_head || u.id === me.id || u.timed_out) return "";
+  return `<button class="small btn-impersonate" data-act="impersonate" data-id="${u.id}" title="Browse the site as this user">Log into user</button>`;
+}
+
+function roleButtons(u) {
+  if (!me.is_head || u.is_head) return impersonateBtn(u);
+  const b = (act, text, cls) => `<button class="small ${cls}" data-act="${act}" data-id="${u.id}">${text}</button>`;
+  const del = iconBtn("trash", { danger: true, cls: "btn-report", title: "Delete account", attrs: `data-act="delete-account" data-id="${u.id}"` });
+  const imp = impersonateBtn(u);
+  if (u.is_admin) return b("remove_admin", "Remove admin", "btn-role-admin") + imp + b("make_mod", "Make mod", "btn-role-mod") + del;
+  if (u.is_mod) return b("make_admin", "Make admin", "btn-role-admin") + imp + b("remove_mod", "Remove mod", "btn-role-mod") + del;
+  return b("make_admin", "Make admin", "btn-role-admin") + imp + b("make_mod", "Make mod", "btn-role-mod") + del;
+}
+
+function paintLists() {
+  const f = norm(filter.value);
+  const hit = (...parts) => !f || parts.some(p => String(p ?? "").toLowerCase().includes(f));
+
+  if (me.is_head) {
+    document.getElementById("users").innerHTML = accounts
+      .filter(a => hit(a.mc_username, a.discord_username, a.login_username))
+      .map(a => `<div class="listing">
+        <div><a href="profile.html?id=${a.id}" style="color:inherit">${esc(a.mc_username)}</a>
+          ${roleBadge(a)} ${statusBadge(a)}
+          <span class="meta">· ${esc(a.discord_username || "—")} · ${esc(a.login_username)} · made ${fmtDate(a.created_at)} · last ${fmtDate(a.last_sign_in_at)}</span></div>
+        <div class="acct-actions">${roleButtons(a)}</div>
+      </div>`).join("") || '<p class="meta">None.</p>';
+  } else {
+    document.getElementById("users").innerHTML = viewUsers
+      .filter(u => hit(u.mc_username, u.discord_username, u.login_username))
+      .map(u => `<div class="listing"><div>${esc(u.mc_username)}
+        ${roleBadge(u)}
+        ${u.verified_at ? '<span class="tag ok">verified</span>' : '<span class="tag warn">unverified</span>'}
+        ${u.timed_out ? '<span class="tag bad">timed out</span>' : ""}</div></div>`).join("") || '<p class="meta">None.</p>';
+  }
+
+  document.getElementById("shops").innerHTML = shopRows
+    .filter(s => hit(s.name, s.city, s.nation, s.profiles && s.profiles.mc_username))
+    .map(s =>
+      `<div class="listing" data-id="${s.id}">
+        <div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
+          <span class="meta">· ${esc(s.profiles?.mc_username)} · ${placeHtml(s) || "no place"} · ${(s.listings || []).length} listings</span></div>
+        <div class="inline-actions">
+          ${me.is_head ? `<button class="small" data-act="transfer" data-id="${s.id}" title="Reassign this shop to another account">Transfer</button>` : ""}
+          ${iconBtn("trash", { danger: true, cls: "btn-report", title: "Delete shop", attrs: 'data-act="del"' })}
+        </div>
+      </div>`).join("") || '<p class="meta">No shops yet.</p>';
+
+  document.getElementById("listings").innerHTML = listingRows
+    .filter(l => hit(l.sell_item, l.want_item, l.shops && l.shops.name))
+    .map(l => `<div class="listing">
+      <div>${itemText(l.want_amount, l.want_item, l.want_unit)} <span class="arrow">&rarr;</span> ${itemText(l.sell_amount, l.sell_item, l.sell_unit)}
+        <span class="meta">· <a href="shop.html?id=${l.shop_id}&listing=${l.id}">${esc(l.shops ? l.shops.name : "?")}</a></span>
+        ${l.timed_out ? '<span class="tag bad">timed out</span>' : ""}</div>
+    </div>`).join("") || '<p class="meta">None.</p>';
+}
+
+async function render() {
+  if (me.is_head) {
+    const r = await callFn("review-signup", { action: "list" });
+    if (!r.ok) { setMsg(usermsg, r.message, "err"); }
+    else accounts = r.data.accounts;
+
+    const pending = accounts.filter(a => !a.verified_at && !a.is_admin && !a.is_mod && !a.is_head)
+      .sort((a, b) => a.created_at < b.created_at ? -1 : 1);
+    document.getElementById("pending").innerHTML = pending.map(a => `
+      <div class="card admin-card">
+        <div class="top">
+          <div><b>${esc(a.mc_username)}</b> <span class="meta">Discord: ${esc(a.discord_username || "?")} · login: ${esc(a.login_username)} · signed up ${fmtDate(a.created_at)} · <b>${timeLeft(a.created_at)}</b> left</span></div>
+          <div class="inline-actions">
+            <button class="small primary" data-act="accept" data-id="${a.id}">Accept</button>
+            <button class="small btn-report" data-act="deny" data-id="${a.id}">Deny</button>
+          </div>
+        </div>
+      </div>`).join("") || '<p class="meta">No pending signups.</p>';
+  } else {
+    const { data: users } = await sb.from("profiles").select("*").order("mc_username");
+    viewUsers = users || [];
+  }
+
+  const [{ data: shops }, { data: listings }] = await Promise.all([
+    sb.from("shops").select("id, owner_id, name, city, nation, profiles(mc_username), listings(id, updated_at, in_stock, timed_out)").order("created_at", { ascending: false }),
+    sb.from("listings").select("*, shops(name)").order("id")
+  ]);
+  shopRows = shops || [];
+  listingRows = listings || [];
+
+  const stale = shopRows.map(s => {
+    const live = (s.listings || []).filter(l => l.in_stock && !l.timed_out);
+    if (!live.length) return null;
+    const newest = live.reduce((m, l) => (!m || l.updated_at > m ? l.updated_at : m), null);
+    if (!newest || daysAgo(newest) < STALE_DAYS) return null;
+    return { s, newest, days: daysAgo(newest), n: live.length };
+  }).filter(Boolean).sort((a, b) => b.days - a.days);
+
+  document.getElementById("stale").innerHTML = stale.length
+    ? stale.map(({ s, newest, days, n }) =>
+      `<div class="listing">
+        <div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
+          <span class="meta">· ${esc(s.profiles?.mc_username || "?")} · ${n} in-stock · quiet ${days}d · last ${updatedHtml(newest, { prefix: false })}</span>
+        </div>
+      </div>`).join("")
+    : '<p class="meta">Nothing stale right now.</p>';
+
+  paintLists();
+}
+
+filter.addEventListener("input", paintLists);
+
+document.querySelector("main").addEventListener("click", async e => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const act = btn.dataset.act;
+
+  if (act === "purge-unverified") {
+    if (!me.is_head) { setMsg(purgemsg, "Only the head admin can purge.", "err"); return; }
+    if (!await confirmModal({
+      title: "Purge unverified",
+      body: "Delete every unverified non-staff account older than 24 hours? This can't be undone.",
+      confirmLabel: "Purge now",
+      danger: true
+    })) return;
+    setMsg(purgemsg, "Purging...");
+    const r = await callFn("review-signup", { action: "purge_unverified" });
+    if (!r.ok) { setMsg(purgemsg, r.message, "err"); return; }
+    const n = (r.data && r.data.purged) || 0;
+    setMsg(purgemsg, "Purged " + n + " account" + (n === 1 ? "" : "s") + ".", "ok");
+    render();
+    return;
+  }
+
+  if (act === "alias-preview" || act === "alias-apply") {
+    const from = document.getElementById("alias-from").value.trim();
+    const to = document.getElementById("alias-to").value.trim();
+    const field = document.getElementById("alias-field").value;
+    if (!from) { setMsg(aliasmsg, "Enter a From value.", "err"); return; }
+    if (act === "alias-apply" && !to) { setMsg(aliasmsg, "Enter a To value.", "err"); return; }
+    if (act === "alias-apply" && norm(from) === norm(to)) { setMsg(aliasmsg, "From and To are the same.", "err"); return; }
+    aliasPreviewRows = await findAliasHits(from, field);
+    document.getElementById("alias-hits").innerHTML = aliasPreviewRows.length
+      ? aliasPreviewRows.map(s => `<div class="listing"><div><a href="shop.html?id=${s.id}" style="color:inherit">${esc(s.name)}</a>
+          <span class="meta">· ${esc(s.profiles?.mc_username || "?")} · city: ${esc(s.city || "—")} · nation: ${esc(s.nation || "—")}</span></div></div>`).join("")
+      : '<p class="meta">No shops store that exact text.</p>';
+    if (act === "alias-preview") {
+      setMsg(aliasmsg, aliasPreviewRows.length + " shop" + (aliasPreviewRows.length === 1 ? "" : "s") + " would change.", aliasPreviewRows.length ? "ok" : "err");
+      return;
+    }
+    if (!aliasPreviewRows.length) { setMsg(aliasmsg, "Nothing to rewrite.", "err"); return; }
+    if (!await confirmModal({
+      title: "Rewrite place names",
+      body: "Rewrite " + aliasPreviewRows.length + " shop(s) to \"" + to + "\"?",
+      confirmLabel: "Rewrite"
+    })) return;
+    let n = 0;
+    for (const s of aliasPreviewRows) {
+      const patch = {};
+      if ((field === "city" || field === "both") && norm(s.city || "") === norm(from)) patch.city = to;
+      if ((field === "nation" || field === "both") && norm(s.nation || "") === norm(from)) patch.nation = to;
+      if (!Object.keys(patch).length) continue;
+      const { error } = await sb.from("shops").update(patch).eq("id", s.id);
+      if (error) { setMsg(aliasmsg, error.message, "err"); return; }
+      n++;
+    }
+    setMsg(aliasmsg, "Rewrote " + n + " shop" + (n === 1 ? "" : "s") + ".", "ok");
+    aliasPreviewRows = [];
+    render();
+    return;
+  }
+
+  if (!btn.dataset.id && act !== "del" && act !== "transfer") return;
+  let r;
+
+  if (act === "transfer") {
+    if (!me.is_head) { setMsg(msg, "Only the head admin can transfer shops.", "err"); return; }
+    const shopId = btn.dataset.id || btn.closest("[data-id]")?.dataset.id;
+    const shop = shopRows.find(s => String(s.id) === String(shopId));
+    if (!shop) return;
+    const nameIn = await promptModal({
+      title: "Transfer shop",
+      body: "Move \"" + shop.name + "\" (currently " + (shop.profiles?.mc_username || "?") + ") to another verified account.",
+      label: "New owner Minecraft name",
+      placeholder: "Exact MC username",
+      maxLength: 60,
+      confirmLabel: "Continue"
+    });
+    if (nameIn === null) return;
+    const targetName = nameIn.trim();
+    if (!targetName) { setMsg(msg, "Enter a Minecraft name.", "err"); return; }
+    const { data: hits } = await sb.from("profiles").select("id, mc_username, verified_at, timed_out")
+      .ilike("mc_username", targetName).limit(10);
+    const target = (hits || []).find(p => (p.mc_username || "").toLowerCase() === targetName.toLowerCase()) || null;
+    if (!target) { setMsg(msg, "No account named \"" + targetName + "\".", "err"); return; }
+    if (String(target.id) === String(shop.owner_id)) { setMsg(msg, "That player already owns this shop.", "err"); return; }
+    if (target.timed_out) { setMsg(msg, "That account is timed out.", "err"); return; }
+    if (!target.verified_at) { setMsg(msg, "That account is not verified yet.", "err"); return; }
+    if (!await confirmModal({
+      title: "Confirm transfer",
+      body: "Transfer \"" + shop.name + "\" to " + target.mc_username + "? The previous owner loses edit access immediately.",
+      confirmLabel: "Transfer shop",
+      danger: true
+    })) return;
+    const { error } = await sb.from("shops").update({ owner_id: target.id }).eq("id", shop.id);
+    if (error) { setMsg(msg, error.message, "err"); return; }
+    setMsg(msg, "Transferred to " + target.mc_username + ".", "ok");
+    render();
+    return;
+  }
+
+  if (act === "del") {
+    if (!await confirmModal({ title: "Delete shop", body: "Delete this shop and all its listings? This can't be undone.", confirmLabel: "Delete shop", danger: true })) return;
+    const { error } = await sb.from("shops").delete().eq("id", btn.closest("[data-id]").dataset.id);
+    if (error) { setMsg(msg, error.message, "err"); return; }
+    render();
+    return;
+  }
+  if (act === "impersonate") {
+    const a = accounts.find(x => x.id === btn.dataset.id);
+    const name = a ? a.mc_username : "this user";
+    if (!await confirmModal({
+      title: "Log in as user",
+      body: "Log into " + name + "? You'll see the site as them until you press Exit on the yellow bar.",
+      confirmLabel: "Log in"
+    })) return;
+    setMsg(usermsg, "Switching to " + name + "...");
+    r = await startImpersonation(btn.dataset.id);
+    if (!r.ok) { setMsg(usermsg, r.message, "err"); return; }
+    location.href = "index.html";
+    return;
+  }
+  if (act === "delete-account") {
+    const a = accounts.find(x => x.id === btn.dataset.id);
+    if (!await confirmModal({
+      title: "Delete account",
+      body: "Delete " + (a ? a.mc_username : "this account") + " and EVERYTHING they made (shops, listings, comments, reviews)? This can't be undone.",
+      confirmLabel: "Delete account",
+      danger: true
+    })) return;
+    r = await callFn("review-signup", { action: "delete", user_id: btn.dataset.id });
+  } else if (act === "accept" || act === "deny") {
+    if (act === "deny" && !await confirmModal({
+      title: "Deny signup",
+      body: "Deny and DELETE this account and its comments? This can't be undone.",
+      confirmLabel: "Deny and delete",
+      danger: true
+    })) return;
+    r = await callFn("review-signup", { action: act, user_id: btn.dataset.id });
+  } else {
+    r = await callFn("manage-user", { action: act, user_id: btn.dataset.id });
+  }
+  if (!r.ok) { setMsg(usermsg, r.message, "err"); return; }
+  setMsg(usermsg, "");
+  render();
+});
+
+document.getElementById("form").addEventListener("submit", async e => {
+  e.preventDefault();
+  setMsg(msg, "Creating...");
+  const made = { un: document.getElementById("un").value.trim().toLowerCase(), pw: document.getElementById("pw").value };
+  const r = await callFn("create-user", {
+    username: made.un,
+    mc_username: document.getElementById("mc").value.trim(),
+    discord_username: document.getElementById("dc").value.trim(),
+    password: made.pw,
+    role: document.getElementById("role").value
+  });
+  if (!r.ok) { setMsg(msg, r.message, "err"); return; }
+  e.target.reset();
+  setMsg(msg, "Account created. Login: " + made.un + " / " + made.pw, "ok");
+  render();
+});
+
+load();
+</script>
+</body>
+</html>

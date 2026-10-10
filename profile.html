@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profile - CivMC Shops</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="profile-page">
+<nav id="nav"></nav>
+<main class="profile-page" id="profile-page">
+  <div class="profile-hero" id="hero">
+    <span id="avatar"></span>
+    <div class="grow">
+      <h1 id="name">Loading...</h1>
+      <div class="row" id="tags"></div>
+      <dl class="facts" id="facts"></dl>
+      <p class="bio" id="bio"></p>
+      <div class="inline-actions" id="actions" style="margin-top:12px"></div>
+    </div>
+  </div>
+  <div class="msg" id="msg"></div>
+  <div class="stats" id="stats"></div>
+
+  <div id="edit-wrap" hidden>
+    <div class="row" style="margin-bottom:8px">
+      <button type="button" id="toggledit" data-ico="pen" title="Edit profile" aria-label="Edit profile"></button>
+    </div>
+    <div class="edit-panel" id="own" hidden>
+      <h2 style="margin-top:0">Edit profile</h2>
+
+      <label for="bioedit">Bio (Minecraft colour codes work here)</label>
+      <div class="palette" id="palette-bio"></div>
+      <textarea class="mcfield" id="bioedit" maxlength="300" placeholder="&7Tell people what you trade... (300 characters max)"></textarea>
+      <div class="preview" id="bioprev"></div>
+      <div class="row" style="margin-top:6px"><button id="savebio">Save bio</button></div>
+
+      <div class="row" style="gap:12px;flex-wrap:wrap;margin-top:12px">
+        <div style="flex:1;min-width:140px">
+          <label for="pronounsedit">Pronouns (optional)</label>
+          <input type="text" id="pronounsedit" maxlength="40" placeholder="e.g. they/them" style="width:100%">
+        </div>
+        <div style="flex:1;min-width:160px">
+          <label for="timezoneedit">Timezone (optional)</label>
+          <input type="text" id="timezoneedit" maxlength="60" placeholder="e.g. EST (UTC−5)" style="width:100%">
+        </div>
+      </div>
+      <div class="row" style="margin-top:6px"><button id="saveidentity">Save pronouns / timezone</button></div>
+
+      <label>Highlight colour</label>
+      <p class="meta" style="margin:0 0 6px">Frames the boxes on your public profile. Leave default for the normal border.</p>
+      <div class="hl-swatches" id="hl-swatches"></div>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="hlhex" maxlength="7" placeholder="#7fb35a" spellcheck="false" autocomplete="off" aria-label="Custom highlight hex">
+        <button id="savehl">Save colour</button>
+        <button type="button" class="small" id="clearhl">Use default</button>
+      </div>
+
+      <label>Profile picture</label>
+      <p class="meta" id="picnote" style="margin:0 0 6px"></p>
+      <div class="row" id="picrow">
+        <input type="file" id="picfile" accept="image/png,image/jpeg,image/webp">
+        <button id="savepic">Upload picture</button>
+        <button id="usehead">Use my Minecraft head</button>
+      </div>
+
+      <p class="note">Your Minecraft name and Discord name can't be changed here. To change those, or anything else about your account, <span class="pfa"></span>.</p>
+
+      <h2>Change password</h2>
+      <div class="row">
+        <input type="password" id="pw" placeholder="New password (8+ characters)" autocomplete="new-password">
+        <button id="savepw">Change password</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="profile-tabs" role="tablist" aria-label="Profile sections">
+    <button type="button" class="profile-tab on" role="tab" aria-selected="true" data-tab="shops" id="tab-shops">Shops</button>
+    <button type="button" class="profile-tab" role="tab" aria-selected="false" data-tab="reviews" id="tab-reviews">Reviews written</button>
+  </div>
+  <section class="profile-tab-panel" id="panel-shops" role="tabpanel" aria-labelledby="tab-shops">
+    <div class="profile-section-head">
+      <h2>Shops</h2>
+      <p class="meta" id="shops-sub"></p>
+    </div>
+    <div id="shops" class="shop-grid profile-shop-grid"></div>
+  </section>
+  <section class="profile-tab-panel" id="panel-reviews" role="tabpanel" aria-labelledby="tab-reviews" hidden>
+    <div class="profile-section-head">
+      <h2>Reviews written</h2>
+      <p class="meta" id="reviews-sub"></p>
+    </div>
+    <div id="myreviews"></div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="mock.js"></script>
+<script src="app.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+let id = params.get("id");
+const nameParam = params.get("name");
+const msg = document.getElementById("msg");
+let own = false, myId = null, shown = null, myProfile = null;
+let lastField = null;
+let activeTab = "shops";
+
+function memberSinceText(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+}
+
+function switchTab(tab) {
+  activeTab = tab === "reviews" ? "reviews" : "shops";
+  document.querySelectorAll(".profile-tab").forEach(btn => {
+    const on = btn.dataset.tab === activeTab;
+    btn.classList.toggle("on", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  document.getElementById("panel-shops").hidden = activeTab !== "shops";
+  document.getElementById("panel-reviews").hidden = activeTab !== "reviews";
+}
+
+document.querySelector(".profile-tabs").addEventListener("click", e => {
+  const btn = e.target.closest("[data-tab]");
+  if (btn) switchTab(btn.dataset.tab);
+});
+const HL_SWATCHES = ["#7fb35a", "#c9953a", "#6a9fb5", "#5aaf9a", "#b87333", "#c4a574", "#c25b4e", "#98998c"];
+document.querySelectorAll(".pfa").forEach(el => el.textContent = PFA_HELP);
+document.getElementById("palette-bio").innerHTML = paletteHtml();
+
+function normalizeHex(v) {
+  const s = String(v || "").trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(s)) return "#" + s.slice(1).toLowerCase();
+  if (/^#[0-9A-Fa-f]{3}$/.test(s)) {
+    const h = s.slice(1).toLowerCase();
+    return "#" + h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  }
+  return null;
+}
+
+function applyHighlight(color) {
+  const root = document.getElementById("profile-page");
+  const targets = [root, document.body];
+  for (const el of targets) {
+    if (!el) continue;
+    if (color) el.style.setProperty("--profile-highlight", color);
+    else el.style.removeProperty("--profile-highlight");
+  }
+}
+
+function syncHlUi(color) {
+  const hex = document.getElementById("hlhex");
+  hex.value = color || "";
+  document.querySelectorAll("#hl-swatches .hl-swatch").forEach(btn => {
+    const c = btn.dataset.color || null;
+    btn.classList.toggle("on", (color || null) === c);
+  });
+}
+
+document.getElementById("hl-swatches").innerHTML =
+  `<button type="button" class="hl-swatch hl-default" data-color="" title="Default border" aria-label="Default border"></button>` +
+  HL_SWATCHES.map(c =>
+    `<button type="button" class="hl-swatch" data-color="${c}" style="--swatch:${c}" title="${c}" aria-label="Highlight ${c}"></button>`
+  ).join("");
+
+document.getElementById("hl-swatches").onclick = e => {
+  const btn = e.target.closest(".hl-swatch");
+  if (!btn) return;
+  const c = btn.dataset.color || "";
+  document.getElementById("hlhex").value = c;
+  syncHlUi(c || null);
+  applyHighlight(c || null);
+};
+
+function updatePrev(field, prevId) {
+  const prev = document.getElementById(prevId);
+  const v = field.value;
+  if (v.trim()) prev.innerHTML = mcText(v);
+  else prev.innerHTML = '<span class="meta">Preview</span>';
+}
+
+document.getElementById("own").addEventListener("focusin", e => {
+  if (e.target.classList.contains("mcfield")) lastField = e.target;
+});
+document.getElementById("own").addEventListener("input", e => {
+  if (e.target.id === "bioedit") updatePrev(e.target, "bioprev");
+});
+document.getElementById("own").addEventListener("click", e => {
+  const cb = e.target.closest("button[data-code]");
+  if (!cb) return;
+  const field = lastField && document.getElementById("own").contains(lastField)
+    ? lastField
+    : document.getElementById("bioedit");
+  insertMcCode(field, cb.dataset.code);
+  if (field.value.length > field.maxLength) field.value = field.value.slice(0, field.maxLength);
+  updatePrev(field, "bioprev");
+});
+
+async function load() {
+  const session = await getSession();
+  myId = session ? session.user.id : null;
+  myProfile = myId ? await getProfile(myId) : null;
+  if (!id && nameParam) {
+    const { data: byName } = await sb.from("profiles").select("id, mc_username").ilike("mc_username", nameParam).limit(10);
+    const exact = (byName || []).find(p => p.mc_username && p.mc_username.toLowerCase() === nameParam.toLowerCase());
+    const hit = exact || (byName && byName[0]);
+    if (hit) { id = hit.id; history.replaceState(null, "", "profile.html?id=" + encodeURIComponent(id)); }
+  }
+  if (!id) { setMsg(msg, "No profile picked.", "err"); return; }
+  const { data: p } = await sb.from("profiles").select("*").eq("id", id).single();
+  if (!p) { document.getElementById("name").textContent = "Profile not found"; return; }
+  shown = p;
+  own = myId === p.id;
+
+  document.title = p.mc_username + " - CivMC Shops";
+  document.getElementById("name").textContent = p.mc_username;
+  document.getElementById("avatar").innerHTML = avatarImg(p, 128);
+  applyHighlight(p.highlight_color || null);
+
+  let tags = p.verified_at ? '<span class="tag ok">verified</span>' : '<span class="tag warn">unverified</span>';
+  if (p.is_head) tags += ' <span class="tag">head admin</span>';
+  else if (p.is_admin) tags += ' <span class="tag">admin</span>';
+  else if (p.is_mod) tags += ' <span class="tag">mod</span>';
+  if (p.timed_out) tags += ' <span class="tag bad">timed out</span>';
+  document.getElementById("tags").innerHTML = tags;
+
+  const since = memberSinceText(p.created_at);
+  document.getElementById("facts").innerHTML =
+    `<dt>Minecraft</dt><dd><b>${esc(p.mc_username)}</b></dd>
+     <dt>Discord</dt><dd>${p.discord_username ? `<b>${esc(p.discord_username)}</b> <button class="small" id="copydc">Copy</button>` : '<span class="meta">not set</span>'}</dd>
+     ${p.pronouns ? `<dt>Pronouns</dt><dd>${esc(p.pronouns)}</dd>` : ""}
+     ${p.timezone ? `<dt>Timezone</dt><dd>${esc(p.timezone)}</dd>` : ""}
+     <dt>Member since</dt><dd title="${esc(p.created_at ? new Date(p.created_at).toLocaleString() : "")}">${esc(since)}</dd>
+     <dt>Last seen</dt><dd>${lastSeenHtml(p.last_seen_at)}</dd>`;
+  const cp = document.getElementById("copydc");
+  if (cp) cp.onclick = async () => {
+    const ok = await copyText(p.discord_username);
+    cp.textContent = ok ? "Copied" : "Couldn't copy";
+  };
+
+  const bioEl = document.getElementById("bio");
+  if (p.bio) bioEl.innerHTML = mcText(p.bio);
+  else bioEl.innerHTML = own ? "" : '<span class="meta">No bio yet.</span>';
+
+  let act = "";
+  if (!own && myId) act += `<button class="small btn-report" id="rep">Report user</button>`;
+  act += `<button class="small" id="shareprof">Share</button>`;
+  document.getElementById("actions").innerHTML = act;
+  const rep = document.getElementById("rep");
+  if (rep) rep.onclick = async () => {
+    const r = await sendReport("user", p.id);
+    if (r) setMsg(msg, r.text, r.kind);
+  };
+  const sp = document.getElementById("shareprof");
+  if (sp) sp.onclick = async () => {
+    const ok = await copyText(location.href.split("#")[0]);
+    setMsg(msg, ok ? "Profile link copied." : "Couldn't copy.", ok ? "ok" : "err");
+  };
+
+  document.getElementById("edit-wrap").hidden = !own;
+  if (own) {
+    document.getElementById("bioedit").value = p.bio || "";
+    updatePrev(document.getElementById("bioedit"), "bioprev");
+    document.getElementById("pronounsedit").value = p.pronouns || "";
+    document.getElementById("timezoneedit").value = p.timezone || "";
+    syncHlUi(p.highlight_color || null);
+    const verified = isVerified(p);
+    document.getElementById("picnote").textContent = verified
+      ? (p.avatar_path ? "You're using a custom picture." : "You're using your Minecraft head. Upload a picture to replace it.")
+      : "Verified accounts can upload a custom picture. Until then you get your Minecraft head.";
+    document.getElementById("picfile").disabled = !verified;
+    document.getElementById("savepic").disabled = !verified;
+    document.getElementById("usehead").disabled = !p.avatar_path;
+  }
+
+  let totalListings = 0;
+  let allReviews = [];
+  let active = false;
+  const weekAgo = Date.now() - 7 * 86400000;
+
+  const { data: shopsFull } = await sb.from("shops")
+    .select("id, owner_id, name, styled_name, icon_item, icon_path, city, nation, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, listings(id, updated_at), reviews(rating, traded, timed_out)")
+    .eq("owner_id", p.id).order("name");
+  const full = (shopsFull || []).filter(s => {
+    if ((s.archived || s.is_open === false) && !own && !isStaff(myProfile)) return false;
+    return !s.timed_out || own || isStaff(myProfile);
+  });
+
+  full.forEach(s => {
+    const ls = s.listings || [];
+    totalListings += ls.length;
+    (s.reviews || []).forEach(r => allReviews.push(r));
+    if (ls.some(l => l.updated_at && new Date(l.updated_at).getTime() >= weekAgo)) active = true;
+  });
+
+  const rating = ratingSummary(allReviews);
+  if (isTrustedTrader(allReviews)) {
+    document.getElementById("tags").innerHTML += " " + trustedBadge(allReviews);
+  }
+  document.getElementById("stats").innerHTML = `
+    <div class="stat"><div class="big">${full.length}</div><div class="lbl">Shops</div></div>
+    <div class="stat"><div class="big">${totalListings}</div><div class="lbl">Listings</div></div>
+    <div class="stat"><div class="big">${rating ? rating.avg.toFixed(1) : "—"}</div><div class="lbl">${rating ? "Avg rating (" + rating.count + ")" : "No ratings"}</div></div>
+    <div class="stat"><div class="big">${active ? "Active" : "Quiet"}</div><div class="lbl">${active ? "Updated in last 7 days" : "No recent listing updates"}</div></div>
+    <div class="stat"><div class="big" style="font-size:1rem">${esc(since)}</div><div class="lbl">Member since</div></div>`;
+
+  document.getElementById("shops-sub").textContent = full.length
+    ? full.length + " shop" + (full.length === 1 ? "" : "s") + " · " + totalListings + " listing" + (totalListings === 1 ? "" : "s")
+    : "";
+  document.getElementById("tab-shops").textContent = "Shops" + (full.length ? " (" + full.length + ")" : "");
+
+  const shopBox = document.getElementById("shops");
+  if (!full.length) {
+    shopBox.className = "";
+    shopBox.innerHTML = own
+      ? emptyState("You don't have a shop yet.", "dashboard.html", "Create a shop")
+      : emptyState("This player hasn't opened a shop yet.");
+  } else {
+    shopBox.className = "shop-grid profile-shop-grid";
+    shopBox.innerHTML = full.map(s => {
+      const card = { ...s, listings: [{ count: (s.listings || []).length }], profiles: null };
+      return shopCardHtml(card, {
+        listingCount: (s.listings || []).length
+      });
+    }).join("");
+  }
+
+  const { data: written } = await sb.from("reviews")
+    .select("*, shops(id, name, styled_name)")
+    .eq("author_id", p.id)
+    .order("created_at", { ascending: false })
+    .limit(40);
+  const okReviews = (written || []).filter(r => !r.timed_out);
+  document.getElementById("reviews-sub").textContent = okReviews.length
+    ? okReviews.length + " public review" + (okReviews.length === 1 ? "" : "s")
+    : "";
+  document.getElementById("tab-reviews").textContent = "Reviews written" + (okReviews.length ? " (" + okReviews.length + ")" : "");
+  document.getElementById("myreviews").innerHTML = okReviews.length
+    ? `<div class="profile-reviews">${okReviews.map(r => `
+        <div class="review">
+          <div class="top">
+            <span><span class="stars">${starsText(r.rating)}</span>
+              <a href="shop.html?id=${r.shop_id}">${r.shops ? shopName(r.shops) : "shop"}</a>
+              ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
+              <span class="meta">· ${agoText(r.created_at)}</span></span>
+          </div>
+          ${r.body ? `<p class="body">${esc(r.body)}</p>` : ""}
+          ${r.owner_reply ? `<div class="owner-reply"><span class="tag owner">owner reply</span>
+            <p class="body">${esc(r.owner_reply)}</p>
+            ${r.owner_reply_at ? `<span class="meta">${agoText(r.owner_reply_at)}</span>` : ""}</div>` : ""}
+        </div>`).join("")}</div>`
+    : '<p class="meta">No public reviews written yet.</p>';
+  switchTab(activeTab);
+}
+
+document.getElementById("toggledit").onclick = () => {
+  const panel = document.getElementById("own");
+  panel.hidden = !panel.hidden;
+  const editBtn = document.getElementById("toggledit");
+  const editing = !panel.hidden;
+  editBtn.title = editing ? "Close editor" : "Edit profile";
+  editBtn.setAttribute("aria-label", editBtn.title);
+  editBtn.innerHTML = uiIcon(editing ? "x" : "pen");
+  editBtn.classList.add("icon-btn");
+};
+
+document.getElementById("savebio").onclick = async () => {
+  const v = document.getElementById("bioedit").value.trim().slice(0, 300);
+  const { error } = await sb.from("profiles").update({ bio: v || null }).eq("id", shown.id);
+  if (error) { setMsg(msg, error.message, "err"); return; }
+  setMsg(msg, "Bio saved.", "ok");
+  load();
+};
+
+document.getElementById("saveidentity").onclick = async () => {
+  const pronouns = document.getElementById("pronounsedit").value.trim().slice(0, 40) || null;
+  const timezone = document.getElementById("timezoneedit").value.trim().slice(0, 60) || null;
+  const { error } = await sb.from("profiles").update({ pronouns, timezone }).eq("id", shown.id);
+  if (error) { setMsg(msg, error.message, "err"); return; }
+  setMsg(msg, "Pronouns / timezone saved.", "ok");
+  load();
+};
+
+async function saveHighlight(color) {
+  const { error } = await sb.from("profiles").update({ highlight_color: color }).eq("id", shown.id);
+  if (error) { setMsg(msg, error.message, "err"); return; }
+  setMsg(msg, color ? "Highlight colour saved." : "Using default borders.", "ok");
+  load();
+}
+
+document.getElementById("savehl").onclick = async () => {
+  const raw = document.getElementById("hlhex").value.trim();
+  if (!raw) { await saveHighlight(null); return; }
+  const hex = normalizeHex(raw);
+  if (!hex) { setMsg(msg, "Use a hex colour like #7fb35a.", "err"); return; }
+  await saveHighlight(hex);
+};
+
+document.getElementById("clearhl").onclick = async () => {
+  document.getElementById("hlhex").value = "";
+  syncHlUi(null);
+  await saveHighlight(null);
+};
+
+document.getElementById("savepic").onclick = async () => {
+  const file = document.getElementById("picfile").files[0];
+  if (!file) { setMsg(msg, "Pick a picture first.", "err"); return; }
+  setMsg(msg, "Uploading...");
+  const up = await uploadImage(file, "avatars", shown.id);
+  if (!up.ok) { setMsg(msg, up.message, "err"); return; }
+  const old = shown.avatar_path;
+  const { error } = await sb.from("profiles").update({ avatar_path: up.path }).eq("id", shown.id);
+  if (error) { setMsg(msg, error.message, "err"); return; }
+  if (old) sb.storage.from("uploads").remove([old]);
+  document.getElementById("picfile").value = "";
+  setMsg(msg, "Picture updated.", "ok");
+  load();
+};
+
+document.getElementById("usehead").onclick = async () => {
+  const old = shown.avatar_path;
+  const { error } = await sb.from("profiles").update({ avatar_path: null }).eq("id", shown.id);
+  if (error) { setMsg(msg, error.message, "err"); return; }
+  if (old) sb.storage.from("uploads").remove([old]);
+  setMsg(msg, "Using your Minecraft head again.", "ok");
+  load();
+};
+
+document.getElementById("savepw").onclick = async () => {
+  const pw = document.getElementById("pw").value;
+  if (pw.length < 8) { setMsg(msg, "Use at least 8 characters.", "err"); return; }
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if (error) { setMsg(msg, error.message, "err"); return; }
+  await sb.from("profiles").update({ must_change_password: false }).eq("id", shown.id);
+  document.getElementById("pw").value = "";
+  setMsg(msg, "Password changed.", "ok");
+};
+
+load();
+</script>
+</body>
+</html>

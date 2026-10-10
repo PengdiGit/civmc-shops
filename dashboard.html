@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My shops - CivMC Shops</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="dash-page">
+<nav id="nav"></nav>
+<main>
+  <header class="page-hero">
+    <span class="page-eyebrow">Workshop</span>
+    <h1>My shops <span class="owner-alert-badge" id="alert-badge" hidden></span></h1>
+    <p class="sub" id="who"></p>
+  </header>
+  <div id="verify"></div>
+  <div id="owner-alerts" class="owner-alerts" hidden></div>
+  <div id="notifications" class="owner-alerts dash-notifications" hidden></div>
+
+  <div class="dash-new-shop-bar">
+    <button type="button" class="dash-new-shop-toggle" id="toggle-new-shop" data-ico="plus">New shop</button>
+  </div>
+  <div class="dash-new-shop-wrap" id="newshop-wrap" hidden>
+  <h2>New shop</h2>
+  <div class="panel" id="newshop" data-icon-item="">
+    <div class="row">
+      <div style="flex:2;min-width:180px"><label for="s-name">Shop name (plain text, this is what people search)</label><input type="text" id="s-name" maxlength="60" style="width:100%"></div>
+      <div style="flex:1;min-width:100px"><label for="s-city">City</label><input type="text" id="s-city" maxlength="60" placeholder="Mount Augusta" style="width:100%"></div>
+      <div style="flex:1;min-width:100px"><label for="s-nation">Nation</label><input type="text" id="s-nation" maxlength="60" placeholder="Commonwealth" style="width:100%"></div>
+      <div><label for="s-x">X</label><input type="number" id="s-x" style="width:90px"></div>
+      <div><label for="s-z">Z</label><input type="number" id="s-z" style="width:90px"></div>
+    </div>
+
+    <label for="s-styled">Fancy name (optional). Minecraft colour codes: <b>&amp;6</b> gold, <b>&amp;l</b> bold, <b>&amp;r</b> reset...</label>
+    <div class="palette" id="s-palette"></div>
+    <input type="text" class="mcfield" id="s-styled" maxlength="120" placeholder="&6&lBob's &r&eBakery" style="width:100%">
+    <div class="preview" id="s-styled-prev"></div>
+
+    <label for="s-desc">Description (optional, same colour codes work)</label>
+    <textarea class="mcfield" id="s-desc" maxlength="500" placeholder="What do you sell? Where in the city are you? Anything people should know."></textarea>
+    <div class="preview" id="s-desc-prev"></div>
+
+    <label for="s-find">Find me (optional)</label>
+    <input type="text" id="s-find" maxlength="120" placeholder="e.g. 2nd floor, blue wool · underground entrance" style="width:100%">
+
+    <label>Shop picture</label>
+    <div class="row">
+      <span id="s-iconprev"></span>
+      <button type="button" id="s-pick-icon">Use an item as the icon</button>
+      <input type="file" id="s-file" accept="image/png,image/jpeg,image/webp">
+      <button type="button" id="s-clear-icon" data-ico="x" title="Clear icon" aria-label="Clear icon" hidden></button>
+    </div>
+    <p class="meta" style="margin:4px 0 0">An uploaded picture is used instead of the item icon. With neither, your shop gets a chest.</p>
+
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="add-shop">Create shop</button>
+      <button type="button" class="small" id="cancel-new-shop">Cancel</button>
+    </div>
+  </div>
+  </div>
+  <div class="msg" id="msg"></div>
+
+  <p class="meta" style="margin:10px 0 0">Each listing reads: what you buy &rarr; what you sell. Hover an icon to see what it does.</p>
+  <div id="shops"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="mock.js"></script>
+<script src="items.js"></script>
+<script src="item-picker.js"></script>
+<script src="app.js"></script>
+<script>
+let me = null;
+let shopsData = {};                 // shop id -> shop (with listings), from the last load
+let stockUndo = {};                 // shop id -> [{id, stock, in_stock, group_name}] snapshot for undo
+let addingListingSlot = null;       // { shopId, groupKey } when + add form is open
+let lastField = null;               // last colour-code text box you clicked in
+let marketByItem = {};              // for owner price alerts
+let ownerAlertList = [];
+let myNotifications = [];
+let dashDirty = false;              // unsaved listing / shop-detail edits
+const msg = document.getElementById("msg");
+
+function markDashDirty() { dashDirty = true; }
+function clearDashDirty() { dashDirty = false; }
+async function confirmLeaveDash() {
+  if (!dashDirty) return true;
+  return confirmModal({
+    title: "Unsaved changes",
+    body: "You have unsaved listing or shop edits on this page. Leave anyway?",
+    confirmLabel: "Leave",
+    danger: true
+  });
+}
+window.addEventListener("beforeunload", e => {
+  if (!dashDirty) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+document.addEventListener("click", async e => {
+  const a = e.target.closest("a[href]");
+  if (!a || !dashDirty) return;
+  if (a.target === "_blank" || a.hasAttribute("download")) return;
+  const href = a.getAttribute("href") || "";
+  if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+  try {
+    const url = new URL(href, location.href);
+    if (url.pathname === location.pathname && url.search === location.search) return;
+  } catch (err) {}
+  e.preventDefault();
+  e.stopPropagation();
+  if (await confirmLeaveDash()) {
+    clearDashDirty();
+    location.href = a.href;
+  }
+}, true);
+
+const unitSelect = (cls, sel) => `<select class="unit ${cls}" title="unit (blank = single items)">
+  <option value=""></option><option value="ci"${sel === "ci" ? " selected" : ""}>CI</option><option value="cs"${sel === "cs" ? " selected" : ""}>CS</option></select>`;
+const unitText = u => u ? " " + u.toUpperCase() : "";
+const fmtListing = l => `${l.want_amount}${unitText(l.want_unit)} ${l.want_item} → ${l.sell_amount}${unitText(l.sell_unit)} ${l.sell_item}`;
+
+async function loadMarketForAlerts() {
+  marketByItem = {};
+  try {
+    const { data } = await sb.rpc("market_now");
+    (data || []).forEach(m => { (marketByItem[m.item] = marketByItem[m.item] || { sell: null, buy: null })[m.side] = m; });
+  } catch (e) {}
+}
+
+function paintOwnerAlerts(shops) {
+  const box = document.getElementById("owner-alerts");
+  const badge = document.getElementById("alert-badge");
+  if (!alertsEnabled(me && me.profile)) {
+    ownerAlertList = [];
+    box.hidden = true;
+    box.innerHTML = "";
+    badge.hidden = true;
+    return;
+  }
+  ownerAlertList = collectOwnerAlerts(shops, marketByItem);
+  if (!ownerAlertList.length) {
+    box.hidden = true;
+    box.innerHTML = "";
+    badge.hidden = true;
+    return;
+  }
+  badge.hidden = false;
+  badge.textContent = String(ownerAlertList.length);
+  box.hidden = false;
+  const kindTag = k => k === "stale" ? "warn" : k === "overprice" ? "bad" : "warn";
+  const kindLabel = k => k === "stale" ? "stale" : k === "overprice" ? "price" : "restock";
+  box.innerHTML = `<div class="owner-alerts-head"><b>Owner alerts</b>
+    <span class="meta">${ownerAlertList.length} need attention</span>
+    <a class="small" href="settings.html">Settings</a></div>` +
+    ownerAlertList.map((a, i) => `<div class="owner-alert" data-alert="${i}">
+      <span class="tag ${kindTag(a.kind)}">${kindLabel(a.kind)}</span>
+      <span class="owner-alert-body"><a href="shop.html?id=${a.shop.id}&listing=${a.listing.id}">${esc(a.shop.name)}</a>
+        · ${esc(a.text)}</span>
+      <button type="button" class="small" data-act="ignore-alert" data-i="${i}">Ignore</button>
+    </div>`).join("");
+}
+
+async function paintNotifications() {
+  const box = document.getElementById("notifications");
+  if (!box || !me) return;
+  const { data } = await loadMyNotifications(me.session.user.id, 30);
+  myNotifications = data || [];
+  const invites = myNotifications.filter(n => n.type === "sale_invite" && !n.read_at);
+  const others = myNotifications.filter(n => !n.read_at && n.type !== "sale_invite");
+  if (!invites.length && !others.length) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  box.hidden = false;
+  let html = `<div class="owner-alerts-head"><b>Notifications</b>
+    <span class="meta">${invites.length + others.length} unread</span></div>`;
+  invites.forEach(n => {
+    const p = n.payload || {};
+    const scope = p.scope === "nation" ? ("nation " + (p.nation || "?")) : "server-wide";
+    const pct = p.percent_off != null ? (p.percent_off + "% off") : (p.label || "sale");
+    html += `<div class="owner-alert" data-note="${n.id}">
+      <span class="tag sale">sale</span>
+      <span class="owner-alert-body"><b>${esc(p.name || "Sale")}</b> (${esc(scope)}, ${esc(String(pct))}) —
+        There is a sale happening, want to participate?</span>
+      <button type="button" class="small primary" data-act="sale-yes" data-note="${n.id}">Yes</button>
+      <button type="button" class="small" data-act="sale-no" data-note="${n.id}">No</button>
+    </div>`;
+  });
+  others.forEach(n => {
+    html += `<div class="owner-alert" data-note="${n.id}">
+      <span class="tag">${esc(n.type)}</span>
+      <span class="owner-alert-body">${esc(JSON.stringify(n.payload || {}))}</span>
+      <button type="button" class="small" data-act="note-read" data-note="${n.id}">Dismiss</button>
+    </div>`;
+  });
+  box.innerHTML = html;
+  if (location.hash === "#notifications") box.scrollIntoView({ block: "start" });
+}
+
+function salePanelHtml(s) {
+  if (shopSaleActive(s)) {
+    const until = s.sale_ends_at ? (" until " + new Date(s.sale_ends_at).toLocaleString()) : " (until cancelled)";
+    const pct = s.sale_percent != null ? (s.sale_percent + "% off · ") : "";
+    return `<div class="sale-panel">
+      ${saleBadgeHtml(s)} <span class="meta">${esc(pct)}active${esc(until)}</span>
+      <button type="button" class="small" data-act="end-sale">End sale</button>
+    </div>`;
+  }
+  return `<div class="sale-panel" data-sale-form="${s.id}">
+    <details>
+      <summary class="meta">Start a shop sale</summary>
+      <div class="row" style="margin-top:8px;flex-wrap:wrap">
+        <input type="text" class="sale-name" maxlength="60" placeholder="Sale name" style="width:140px">
+        <input type="number" class="sale-pct" min="1" max="99" step="1" placeholder="% off" style="width:72px" title="Optional percent off diamond prices">
+        <input type="datetime-local" class="sale-end" title="End time (optional — leave blank until cancelled)">
+        <button type="button" class="small primary" data-act="start-sale">Start sale</button>
+      </div>
+      <p class="meta" style="margin:4px 0 0">Diamond listings get % off (original prices stored for restore). Public cards show “(Name) sale!”.</p>
+    </details>
+  </div>`;
+}
+
+function setNewShopOpen(open) {
+  const wrap = document.getElementById("newshop-wrap");
+  const toggle = document.getElementById("toggle-new-shop");
+  if (!wrap || !toggle) return;
+  wrap.hidden = !open;
+  toggle.hidden = open;
+  if (open) {
+    const name = document.getElementById("s-name");
+    if (name && !name.disabled) name.focus();
+  }
+}
+
+async function load() {
+  const ctx = await requireLogin();
+  if (!ctx) return;
+  me = ctx;
+  document.getElementById("who").textContent = "Logged in as " + (ctx.profile?.mc_username || "?");
+
+  document.getElementById("toggle-new-shop").onclick = () => setNewShopOpen(true);
+  document.getElementById("cancel-new-shop").onclick = () => setNewShopOpen(false);
+
+  if (!isVerified(ctx.profile)) {
+    document.getElementById("verify").innerHTML = `
+      <div class="banner"><b>Your account isn't verified yet.</b> Until you're verified you can browse, favourite and report, but you can't create shops, comment, review or upload pictures.
+      <a href="verify.html">Verify here</a> — ${PFA_HELP}, fill out the information, and wait (can take up to 24 hours).</div>`;
+    document.querySelectorAll("#newshop input, #newshop textarea, #newshop button").forEach(el => el.disabled = true);
+  }
+  setupNewShopForm();
+  await loadMarketForAlerts();
+  await paintNotifications();
+  render();
+}
+
+function refreshNewIconPrev() {
+  const panel = document.getElementById("newshop");
+  const item = panel.dataset.iconItem || "";
+  document.getElementById("s-iconprev").innerHTML = shopIcon({ icon_item: item || null, icon_path: null }, "card");
+  document.getElementById("s-clear-icon").hidden = !item;
+}
+
+function updateNewPreview(field, prevId) {
+  const prev = document.getElementById(prevId);
+  const v = field.value;
+  if (v.trim()) prev.innerHTML = mcText(v);
+  else if (field.id === "s-styled") prev.innerHTML = '<span class="meta">Preview. Leave empty to show the plain name.</span>';
+  else prev.innerHTML = '<span class="meta">Preview</span>';
+}
+
+function setupNewShopForm() {
+  const panel = document.getElementById("newshop");
+  if (panel.dataset.ready) return;
+  panel.dataset.ready = "1";
+  document.getElementById("s-palette").innerHTML = paletteHtml();
+  refreshNewIconPrev();
+  updateNewPreview(document.getElementById("s-styled"), "s-styled-prev");
+  updateNewPreview(document.getElementById("s-desc"), "s-desc-prev");
+
+  panel.addEventListener("focusin", e => {
+    if (e.target.classList.contains("mcfield")) lastField = e.target;
+  });
+  panel.addEventListener("input", e => {
+    if (e.target.id === "s-styled") updateNewPreview(e.target, "s-styled-prev");
+    if (e.target.id === "s-desc") updateNewPreview(e.target, "s-desc-prev");
+  });
+  panel.addEventListener("click", e => {
+    const cb = e.target.closest("button[data-code]");
+    if (cb) {
+      const field = lastField && panel.contains(lastField) ? lastField : document.getElementById("s-styled");
+      insertMcCode(field, cb.dataset.code);
+      if (field.value.length > field.maxLength) field.value = field.value.slice(0, field.maxLength);
+      updateNewPreview(field, field.id === "s-styled" ? "s-styled-prev" : "s-desc-prev");
+      return;
+    }
+  });
+  document.getElementById("s-pick-icon").onclick = () => {
+    openItemPicker(name => {
+      panel.dataset.iconItem = name;
+      refreshNewIconPrev();
+    });
+  };
+  document.getElementById("s-clear-icon").onclick = () => {
+    panel.dataset.iconItem = "";
+    document.getElementById("s-file").value = "";
+    refreshNewIconPrev();
+  };
+}
+
+function setPick(btn, name) {
+  btn.dataset.value = name;
+  btn.innerHTML = `<img src="${esc(itemImg(name))}" alt=""> ${esc(name)}`;
+}
+const pickBtn = (which, name) => name
+  ? `<button type="button" class="pickbtn" data-act="pick" data-pick="${which}" data-value="${esc(name)}"><img src="${esc(itemImg(name))}" alt=""> ${esc(name)}</button>`
+  : `<button type="button" class="pickbtn" data-act="pick" data-pick="${which}">Pick item you're ${which === "sell" ? "selling" : "buying"}</button>`;
+
+function panelHtml(s) {
+  const iconPrev = shopIcon({ icon_item: s.icon_item, icon_path: s.icon_path }, "card");
+  return `
+  <div class="panel" data-panel="${s.id}" data-icon-item="${esc(s.icon_item || "")}" hidden>
+    <div class="row">
+      <div style="flex:2;min-width:180px"><label>Shop name (plain text, this is what people search)</label><input type="text" class="p-name" maxlength="60" value="${esc(s.name)}" style="width:100%"></div>
+      <div style="flex:1;min-width:100px"><label>City</label><input type="text" class="p-city" maxlength="60" value="${esc(s.city || "")}" style="width:100%"></div>
+      <div style="flex:1;min-width:100px"><label>Nation</label><input type="text" class="p-nation" maxlength="60" value="${esc(s.nation || "")}" style="width:100%"></div>
+      <div><label>X</label><input type="number" class="p-x" value="${s.x ?? ""}" style="width:90px"></div>
+      <div><label>Z</label><input type="number" class="p-z" value="${s.z ?? ""}" style="width:90px"></div>
+    </div>
+
+    <label>Fancy name (optional). Minecraft colour codes: <b>&amp;6</b> gold, <b>&amp;l</b> bold, <b>&amp;r</b> reset...</label>
+    <div class="palette">${paletteHtml()}</div>
+    <input type="text" class="mcfield p-styled" maxlength="120" placeholder="&6&lBob's &r&eBakery" value="${esc(s.styled_name || "")}" style="width:100%">
+    <div class="preview"></div>
+
+    <label>Description (optional, same colour codes work)</label>
+    <textarea class="mcfield p-desc" maxlength="500" placeholder="What do you sell? Where in the city are you? Anything people should know.">${esc(s.description || "")}</textarea>
+    <div class="preview"></div>
+
+    <label>Find me (optional)</label>
+    <input type="text" class="p-find" maxlength="120" value="${esc(s.find_note || "")}" placeholder="e.g. 2nd floor, blue wool" style="width:100%">
+
+    <label>Paste sign dump (optional helper)</label>
+    <textarea class="p-signs" rows="3" placeholder="One trade per line, e.g.&#10;64 blaze rod for 1 diamond [24]&#10;B 8 ender pearl : S 1 diamond"></textarea>
+    <div class="row" style="margin-top:4px"><button type="button" class="small" data-act="parse-signs">Parse into draft listings</button></div>
+    <p class="meta" style="margin:4px 0 0">Adds parsed rows below — optional <code>[64]</code> stock suffix. Review amounts, then save each listing.</p>
+
+    <label>Shop picture</label>
+    <div class="row">
+      <span class="p-iconprev">${iconPrev}</span>
+      <button type="button" data-act="pick-icon">Use an item as the icon</button>
+      <input type="file" class="p-file" accept="image/png,image/jpeg,image/webp">
+      ${s.icon_path ? iconBtn("trash", { danger: true, title: "Remove uploaded picture", attrs: 'data-act="remove-pic"' }) : ""}
+    </div>
+    <p class="meta" style="margin:4px 0 0">An uploaded picture is used instead of the item icon. With neither, your shop gets a chest.</p>
+
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="primary small" data-act="save-shop">Save details</button>
+      ${iconBtn("x", { title: "Close", attrs: 'data-act="close-panel"' })}
+    </div>
+  </div>`;
+}
+
+function dashListingOut(l) {
+  return l.in_stock === false || l.stock === 0;
+}
+
+function listingFieldsFromRow(root, shop) {
+  const src = (shop.listings || []).find(x => listingIdEq(x.id, root.dataset.listing));
+  const gn = src ? (src.group_name == null ? null : (String(src.group_name).trim() || null)) : null;
+  return {
+    wa: parseInt(root.querySelector(".dash-wa").value, 10),
+    sa: parseInt(root.querySelector(".dash-sa").value, 10),
+    wi: root.dataset.wantItem || "",
+    si: root.dataset.sellItem || "",
+    wu: root.querySelector(".dash-wu").value,
+    su: root.querySelector(".dash-su").value,
+    stock: parseStockInput(root.querySelector(".dash-stock-amt").value),
+    group_name: gn
+  };
+}
+
+function listingRowMatchesFields(l, f) {
+  return l.want_amount === f.wa && l.sell_amount === f.sa
+    && (l.want_unit || "") === f.wu && (l.sell_unit || "") === f.su
+    && l.want_item === f.wi && l.sell_item === f.si
+    && (l.stock ?? null) === (f.stock ?? null)
+    && l.in_stock === inStockFromStock(f.stock)
+    && (l.group_name || null) === f.group_name;
+}
+
+async function commitListingRow(root, shop, shopId) {
+  const lid = Number(root.dataset.listing);
+  const src = (shop.listings || []).find(x => x.id === lid);
+  if (!src) return { ok: false };
+  const f = listingFieldsFromRow(root, shop);
+  if (!(f.wa > 0) || !(f.sa > 0) || !f.wi || !f.si) {
+    setMsg(msg, "Both items need amounts and an item picked.", "err");
+    return { ok: false };
+  }
+  if (listingRowMatchesFields(src, f)) return { ok: true, skipped: true };
+  if (!await dupOk(shop, f, lid, "Save")) return { ok: false };
+  if (!await marketPriceWarnOk(f)) return { ok: false };
+  const in_stock = inStockFromStock(f.stock);
+  const res = await sb.from("listings").update({
+    sell_item: f.si, sell_amount: f.sa, sell_unit: f.su,
+    want_item: f.wi, want_amount: f.wa, want_unit: f.wu,
+    stock: f.stock, in_stock, group_name: f.group_name,
+    updated_at: new Date().toISOString()
+  }).eq("id", lid);
+  if (res.error) {
+    setMsg(msg, res.error.message, "err");
+    return { ok: false };
+  }
+  return { ok: true };
+}
+
+function dashListingRow(l) {
+  const out = dashListingOut(l);
+  const stockToggle = out
+    ? `<button type="button" class="tag bad dash-stock-toggle" data-act="toggle-stock">out of stock</button>`
+    : `<button type="button" class="tag ok dash-stock-toggle" data-act="toggle-stock">in stock</button>`;
+  const stockVal = l.stock == null ? "" : l.stock;
+  const timed = l.timed_out ? ' <span class="tag bad">timed out</span>' : "";
+  return `<div class="listing-row dash-listing-row" data-listing="${l.id}" data-want-item="${esc(l.want_item)}" data-sell-item="${esc(l.sell_item)}">
+    <div class="dash-listing-main">
+      <div class="dash-trade">
+        <div class="dash-trade-side">
+          <button type="button" class="dash-item-pick" data-act="dash-pick-item" data-side="want" title="Change item you buy">${itemIcon(l.want_item, false)}</button>
+          <input type="number" min="1" class="dash-amt dash-wa" value="${l.want_amount}" title="Amount you buy" aria-label="Buy amount">
+          ${unitSelect("dash-wu", l.want_unit)}
+          <span class="dash-item-label">${esc(l.want_item)}</span>
+        </div>
+        <span class="arrow">&rarr;</span>
+        <div class="dash-trade-side">
+          <button type="button" class="dash-item-pick" data-act="dash-pick-item" data-side="sell" title="Change item you sell">${itemIcon(l.sell_item, false)}</button>
+          <input type="number" min="1" class="dash-amt dash-sa" value="${l.sell_amount}" title="Amount you sell" aria-label="Sell amount">
+          ${unitSelect("dash-su", l.sell_unit)}
+          <span class="dash-item-label">${esc(l.sell_item)}</span>
+        </div>
+        <div class="action-cluster dash-row-actions">
+          ${iconBtn("copy", { title: "Duplicate listing", attrs: 'data-act="duplicate"' })}
+          ${iconBtn("refresh", { title: "Mark still available", attrs: 'data-act="refresh"' })}
+          ${iconBtn("trash", { danger: true, title: "Remove listing", attrs: 'data-act="del-listing"' })}
+        </div>
+      </div>
+      <div class="meta dash-listing-meta">${updatedHtml(l.updated_at)}</div>
+    </div>
+    <div class="dash-listing-stock-col">
+      ${stockToggle}${timed}
+      <label class="dash-stock-label meta">Stock left</label>
+      <input type="number" min="0" class="dash-stock-amt" placeholder="∞" value="${stockVal}" title="Exchanges left (blank = unlimited)">
+      <span class="meta dash-stock-hint">blank = unlimited</span>
+    </div>
+  </div>`;
+}
+
+function dashListingCard(l) {
+  return `<div class="dash-listing-card" data-listing="${l.id}">
+    <div class="dash-drag-handle" draggable="true" role="button" tabindex="0" aria-label="Drag to reorder">
+      <span class="dash-drag-burger" aria-hidden="true"><span></span><span></span><span></span></span>
+    </div>
+    <div class="dash-listing-card-body">${dashListingRow(l)}</div>
+  </div>`;
+}
+
+function shopGroupSections(listings, shop) {
+  const named = new Set();
+  Object.keys(normalizeGroupIcons(shop.group_icons || {})).forEach(k => {
+    const t = String(k || "").trim();
+    if (t) named.add(t);
+  });
+  (listings || []).forEach(l => {
+    const t = String(l.group_name || "").trim();
+    if (t) named.add(t);
+  });
+  const names = [...named].sort((a, b) => a.localeCompare(b));
+  const sections = [{ key: "", label: "Ungrouped", showHead: names.length > 0 }];
+  names.forEach(k => sections.push({ key: k, label: k, showHead: true }));
+  return sections;
+}
+
+function dashGroupHeadHtml(shop, groupKey, label) {
+  const hasIcon = !!groupIconEntry(shop, groupKey);
+  return `<div class="dash-group-head">
+    ${groupIconHtml(shop, groupKey, "sm")}
+    <span class="meta dash-group-title">${esc(label)}</span>
+    <div class="action-cluster dash-group-icon-actions">
+      ${iconBtn("image", { title: "Set group icon", attrs: `data-act="pick-group-icon" data-group="${esc(groupKey)}"` })}
+      ${iconBtn("x", { title: "Clear group icon", attrs: `data-act="clear-group-icon" data-group="${esc(groupKey)}"${hasIcon ? "" : " hidden"}` })}
+    </div>
+  </div>`;
+}
+
+function addListingFormHtml(groupKey) {
+  return `<div class="dash-add-listing-panel" data-group="${esc(groupKey)}">
+    <p class="meta" style="margin:0 0 6px">New listing${groupKey ? ` in <b>${esc(groupKey)}</b>` : ""}. Stock blank = unlimited.</p>
+    <div class="row add-row addform">
+      <input type="number" min="1" value="1" class="l-wa" title="amount you're buying">
+      ${unitSelect("l-wu")}
+      ${pickBtn("want")}
+      <span class="meta">&rarr;</span>
+      <input type="number" min="1" value="1" class="l-sa" title="amount you're selling">
+      ${unitSelect("l-su")}
+      ${pickBtn("sell")}
+      <input type="number" min="0" class="l-stock" title="exchanges left (blank = unlimited)" placeholder="stock" style="width:72px">
+      <button class="small primary" data-act="add-listing">Add listing</button>
+      <button class="small" data-act="cancel-add-listing">Cancel</button>
+    </div>
+  </div>`;
+}
+
+function listingsByGroupHtml(shop) {
+  const listings = shop.listings || [];
+  const sections = shopGroupSections(listings, shop);
+  const sorted = sortListingsOwnerOrder(listings);
+  let html = `<div class="dash-listings-toolbar">
+    <button type="button" class="small ico-label" data-act="add-group">${uiIcon("plus")} Add group</button>
+  </div><div class="dash-listings-root">`;
+  sections.forEach(sec => {
+    const inGroup = sorted.filter(l => String(l.group_name || "").trim() === sec.key);
+    const slotOpen = addingListingSlot
+      && String(addingListingSlot.shopId) === String(shop.id)
+      && addingListingSlot.groupKey === sec.key;
+    html += `<div class="dash-group-block">`;
+    if (sec.showHead) html += dashGroupHeadHtml(shop, sec.key, sec.label);
+    html += `<div class="dash-group-top">
+      <button type="button" class="dash-add-listing-btn" data-act="open-add-listing" data-group="${esc(sec.key)}" title="Add listing to this group" aria-label="Add listing">+</button>
+    </div>`;
+    if (slotOpen) html += addListingFormHtml(sec.key);
+    html += `<div class="dash-listing-list" data-group-name="${esc(sec.key)}">`;
+    inGroup.forEach(l => { html += dashListingCard(l); });
+    html += `</div></div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+async function expirePastSales(shops) {
+  const now = Date.now();
+  for (const s of shops || []) {
+    if (!s.sale_active || !s.sale_ends_at) continue;
+    if (Date.parse(s.sale_ends_at) >= now) continue;
+    await endShopSale(s.id);
+    s.sale_active = false;
+  }
+}
+
+async function render(resetShop) {
+  const { data: shops, error } = await sb
+    .from("shops").select("*, listings(*)")
+    .eq("owner_id", me.session.user.id)
+    .order("created_at");
+  if (error) { setMsg(msg, error.message, "err"); return; }
+
+  await expirePastSales(shops || []);
+
+  const box = document.getElementById("shops");
+
+  // remember what's open / half-typed so a redraw doesn't wipe it
+  const openPanels = new Set([...box.querySelectorAll("[data-panel]:not([hidden])")].map(p => p.dataset.panel));
+  const keep = {};
+  box.querySelectorAll("[data-shop]").forEach(el => {
+    const add = el.querySelector(".dash-add-listing-panel .addform");
+    if (!add) return;
+    keep[el.dataset.shop] = {
+      sell: add.querySelector('[data-pick="sell"]').dataset.value || "",
+      want: add.querySelector('[data-pick="want"]').dataset.value || "",
+      sa: add.querySelector(".l-sa").value, wa: add.querySelector(".l-wa").value,
+      su: add.querySelector(".l-su").value, wu: add.querySelector(".l-wu").value
+    };
+  });
+
+  shopsData = {};
+  shops.forEach(s => { s.listings = sortListingsOwnerOrder(s.listings || []); shopsData[s.id] = s; });
+  paintOwnerAlerts(shops || []);
+  if (!shops.length) {
+    box.innerHTML = emptyState("No shops yet. Press + New Shop to create one.");
+    clearDashDirty();
+    return;
+  }
+
+  box.innerHTML = shops.map(s => {
+    const nList = (s.listings || []).length;
+    return `
+    <div class="card collapse-section dash-shop-card" data-shop="${s.id}" data-collapse="dash-shop-${s.id}">
+      <div class="top">
+        <div class="cardrow dash-shop-head">
+          <button type="button" class="collapse-toggle dash-shop-collapse-toggle" aria-expanded="true" aria-controls="dash-shop-body-${s.id}" title="Show or hide listings">
+            <span class="collapse-chevron" aria-hidden="true"></span>
+          </button>
+          ${shopIcon(s, "card")}
+          <div><a href="shop.html?id=${s.id}" style="color:inherit"><b>${shopName(s)}</b></a>
+            ${saleBadgeHtml(s)}
+            ${s.is_open === false ? '<span class="tag warn">closed - hidden from public</span>' : ""}
+            ${s.timed_out ? '<span class="tag bad">timed out - hidden</span>' : ""}
+            <div class="meta">${placeHtml(s) ? placeHtml(s) + " · " : ""}${coordsHtml(s.x, s.z)}${nList ? " · " + nList + " listing" + (nList === 1 ? "" : "s") : ""}</div></div>
+        </div>
+        <div class="action-cluster dash-shop-actions">
+          ${iconBtn("external", { tag: "a", title: "Preview shop", attrs: `href="shop.html?id=${s.id}" target="_blank" rel="noopener"` })}
+          ${iconBtn("check", { title: "Mark all in stock", attrs: 'data-act="mark-all-in"' })}
+          ${iconBtn("ban", { title: "Mark all out of stock", attrs: 'data-act="mark-all-out"' })}
+          ${stockUndo[s.id] ? iconBtn("undo", { title: "Undo stock change", attrs: 'data-act="undo-stock"' }) : ""}
+          ${iconBtn("table", { title: "Bulk edit stock", attrs: 'data-act="bulk-toggle"' })}
+          ${iconBtn("pen", { title: "Edit shop details", attrs: 'data-act="toggle-panel"' })}
+          ${s.is_open === false
+            ? iconBtn("eye", { primary: true, title: "Open shop", attrs: 'data-act="open-shop"' })
+            : iconBtn("eyeOff", { title: "Close shop", attrs: 'data-act="close-shop"' })}
+          ${iconBtn("trash", { danger: true, title: "Delete shop", attrs: 'data-act="del-shop"' })}
+        </div>
+      </div>
+
+      <div class="collapse-body dash-shop-body" id="dash-shop-body-${s.id}">
+      ${salePanelHtml(s)}
+      ${panelHtml(s)}
+      <div class="bulk-panel" data-bulk="${s.id}" hidden>
+        <div class="row" style="margin-bottom:8px">
+          <button type="button" class="small" data-act="bulk-out">Mark all out</button>
+          <button type="button" class="small" data-act="bulk-stock">Set stock to N…</button>
+          <button type="button" class="small primary" data-act="bulk-save">Save stock changes</button>
+          ${iconBtn("x", { title: "Hide bulk edit", attrs: 'data-act="bulk-toggle"' })}
+        </div>
+        <div class="bulk-table-wrap"><table class="bulk-table">
+          <thead><tr><th>Buy</th><th>Sell</th><th>Stock</th><th>Group</th><th>Updated</th></tr></thead>
+          <tbody>${s.listings.map(l => `<tr data-bulk-id="${l.id}">
+            <td>${esc(l.want_amount + (l.want_unit ? " " + l.want_unit.toUpperCase() : "") + " " + l.want_item)}</td>
+            <td>${esc(l.sell_amount + (l.sell_unit ? " " + l.sell_unit.toUpperCase() : "") + " " + l.sell_item)}</td>
+            <td><input type="number" min="0" class="b-stock" value="${l.stock == null ? "" : l.stock}" placeholder="∞" style="width:72px"></td>
+            <td><input type="text" class="b-group" maxlength="60" value="${esc(l.group_name || "")}" placeholder="—" style="width:90px"></td>
+            <td class="meta">${updatedHtml(l.updated_at, { prefix: false })}</td>
+          </tr>`).join("")}</tbody>
+        </table></div>
+      </div>
+      <p class="meta dash-listing-tools">Use <b>+</b> on a group to add a listing. Drag to reorder or move between groups. Click item icons or in-stock to edit.</p>
+      ${listingsByGroupHtml(s)}
+      </div>
+    </div>`;
+  }).join("");
+
+  applyCollapseState(box);
+
+  box.querySelectorAll("[data-panel]").forEach(p => {
+    if (openPanels.has(p.dataset.panel)) p.hidden = false;
+    p.querySelectorAll(".mcfield").forEach(updatePreview);
+  });
+  box.querySelectorAll("[data-shop]").forEach(el => {
+    const k = keep[el.dataset.shop];
+    if (!k || el.dataset.shop === String(resetShop)) return;
+    const add = el.querySelector(".dash-add-listing-panel .addform");
+    if (!add) return;
+    add.querySelector(".l-sa").value = k.sa;
+    add.querySelector(".l-wa").value = k.wa;
+    add.querySelector(".l-su").value = k.su;
+    add.querySelector(".l-wu").value = k.wu;
+    if (k.sell) setPick(add.querySelector('[data-pick="sell"]'), k.sell);
+    if (k.want) setPick(add.querySelector('[data-pick="want"]'), k.want);
+  });
+  clearDashDirty();
+}
+
+function updatePreview(field) {
+  const prev = field.nextElementSibling;
+  if (!prev || !prev.classList.contains("preview")) return;
+  const v = field.value;
+  if (v.trim()) prev.innerHTML = mcText(v);
+  else if (field.classList.contains("p-styled")) prev.innerHTML = `<span class="meta">Preview. Leave empty to show the plain name.</span>`;
+  else prev.innerHTML = `<span class="meta">Preview</span>`;
+}
+
+// ---- duplicate warning: same sell item + want item already in this shop
+async function dupOk(shop, f, ignoreId, verb) {
+  const same = shop.listings.filter(l => l.id !== ignoreId && l.sell_item === f.si && l.want_item === f.wi);
+  if (!same.length) return true;
+  const exact = same.some(l => l.sell_amount === f.sa && (l.sell_unit || "") === f.su && l.want_amount === f.wa && (l.want_unit || "") === f.wu);
+  return confirmModal({
+    title: "Similar listing exists",
+    body: exact
+      ? `You already have this exact listing:\n${fmtListing(same[0])}\n\n${verb} anyway?`
+      : `You already have a listing for ${f.si} → ${f.wi}:\n${same.map(fmtListing).join("\n")}\n\n${verb} this one anyway?`,
+    confirmLabel: verb
+  });
+}
+
+document.getElementById("add-shop").onclick = async () => {
+  const panel = document.getElementById("newshop");
+  const name = document.getElementById("s-name").value.trim();
+  if (!name) { setMsg(msg, "Shop needs a name.", "err"); return; }
+  const x = document.getElementById("s-x").value;
+  const z = document.getElementById("s-z").value;
+  const btn = document.getElementById("add-shop");
+  btn.disabled = true;
+
+  let icon_path = null;
+  const file = document.getElementById("s-file").files[0];
+  if (file) {
+    setMsg(msg, "Uploading picture...");
+    const up = await uploadImage(file, "shops", me.session.user.id);
+    if (!up.ok) { setMsg(msg, up.message, "err"); btn.disabled = false; return; }
+    icon_path = up.path;
+  }
+
+  const { data: created, error } = await sb.from("shops").insert({
+    owner_id: me.session.user.id,
+    name,
+    city: document.getElementById("s-city").value.trim() || null,
+    nation: document.getElementById("s-nation").value.trim() || null,
+    x: x === "" ? null : parseInt(x),
+    z: z === "" ? null : parseInt(z),
+    styled_name: document.getElementById("s-styled").value.trim() || null,
+    description: document.getElementById("s-desc").value.trim() || null,
+    find_note: document.getElementById("s-find").value.trim() || null,
+    icon_item: panel.dataset.iconItem || null,
+    icon_path
+  }).select("id").single();
+  btn.disabled = false;
+  if (error) { setMsg(msg, error.message, "err"); return; }
+
+  ["s-name", "s-city", "s-nation", "s-x", "s-z", "s-styled", "s-desc", "s-find"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("s-file").value = "";
+  panel.dataset.iconItem = "";
+  refreshNewIconPrev();
+  updateNewPreview(document.getElementById("s-styled"), "s-styled-prev");
+  updateNewPreview(document.getElementById("s-desc"), "s-desc-prev");
+  setMsg(msg, "Shop created.", "ok");
+  setNewShopOpen(false);
+  render();
+};
+
+function normalizeListingGroup(raw) {
+  const k = String(raw || "").trim();
+  return k ? k : null;
+}
+
+function listingIdEq(a, b) {
+  return String(a) === String(b);
+}
+
+function dashGroupListEl(from) {
+  const block = from.closest(".dash-group-block");
+  return block ? block.querySelector(".dash-listing-list") : null;
+}
+
+async function applyListingDisplayOrder(shop, order) {
+  const before = new Map((shop.listings || []).map(l => [String(l.id), {
+    sort_order: l.sort_order,
+    group_name: l.group_name == null ? null : (String(l.group_name).trim() || null)
+  }]));
+  for (let i = 0; i < order.length; i++) {
+    const l = order[i];
+    const was = before.get(String(l.id));
+    if (!was) continue;
+    const gn = l.group_name == null ? null : (String(l.group_name).trim() || null);
+    const patch = {};
+    if (was.sort_order !== i) patch.sort_order = i;
+    if ((was.group_name || null) !== (gn || null)) patch.group_name = gn;
+    if (Object.keys(patch).length) {
+      const r = await sb.from("listings").update(patch).eq("id", l.id);
+      if (r.error) return r.error.message;
+      const prev = (shop.listings || []).find(x => listingIdEq(x.id, l.id));
+      if (prev) {
+        prev.sort_order = i;
+        prev.group_name = gn;
+      }
+    } else {
+      l.sort_order = i;
+    }
+  }
+  shop.listings = order.slice();
+  return null;
+}
+
+async function reorderListingDrag(shop, fromId, toId) {
+  const order = sortListingsOwnerOrder(shop.listings || []);
+  const fromIdx = order.findIndex(l => listingIdEq(l.id, fromId));
+  let toIdx = order.findIndex(l => listingIdEq(l.id, toId));
+  if (fromIdx < 0 || toIdx < 0) return "Listing not found.";
+  const targetGroup = order[toIdx].group_name;
+  const [item] = order.splice(fromIdx, 1);
+  toIdx = order.findIndex(l => listingIdEq(l.id, toId));
+  item.group_name = normalizeListingGroup(targetGroup);
+  order.splice(toIdx, 0, item);
+  return applyListingDisplayOrder(shop, order);
+}
+
+async function moveListingToGroupEnd(shop, fromId, groupKeyRaw) {
+  const newGroup = normalizeListingGroup(groupKeyRaw);
+  const gKey = String(newGroup || "");
+  let order = sortListingsOwnerOrder(shop.listings || []);
+  const fromIdx = order.findIndex(l => listingIdEq(l.id, fromId));
+  if (fromIdx < 0) return "Listing not found.";
+  const [item] = order.splice(fromIdx, 1);
+  item.group_name = newGroup;
+  let insertAt = -1;
+  for (let i = order.length - 1; i >= 0; i--) {
+    if (String(order[i].group_name || "") === gKey) {
+      insertAt = i + 1;
+      break;
+    }
+  }
+  if (insertAt < 0) {
+    if (!gKey) insertAt = order.length;
+    else {
+      insertAt = order.findIndex(l => {
+        const ga = String(l.group_name || "").toLowerCase();
+        const gb = gKey.toLowerCase();
+        if (!ga) return true;
+        return gb.localeCompare(ga) < 0;
+      });
+      if (insertAt < 0) insertAt = order.length;
+    }
+  }
+  order.splice(insertAt, 0, item);
+  return applyListingDisplayOrder(shop, order);
+}
+
+function clearListingDragMarkers() {
+  shopsRoot.querySelectorAll(".dash-listing-card.drag-over, .dash-listing-list.drag-over-group, .dash-group-head.drag-over-group, .dash-group-block.drag-over-group")
+    .forEach(el => el.classList.remove("drag-over", "drag-over-group"));
+}
+
+let dragListingId = null;
+let dragShopId = null;
+const shopsRoot = document.getElementById("shops");
+const DND_MIME = "application/x-civmc-listing";
+
+function readListingDragPayload(e) {
+  try {
+    const raw = e.dataTransfer.getData(DND_MIME) || e.dataTransfer.getData("text/plain");
+    if (!raw) return null;
+    if (raw.startsWith("{")) return JSON.parse(raw);
+    return { listingId: raw, shopId: dragShopId };
+  } catch (err) {
+    return dragListingId ? { listingId: dragListingId, shopId: dragShopId } : null;
+  }
+}
+
+shopsRoot.addEventListener("dragstart", e => {
+  const handle = e.target.closest(".dash-drag-handle");
+  if (!handle) return;
+  const card = handle.closest(".dash-listing-card");
+  const shopEl = handle.closest("[data-shop]");
+  if (!card || !shopEl) return;
+  const payload = { listingId: card.dataset.listing, shopId: shopEl.dataset.shop };
+  dragListingId = payload.listingId;
+  dragShopId = payload.shopId;
+  e.dataTransfer.setData(DND_MIME, JSON.stringify(payload));
+  e.dataTransfer.setData("text/plain", String(payload.listingId));
+  e.dataTransfer.effectAllowed = "move";
+  card.classList.add("is-dragging");
+});
+shopsRoot.addEventListener("dragend", () => {
+  shopsRoot.querySelectorAll(".dash-listing-card.is-dragging").forEach(c => c.classList.remove("is-dragging"));
+  clearListingDragMarkers();
+  dragListingId = null;
+  dragShopId = null;
+});
+shopsRoot.addEventListener("dragenter", e => {
+  if (!dragListingId) return;
+  e.preventDefault();
+});
+shopsRoot.addEventListener("dragover", e => {
+  if (!dragListingId) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  clearListingDragMarkers();
+  const card = e.target.closest(".dash-listing-card");
+  if (card && !listingIdEq(card.dataset.listing, dragListingId)) {
+    card.classList.add("drag-over");
+    return;
+  }
+  const block = e.target.closest(".dash-group-block");
+  if (block) {
+    block.classList.add("drag-over-group");
+    const list = block.querySelector(".dash-listing-list");
+    if (list) list.classList.add("drag-over-group");
+  }
+});
+shopsRoot.addEventListener("drop", async e => {
+  e.preventDefault();
+  e.stopPropagation();
+  const payload = readListingDragPayload(e);
+  if (!payload || payload.listingId == null || payload.shopId == null) return;
+  const shop = shopsData[payload.shopId] || shopsData[String(payload.shopId)];
+  if (!shop) return;
+  let err = null;
+  let didMove = false;
+  const fromId = payload.listingId;
+  const targetCard = e.target.closest(".dash-listing-card");
+  if (targetCard && !listingIdEq(targetCard.dataset.listing, fromId)) {
+    err = await reorderListingDrag(shop, fromId, targetCard.dataset.listing);
+    didMove = !err;
+  } else {
+    const list = e.target.closest(".dash-listing-list") || dashGroupListEl(e.target);
+    if (list) {
+      const groupKey = list.getAttribute("data-group-name");
+      err = await moveListingToGroupEnd(shop, fromId, groupKey == null ? "" : groupKey);
+      didMove = !err;
+    }
+  }
+  clearListingDragMarkers();
+  dragListingId = null;
+  dragShopId = null;
+  if (didMove) {
+    setMsg(msg, "Listing moved.", "ok");
+    render();
+    return;
+  }
+  if (err) setMsg(msg, err, "err");
+});
+
+// live preview + remember which colour-code box you're in
+document.getElementById("shops").addEventListener("input", e => { if (e.target.classList.contains("mcfield")) updatePreview(e.target); });
+document.getElementById("shops").addEventListener("focusin", e => { if (e.target.classList.contains("mcfield")) lastField = e.target; });
+
+document.getElementById("notifications").addEventListener("click", async e => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const noteId = Number(btn.dataset.note);
+  const note = myNotifications.find(n => String(n.id) === String(noteId));
+  if (!note) return;
+  if (btn.dataset.act === "sale-yes") {
+    const shops = Object.values(shopsData);
+    const r = await acceptSaleInvite(note, shops);
+    if (r.error) { setMsg(msg, r.error, "err"); return; }
+    setMsg(msg, "Joined sale on " + r.joined + " shop" + (r.joined === 1 ? "" : "s") + ".", "ok");
+    await paintNotifications();
+    render();
+    return;
+  }
+  if (btn.dataset.act === "sale-no") {
+    await declineSaleInvite(note);
+    setMsg(msg, "Sale invite declined.", "ok");
+    await paintNotifications();
+    return;
+  }
+  if (btn.dataset.act === "note-read") {
+    await markNotificationRead(note.id);
+    await paintNotifications();
+  }
+});
+
+document.getElementById("owner-alerts").addEventListener("click", async e => {
+  const btn = e.target.closest("[data-act=ignore-alert]");
+  if (!btn) return;
+  const a = ownerAlertList[Number(btn.dataset.i)];
+  if (!a) return;
+  btn.disabled = true;
+  const r = await ignoreOwnerAlert(a);
+  if (r.error) { setMsg(msg, r.error, "err"); btn.disabled = false; return; }
+  setMsg(msg, a.kind === "stale" ? "Stale alert ignored — 7-day clock restarted." : "Alert ignored for 7 days (or until you edit the listing).", "ok");
+  render();
+});
+
+document.getElementById("shops").addEventListener("click", async e => {
+  // colour-code buttons
+  const cb = e.target.closest("button[data-code]");
+  if (cb) {
+    const panel = cb.closest("[data-panel]");
+    let f = lastField && panel.contains(lastField) ? lastField : panel.querySelector(".p-styled");
+    const a = f.selectionStart ?? f.value.length, b = f.selectionEnd ?? a;
+    f.value = (f.value.slice(0, a) + cb.dataset.code + f.value.slice(b)).slice(0, f.maxLength);
+    f.focus();
+    f.setSelectionRange(a + 2, a + 2);
+    updatePreview(f);
+    return;
+  }
+
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const act = btn.dataset.act;
+
+  if (act === "pick") { openItemPicker(name => setPick(btn, name)); return; }
+
+  const shopElEarly = btn.closest("[data-shop]");
+  if (act === "open-add-listing" && shopElEarly) {
+    addingListingSlot = { shopId: shopElEarly.dataset.shop, groupKey: btn.dataset.group ?? "" };
+    render();
+    return;
+  }
+  if (act === "cancel-add-listing" && shopElEarly) {
+    addingListingSlot = null;
+    render();
+    return;
+  }
+  if (act === "add-group" && shopElEarly) {
+    const shop = shopsData[shopElEarly.dataset.shop];
+    const name = await promptModal({
+      title: "New group",
+      body: "Section label on your public shop page (sidebar + headings).",
+      label: "Group name",
+      maxLength: 60,
+      confirmLabel: "Add group"
+    });
+    if (name == null) return;
+    const trimmed = name.trim().slice(0, 60);
+    if (!trimmed) { setMsg(msg, "Group name can't be empty.", "err"); return; }
+    if (shopGroupSections(shop.listings, shop).some(s => s.key === trimmed)) {
+      setMsg(msg, "That group already exists.", "err");
+      return;
+    }
+    const icons = { ...normalizeGroupIcons(shop.group_icons) };
+    icons[trimmed] = {};
+    btn.disabled = true;
+    sb.from("shops").update({ group_icons: icons }).eq("id", shopElEarly.dataset.shop).then(r => {
+      btn.disabled = false;
+      if (r.error) { setMsg(msg, r.error.message, "err"); return; }
+      shop.group_icons = icons;
+      addingListingSlot = { shopId: shopElEarly.dataset.shop, groupKey: trimmed };
+      setMsg(msg, "Group added.", "ok");
+      render();
+    });
+    return;
+  }
+
+  if (act === "dash-pick-item") {
+    const shopEl = btn.closest("[data-shop]");
+    const row = btn.closest(".dash-listing-row");
+    if (!shopEl || !row) return;
+    const shop = shopsData[shopEl.dataset.shop];
+    const side = btn.dataset.side;
+    openItemPicker(async name => {
+      if (side === "want") row.dataset.wantItem = name;
+      else row.dataset.sellItem = name;
+      const sideEl = btn.closest(".dash-trade-side");
+      if (sideEl) sideEl.querySelector(".dash-item-label").textContent = name;
+      btn.innerHTML = itemIcon(name, false);
+      const r = await commitListingRow(row, shop, shopEl.dataset.shop);
+      if (r.ok && !r.skipped) {
+        setMsg(msg, "Listing updated.", "ok");
+        render();
+      }
+    });
+    return;
+  }
+
+  const shopEl = btn.closest("[data-shop]");
+  if (act === "pick-group-icon" && shopEl) {
+    const shopId = shopEl.dataset.shop;
+    const shop = shopsData[shopId];
+    const gName = btn.dataset.group || "";
+    openItemPicker(async name => {
+      const icons = { ...normalizeGroupIcons(shop.group_icons) };
+      icons[gName] = { icon_item: name, icon_path: null };
+      const r = await sb.from("shops").update({ group_icons: icons }).eq("id", shopId);
+      if (r.error) { setMsg(msg, r.error.message, "err"); return; }
+      shop.group_icons = icons;
+      setMsg(msg, "Group icon saved.", "ok");
+      render();
+    });
+    return;
+  }
+  if (act === "clear-group-icon" && shopEl) {
+    const shopId = shopEl.dataset.shop;
+    const shop = shopsData[shopId];
+    const gName = btn.dataset.group || "";
+    const icons = { ...normalizeGroupIcons(shop.group_icons) };
+    delete icons[gName];
+    const r = await sb.from("shops").update({ group_icons: icons }).eq("id", shopId);
+    if (r.error) { setMsg(msg, r.error.message, "err"); return; }
+    shop.group_icons = icons;
+    setMsg(msg, "Group icon cleared.", "ok");
+    render();
+    return;
+  }
+
+  if (!shopEl) return;
+  const shopId = shopEl.dataset.shop;
+  const shop = shopsData[shopId];
+  const panel = shopEl.querySelector("[data-panel]");
+  const lEl = btn.closest("[data-listing]");
+  const lid = lEl ? Number(lEl.dataset.listing) : null;
+  let res;
+
+  // ---- shop details panel
+  if (act === "toggle-panel") { panel.hidden = !panel.hidden; return; }
+  if (act === "close-panel") { panel.hidden = true; return; }
+  if (act === "mark-all-in" || act === "mark-all-out") {
+    const ids = (shop.listings || []).map(l => l.id);
+    if (!ids.length) { setMsg(msg, "No listings.", "err"); return; }
+    stockUndo[shopId] = (shop.listings || []).map(l => ({
+      id: l.id, stock: l.stock, in_stock: l.in_stock, group_name: l.group_name || null
+    }));
+    const stock = act === "mark-all-out" ? 0 : null;
+    const now = new Date().toISOString();
+    for (const id of ids) {
+      const r = await sb.from("listings").update({
+        stock, in_stock: inStockFromStock(stock), updated_at: now
+      }).eq("id", id);
+      if (r.error) { setMsg(msg, r.error.message, "err"); return; }
+    }
+    setMsg(msg, act === "mark-all-out" ? "All listings marked out of stock." : "All listings marked in stock.", "ok");
+    render();
+    return;
+  }
+  if (act === "undo-stock") {
+    const snap = stockUndo[shopId];
+    if (!snap || !snap.length) { setMsg(msg, "Nothing to undo.", "err"); return; }
+    const now = new Date().toISOString();
+    for (const row of snap) {
+      const r = await sb.from("listings").update({
+        stock: row.stock,
+        in_stock: inStockFromStock(row.stock),
+        group_name: row.group_name,
+        updated_at: now
+      }).eq("id", row.id);
+      if (r.error) { setMsg(msg, r.error.message, "err"); return; }
+    }
+    delete stockUndo[shopId];
+    setMsg(msg, "Restored previous stock.", "ok");
+    render();
+    return;
+  }
+  if (act === "pick-icon") {
+    openItemPicker(name => {
+      panel.dataset.iconItem = name;
+      panel.querySelector(".p-iconprev").innerHTML = shopIcon({ icon_item: name, icon_path: panel.dataset.removePic ? null : shop.icon_path }, "card");
+    });
+    return;
+  }
+  if (act === "remove-pic") {
+    panel.dataset.removePic = "1";
+    panel.querySelector(".p-iconprev").innerHTML = shopIcon({ icon_item: panel.dataset.iconItem, icon_path: null }, "card");
+    btn.remove();
+    return;
+  }
+  if (act === "parse-signs") {
+    const raw = panel.querySelector(".p-signs").value;
+    const drafts = parseSignDump(raw);
+    if (!drafts.length) { setMsg(msg, "Couldn't parse any lines. Try: 64 blaze rod for 1 diamond", "err"); return; }
+    const add = shopEl.querySelector(".addform");
+    // Apply first draft into the add form; queue the rest as stacked adds
+    const applyDraft = (d) => {
+      add.querySelector(".l-wa").value = d.want_amount;
+      add.querySelector(".l-sa").value = d.sell_amount;
+      add.querySelector(".l-wu").value = d.want_unit || "";
+      add.querySelector(".l-su").value = d.sell_unit || "";
+      add.querySelector(".l-stock").value = d.stock == null ? "" : String(d.stock);
+      setPick(add.querySelector('[data-pick="want"]'), d.want_item);
+      setPick(add.querySelector('[data-pick="sell"]'), d.sell_item);
+    };
+    applyDraft(drafts[0]);
+    for (let i = 1; i < drafts.length; i++) {
+      const d = drafts[i];
+      const stock = d.stock == null ? null : d.stock;
+      await sb.from("listings").insert({
+        shop_id: shopId,
+        sell_item: d.sell_item, sell_amount: d.sell_amount, sell_unit: d.sell_unit || "",
+        want_item: d.want_item, want_amount: d.want_amount, want_unit: d.want_unit || "",
+        stock, in_stock: inStockFromStock(stock)
+      });
+    }
+    panel.querySelector(".p-signs").value = "";
+    setMsg(msg, drafts.length === 1
+      ? "Parsed 1 listing into the add form — click Add listing."
+      : "Added " + (drafts.length - 1) + " listing(s); first is in the add form.", "ok");
+    if (drafts.length > 1) render();
+    return;
+  }
+  if (act === "bulk-toggle") {
+    const bulk = shopEl.querySelector("[data-bulk]");
+    bulk.hidden = !bulk.hidden;
+    return;
+  }
+  if (act === "bulk-out") {
+    shopEl.querySelectorAll(".b-stock").forEach(inp => { inp.value = "0"; });
+    return;
+  }
+  if (act === "bulk-stock") {
+    const n = await promptModal({
+      title: "Set stock for all",
+      body: "Applies to every row in bulk edit. Leave blank for unlimited.",
+      label: "Stock left",
+      defaultValue: "10",
+      placeholder: "blank = unlimited",
+      confirmLabel: "Apply"
+    });
+    if (n === null) return;
+    const v = n.trim() === "" ? "" : String(Math.max(0, parseInt(n, 10) || 0));
+    shopEl.querySelectorAll(".b-stock").forEach(inp => { inp.value = v; });
+    return;
+  }
+  if (act === "bulk-save") {
+    btn.disabled = true;
+    stockUndo[shopId] = (shop.listings || []).map(l => ({
+      id: l.id, stock: l.stock, in_stock: l.in_stock, group_name: l.group_name || null
+    }));
+    const now = new Date().toISOString();
+    for (const tr of shopEl.querySelectorAll("[data-bulk-id]")) {
+      const stock = parseStockInput(tr.querySelector(".b-stock").value);
+      const group_name = (tr.querySelector(".b-group").value || "").trim() || null;
+      const r = await sb.from("listings").update({
+        stock, in_stock: inStockFromStock(stock), group_name, updated_at: now
+      }).eq("id", tr.dataset.bulkId);
+      if (r.error) { setMsg(msg, r.error.message, "err"); btn.disabled = false; return; }
+    }
+    btn.disabled = false;
+    setMsg(msg, "Stock / groups updated for all listings.", "ok");
+    render();
+    return;
+  }
+  if (act === "save-shop") {
+    const name = panel.querySelector(".p-name").value.trim();
+    if (!name) { setMsg(msg, "The shop needs a plain name.", "err"); return; }
+    const x = panel.querySelector(".p-x").value, z = panel.querySelector(".p-z").value;
+    let icon_path = panel.dataset.removePic ? null : shop.icon_path;
+    const file = panel.querySelector(".p-file").files[0];
+    btn.disabled = true;
+    if (file) {
+      setMsg(msg, "Uploading picture...");
+      const up = await uploadImage(file, "shops", me.session.user.id);
+      if (!up.ok) { setMsg(msg, up.message, "err"); btn.disabled = false; return; }
+      icon_path = up.path;
+    }
+    const r = await sb.from("shops").update({
+      name,
+      city: panel.querySelector(".p-city").value.trim() || null,
+      nation: panel.querySelector(".p-nation").value.trim() || null,
+      x: x === "" ? null : parseInt(x), z: z === "" ? null : parseInt(z),
+      styled_name: panel.querySelector(".p-styled").value.trim() || null,
+      description: panel.querySelector(".p-desc").value.trim() || null,
+      find_note: panel.querySelector(".p-find").value.trim() || null,
+      icon_item: panel.dataset.iconItem || null, icon_path
+    }).eq("id", shopId);
+    btn.disabled = false;
+    if (r.error) { setMsg(msg, r.error.message, "err"); return; }
+    if (shop.icon_path && shop.icon_path !== icon_path) sb.storage.from("uploads").remove([shop.icon_path]);
+    setMsg(msg, "Shop details saved.", "ok");
+    render();
+    return;
+  }
+
+  // ---- open / close / sales
+  if (act === "close-shop") {
+    if (!await confirmModal({ title: "Close shop", body: "Your shop will disappear from Find, favourites, and the market until you open it again. You can still preview and edit it here.", confirmLabel: "Close shop" })) return;
+    res = await sb.from("shops").update({ is_open: false }).eq("id", shopId);
+    if (res.error) { setMsg(msg, res.error.message, "err"); return; }
+    setMsg(msg, "Shop closed.", "ok");
+    render();
+    return;
+  } else if (act === "open-shop") {
+    res = await sb.from("shops").update({ is_open: true }).eq("id", shopId);
+    if (res.error) { setMsg(msg, res.error.message, "err"); return; }
+    setMsg(msg, "Shop is open again.", "ok");
+    render();
+    return;
+  } else if (act === "start-sale") {
+    const form = shopEl.querySelector("[data-sale-form]");
+    const name = form.querySelector(".sale-name").value.trim();
+    const pctRaw = form.querySelector(".sale-pct").value.trim();
+    const endRaw = form.querySelector(".sale-end").value;
+    const r = await startShopSale(shopId, {
+      name,
+      percent: pctRaw === "" ? null : pctRaw,
+      ends_at: endRaw ? new Date(endRaw).toISOString() : null
+    });
+    if (r.error) { setMsg(msg, r.error, "err"); return; }
+    setMsg(msg, "Sale started.", "ok");
+    render();
+    return;
+  } else if (act === "end-sale") {
+    if (!await confirmModal({ title: "End sale", body: "End this sale and restore original diamond prices?", confirmLabel: "End sale" })) return;
+    const r = await endShopSale(shopId);
+    if (r.error) { setMsg(msg, r.error, "err"); return; }
+    setMsg(msg, "Sale ended. Prices restored.", "ok");
+    render();
+    return;
+  }
+
+  // ---- shop + listing buttons
+  if (act === "del-shop") {
+    if (!await confirmModal({ title: "Delete shop", body: "Delete this shop and all its listings? This can't be undone.", confirmLabel: "Delete shop", danger: true })) return;
+    res = await sb.from("shops").delete().eq("id", shopId);
+    if (!res.error && shop.icon_path) sb.storage.from("uploads").remove([shop.icon_path]);
+  } else if (act === "del-listing") {
+    if (!await confirmModal({ title: "Remove listing", body: "Remove this listing?", confirmLabel: "Remove", danger: true })) return;
+    res = await sb.from("listings").delete().eq("id", lid);
+  } else if (act === "refresh") {
+    res = await sb.from("listings").update({ updated_at: new Date().toISOString() }).eq("id", lid);
+  } else if (act === "duplicate") {
+    const src = shop.listings.find(l => l.id === lid);
+    if (!src) return;
+    const sort_order = nextListingSortOrder(shop.listings);
+    res = await sb.from("listings").insert({
+      shop_id: shopId,
+      sell_item: src.sell_item, sell_amount: src.sell_amount, sell_unit: src.sell_unit || "",
+      want_item: src.want_item, want_amount: src.want_amount, want_unit: src.want_unit || "",
+      stock: src.stock, in_stock: inStockFromStock(src.stock),
+      group_name: src.group_name || null, sort_order
+    });
+    if (!res.error) setMsg(msg, "Listing duplicated.", "ok");
+  } else if (act === "toggle-stock") {
+    const l = shop.listings.find(x => x.id === lid);
+    if (!l) return;
+    const out = dashListingOut(l);
+    const now = new Date().toISOString();
+    if (out) {
+      res = await sb.from("listings").update({
+        in_stock: true,
+        stock: l.stock === 0 ? null : l.stock,
+        updated_at: now
+      }).eq("id", lid);
+    } else {
+      res = await sb.from("listings").update({ in_stock: false, stock: 0, updated_at: now }).eq("id", lid);
+    }
+    if (!res.error) setMsg(msg, out ? "Marked in stock." : "Marked out of stock.", "ok");
+  } else if (act === "add-listing") {
+    const panel = shopEl.querySelector(".dash-add-listing-panel");
+    const add = panel && panel.querySelector(".addform");
+    if (!add) { setMsg(msg, "Open + on a group to add a listing.", "err"); return; }
+    const stock = parseStockInput(add.querySelector(".l-stock").value);
+    const group_name = normalizeListingGroup(panel.dataset.group || "");
+    const f = {
+      sa: parseInt(add.querySelector(".l-sa").value), wa: parseInt(add.querySelector(".l-wa").value),
+      si: add.querySelector('[data-pick="sell"]').dataset.value || "", wi: add.querySelector('[data-pick="want"]').dataset.value || "",
+      su: add.querySelector(".l-su").value, wu: add.querySelector(".l-wu").value
+    };
+    if (!f.si || !f.wi || !(f.sa > 0) || !(f.wa > 0)) { setMsg(msg, "Pick both items and fill in both amounts.", "err"); return; }
+    if (!await dupOk(shop, f, null, "Add")) return;
+    if (!await marketPriceWarnOk(f)) return;
+    res = await sb.from("listings").insert({
+      shop_id: shopId, sell_item: f.si, sell_amount: f.sa, sell_unit: f.su, want_item: f.wi, want_amount: f.wa, want_unit: f.wu,
+      stock, in_stock: inStockFromStock(stock), group_name,
+      sort_order: nextListingSortOrder(shop.listings)
+    });
+    if (!res.error) {
+      addingListingSlot = { shopId, groupKey: String(group_name || "") };
+    }
+  }
+
+  if (res && res.error) { setMsg(msg, res.error.message, "err"); return; }
+  if (act === "duplicate") setMsg(msg, "Listing duplicated.", "ok");
+  if (act === "add-listing") setMsg(msg, "Listing added.", "ok");
+  render(act === "add-listing" ? shopId : null);
+});
+
+document.getElementById("shops").addEventListener("input", e => {
+  if (e.target.matches("input, textarea, select")) markDashDirty();
+});
+document.getElementById("newshop").addEventListener("input", e => {
+  if (e.target.matches("input, textarea, select")) markDashDirty();
+});
+
+document.getElementById("shops").addEventListener("change", async e => {
+  const t = e.target;
+  if (t.matches("input, textarea, select")) markDashDirty();
+  if (!t.matches(".dash-wu, .dash-su")) return;
+  const row = t.closest(".dash-listing-row");
+  const shopEl = t.closest("[data-shop]");
+  if (!row || !shopEl) return;
+  const shop = shopsData[shopEl.dataset.shop];
+  const r = await commitListingRow(row, shop, shopEl.dataset.shop);
+  if (r.ok && !r.skipped) {
+    setMsg(msg, "Listing updated.", "ok");
+    render();
+  }
+});
+
+document.getElementById("shops").addEventListener("focusout", async e => {
+  const t = e.target;
+  if (!t.matches(".dash-wa, .dash-sa, .dash-stock-amt")) return;
+  const row = t.closest(".dash-listing-row");
+  const shopEl = t.closest("[data-shop]");
+  if (!row || !shopEl) return;
+  const shopId = shopEl.dataset.shop;
+  const shop = shopsData[shopId];
+  requestAnimationFrame(async () => {
+    if (row.contains(document.activeElement)) return;
+    const r = await commitListingRow(row, shop, shopId);
+    if (r.ok && !r.skipped) {
+      setMsg(msg, "Listing updated.", "ok");
+      render();
+    }
+  });
+});
+
+load();
+</script>
+</body>
+</html>

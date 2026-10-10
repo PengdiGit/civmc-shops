@@ -1,0 +1,11 @@
+desktop.ini
+Thumbs.db
+.DS_Store
+.env
+.env.*
+*.local
+.supabase/
+.setup-migration.sql
+.mig1.sql
+.mig2.sql
+.mig3.sql
