@@ -305,7 +305,12 @@ function fillItemList() {
 // ------------------------------------------------------------ items, units, deals
 // item textures: the item "oak boat" is Minecraft_Items/oak_boat.png (folder name must match EXACTLY, GitHub Pages is case-sensitive)
 const ITEM_DIR = "Minecraft_Items/";
-const itemImg = name => ITEM_DIR + encodeURIComponent(name.replace(/ /g, "_")) + ".png";
+const ITEM_IMG_ALIAS = { essence: "experience bottle" }; // Civ custom; reuse XP bottle texture
+const itemImg = name => {
+  const key = norm(name || "");
+  const file = ITEM_IMG_ALIAS[key] || key;
+  return ITEM_DIR + encodeURIComponent(file.replace(/ /g, "_")) + ".png";
+};
 function itemIcon(name, big) {
   // inventory-slot tile around the texture; missing textures just disappear
   const cls = big ? "icon-lg" : "icon";
@@ -389,21 +394,91 @@ function bundleContentsPreviewHtml(contents, opts) {
   return `<div class="barrel-gui${o.compact ? " compact" : ""}" title="Bundle contents">${cells}</div>`;
 }
 
+/** Extra payment options beyond primary want_* — max 2 → 3 prices total. */
+function normalizeAltWants(raw) {
+  if (raw == null || raw === "") return null;
+  let arr = raw;
+  if (typeof raw === "string") {
+    try { arr = JSON.parse(raw); } catch (e) { return null; }
+  }
+  if (!Array.isArray(arr)) return null;
+  const out = [];
+  const seen = new Set();
+  for (const row of arr) {
+    if (!row || typeof row !== "object") continue;
+    const item = norm(row.item || row.want_item || "");
+    if (!item || item.length > 60) continue;
+    const amount = parseInt(row.amount != null ? row.amount : row.want_amount, 10);
+    if (!(amount > 0)) continue;
+    let unit = String(row.unit != null ? row.unit : (row.want_unit || "")).toLowerCase();
+    if (unit !== "ci" && unit !== "cs") unit = "";
+    const key = item + "|" + unit;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ item, amount, unit });
+    if (out.length >= 2) break;
+  }
+  return out.length ? out : null;
+}
+
+/** Primary want + alt_wants (1–3). */
+function listingWantOptions(l) {
+  if (!l) return [];
+  const primary = {
+    item: l.want_item,
+    amount: l.want_amount,
+    unit: l.want_unit || ""
+  };
+  const alts = normalizeAltWants(l.alt_wants) || [];
+  const out = [primary];
+  const seen = new Set([norm(primary.item) + "|" + (primary.unit || "")]);
+  alts.forEach(a => {
+    const key = norm(a.item) + "|" + (a.unit || "");
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(a);
+  });
+  return out.slice(0, 3);
+}
+
 function listingExtrasHtml(l) {
   if (!l) return "";
   const ench = String(l.enchants || "").trim();
   const notes = String(l.notes || "").trim();
-  const bundle = isBundleItem(l.sell_item) ? normalizeBundleContents(l.bundle_contents) : null;
-  if (!ench && !notes && !(bundle && bundle.length)) return "";
+  if (!ench && !notes) return "";
   let html = `<div class="listing-extras">`;
   if (ench) {
     html += `<div class="listing-enchants" title="Enchantments">${ench.split(/\s*,\s*/).filter(Boolean).map(e =>
       `<span class="enchant-chip">${esc(e)}</span>`).join("")}</div>`;
   }
   if (notes) html += `<div class="listing-notes">${esc(notes)}</div>`;
-  if (bundle && bundle.length) html += bundleContentsPreviewHtml(bundle, { compact: true });
   html += `</div>`;
   return html;
+}
+
+/** Read-only barrel overlay (opened by clicking the bundle icon on a listing). */
+function openBundlePeekOverlay(contents, title) {
+  const slots = normalizeBundleContents(contents);
+  if (!slots || !slots.length) return;
+  const root = document.createElement("div");
+  root.className = "modal-overlay barrel-peek-overlay";
+  root.innerHTML = `<div class="modal barrel-peek" role="dialog" aria-modal="true" aria-labelledby="barrel-peek-title">
+    <h2 id="barrel-peek-title">${esc(title || "Bundle contents")}</h2>
+    <p class="meta" style="margin:0 0 10px">What's inside this bundle.</p>
+    ${bundleContentsPreviewHtml(slots)}
+    <div class="ui-modal-actions row" style="margin-top:12px">
+      <button type="button" class="primary small" data-barrel-peek-close>Close</button>
+    </div>
+  </div>`;
+  document.body.appendChild(root);
+  document.body.classList.add("ui-modal-open");
+  const close = () => {
+    root.remove();
+    document.body.classList.remove("ui-modal-open");
+  };
+  root.querySelector("[data-barrel-peek-close]").onclick = close;
+  root.addEventListener("click", e => { if (e.target === root) close(); });
+  root.addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); close(); } });
 }
 
 /** Open Minecraft barrel-style 27-slot editor. Resolves cleaned contents array or null if cancelled. */
@@ -515,6 +590,34 @@ function openBundleContentsEditor(initial) {
   });
 }
 
+function tradeWantSideHtml(wants, big) {
+  const list = wants || [];
+  if (list.length <= 1) {
+    const w = list[0] || {};
+    return `<div class="trade-side">${itemText(w.amount, w.item, w.unit, big)}</div>`;
+  }
+  const rows = list.map(w =>
+    `<div class="trade-fork-price">${itemText(w.amount, w.item, w.unit, big)}</div>`
+  ).join("");
+  return `<div class="trade-fork-wants" aria-label="${list.length} price options">
+    <div class="trade-fork-prices">${rows}</div>
+    <div class="trade-fork-join" aria-hidden="true"></div>
+  </div>`;
+}
+
+function tradeSellSideHtml(l, big) {
+  const bundle = isBundleItem(l.sell_item) ? normalizeBundleContents(l.bundle_contents) : null;
+  const body = itemText(l.sell_amount, l.sell_item, l.sell_unit, big);
+  if (!bundle || !bundle.length) return `<div class="trade-side">${body}</div>`;
+  const payload = esc(JSON.stringify(bundle));
+  return `<div class="trade-side trade-side-bundle">
+    <button type="button" class="trade-bundle-btn" data-bundle-peek="${payload}" title="View bundle contents" aria-label="View bundle contents">
+      ${body}
+      <span class="trade-bundle-hint meta">view inside</span>
+    </button>
+  </div>`;
+}
+
 function tradeRow(l, opts) {
   const o = opts || {};
   const big = !!o.big;
@@ -529,16 +632,18 @@ function tradeRow(l, opts) {
   const idAttr = o.id ? ` id="${esc(o.id)}"` : "";
   const listingAttr = o.listingId != null ? ` data-listing="${esc(o.listingId)}"` : "";
   const href = o.href ? ` data-href="${esc(o.href)}"` : "";
-  const cls = ["listing-row", o.cls, stale ? "stale" : "", o.hl ? "hl offer" : ""].filter(Boolean).join(" ");
+  const wants = listingWantOptions(l);
+  const multi = wants.length > 1;
+  const cls = ["listing-row", o.cls, stale ? "stale" : "", o.hl ? "hl offer" : "", multi ? "has-fork" : ""].filter(Boolean).join(" ");
   const foot = (btns || btnsEnd)
     ? `<div class="btns">${btns ? `<div class="btns-start">${btns}</div>` : "<div></div>"}${btnsEnd ? `<div class="btns-end">${btnsEnd}</div>` : ""}</div>`
     : "";
   return `<div class="${cls}"${idAttr}${listingAttr}${href}>
     <div class="top">
-      <div class="trade">
-        <div class="trade-side">${itemText(l.want_amount, l.want_item, l.want_unit, big)}</div>
+      <div class="trade${multi ? " trade-fork" : ""}">
+        ${tradeWantSideHtml(wants, big)}
         <span class="arrow">&rarr;</span>
-        <div class="trade-side">${itemText(l.sell_amount, l.sell_item, l.sell_unit, big)}</div>
+        ${tradeSellSideHtml(l, big)}
         <div class="inline-actions">
           ${r != null ? `<span class="chip" title="diamonds per item">${fmtRate(r)}</span>` : ""}
           ${tags}
@@ -2434,10 +2539,22 @@ if (document.body.classList.contains("admin-page") || document.body.classList.co
   wireCollapsibleSections(document.querySelector("main"));
 }
 
+// Bundle contents peek (click sell-side bundle icon / row)
+document.addEventListener("click", e => {
+  const btn = e.target.closest("[data-bundle-peek]");
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  let contents = null;
+  try { contents = JSON.parse(btn.getAttribute("data-bundle-peek") || "null"); }
+  catch (err) { contents = null; }
+  openBundlePeekOverlay(contents, "Bundle contents");
+});
+
 // cards with data-href act like links, but can hold real links inside (like the owner name)
 document.addEventListener("click", e => {
   const card = e.target.closest("[data-href]");
-  if (!card || e.target.closest("a, button, input, select, textarea")) return;
+  if (!card || e.target.closest("a, button, input, select, textarea, [data-bundle-peek]")) return;
   location.href = card.dataset.href;
 });
 

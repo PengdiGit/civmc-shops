@@ -364,6 +364,19 @@ function dashListingOut(l) {
   return l.in_stock === false || l.stock === 0;
 }
 
+function readAltWantsFromRow(root) {
+  const rows = [...root.querySelectorAll(".dash-alt-want")];
+  const alts = [];
+  rows.forEach(row => {
+    const item = norm(row.dataset.wantItem || "");
+    const amount = parseInt(row.querySelector(".dash-alt-wa")?.value, 10);
+    const unit = row.querySelector(".dash-alt-wu")?.value || "";
+    if (!item || !(amount > 0)) return;
+    alts.push({ item, amount, unit: unit === "ci" || unit === "cs" ? unit : "" });
+  });
+  return normalizeAltWants(alts);
+}
+
 function listingFieldsFromRow(root, shop) {
   const src = (shop.listings || []).find(x => listingIdEq(x.id, root.dataset.listing));
   const gn = src ? (src.group_name == null ? null : (String(src.group_name).trim() || null)) : null;
@@ -385,12 +398,17 @@ function listingFieldsFromRow(root, shop) {
     group_name: gn,
     enchants: normalizeListingEnchants(root.querySelector(".dash-enchants")?.value || ""),
     notes: normalizeListingNotes(root.querySelector(".dash-notes")?.value || ""),
-    bundle_contents: isBundleItem(root.dataset.sellItem || "") ? bundle_contents : null
+    bundle_contents: isBundleItem(root.dataset.sellItem || "") ? bundle_contents : null,
+    alt_wants: readAltWantsFromRow(root)
   };
 }
 
 function listingBundleKey(v) {
   return JSON.stringify(normalizeBundleContents(v) || null);
+}
+
+function listingAltKey(v) {
+  return JSON.stringify(normalizeAltWants(v) || null);
 }
 
 function listingRowMatchesFields(l, f) {
@@ -402,7 +420,8 @@ function listingRowMatchesFields(l, f) {
     && (l.group_name || null) === f.group_name
     && (normalizeListingEnchants(l.enchants) || null) === (f.enchants || null)
     && (normalizeListingNotes(l.notes) || null) === (f.notes || null)
-    && listingBundleKey(l.bundle_contents) === listingBundleKey(f.bundle_contents);
+    && listingBundleKey(l.bundle_contents) === listingBundleKey(f.bundle_contents)
+    && listingAltKey(l.alt_wants) === listingAltKey(f.alt_wants);
 }
 
 async function commitListingRow(root, shop, shopId) {
@@ -423,6 +442,7 @@ async function commitListingRow(root, shop, shopId) {
     want_item: f.wi, want_amount: f.wa, want_unit: f.wu,
     stock: f.stock, in_stock, group_name: f.group_name,
     enchants: f.enchants, notes: f.notes, bundle_contents: f.bundle_contents,
+    alt_wants: f.alt_wants,
     updated_at: new Date().toISOString()
   }).eq("id", lid);
   if (res.error) {
@@ -433,9 +453,23 @@ async function commitListingRow(root, shop, shopId) {
     sell_item: f.si, sell_amount: f.sa, sell_unit: f.su,
     want_item: f.wi, want_amount: f.wa, want_unit: f.wu,
     stock: f.stock, in_stock, group_name: f.group_name,
-    enchants: f.enchants, notes: f.notes, bundle_contents: f.bundle_contents
+    enchants: f.enchants, notes: f.notes, bundle_contents: f.bundle_contents,
+    alt_wants: f.alt_wants
   });
   return { ok: true };
+}
+
+function dashAltWantRowHtml(w) {
+  const item = w && w.item ? w.item : "";
+  const amount = w && w.amount > 0 ? w.amount : 1;
+  const unit = w && w.unit ? w.unit : "";
+  return `<div class="dash-alt-want" data-want-item="${esc(item)}">
+    <button type="button" class="dash-item-pick" data-act="dash-pick-alt-want" title="Change alt price item">${item ? itemIcon(item, false) : "<span class=\"meta\">pick</span>"}</button>
+    <input type="number" min="1" class="dash-amt dash-alt-wa" value="${amount}" title="Alt buy amount" aria-label="Alt buy amount">
+    ${unitSelect("dash-alt-wu", unit)}
+    <span class="dash-item-label">${esc(item || "pick item")}</span>
+    <button type="button" class="small" data-act="remove-alt-want" title="Remove this price">Remove</button>
+  </div>`;
 }
 
 function dashListingRow(l) {
@@ -448,6 +482,7 @@ function dashListingRow(l) {
   const bundle = normalizeBundleContents(l.bundle_contents);
   const bundleAttr = bundle ? esc(JSON.stringify(bundle)) : "";
   const showBundle = isBundleItem(l.sell_item);
+  const alts = normalizeAltWants(l.alt_wants) || [];
   return `<div class="listing-row dash-listing-row" data-listing="${l.id}" data-want-item="${esc(l.want_item)}" data-sell-item="${esc(l.sell_item)}" data-bundle-contents="${bundleAttr}">
     <div class="dash-listing-main">
       <div class="dash-trade">
@@ -470,6 +505,11 @@ function dashListingRow(l) {
           ${iconBtn("trash", { danger: true, title: "Remove listing", attrs: 'data-act="del-listing"' })}
         </div>
       </div>
+      <div class="dash-alt-wants">
+        <div class="dash-alt-wants-list">${alts.map(dashAltWantRowHtml).join("")}</div>
+        <button type="button" class="small" data-act="add-alt-want" ${alts.length >= 2 ? "hidden" : ""}>+ Alt price (up to 3 total)</button>
+        <p class="meta" style="margin:4px 0 0">Alt prices show as a fork into the item you sell (e.g. diamonds or essence).</p>
+      </div>
       <div class="dash-listing-extra">
         <label>Enchants
           <input type="text" class="dash-enchants" maxlength="300" value="${esc(l.enchants || "")}" placeholder="Protection IV, Unbreaking III">
@@ -479,8 +519,7 @@ function dashListingRow(l) {
         </label>
         <div class="dash-bundle-row" ${showBundle ? "" : "hidden"}>
           <button type="button" class="small" data-act="edit-bundle">Edit bundle contents</button>
-          <span class="meta dash-bundle-summary">${bundle && bundle.length ? bundle.length + " slot" + (bundle.length === 1 ? "" : "s") + " filled" : "Empty barrel"}</span>
-          ${bundle && bundle.length ? bundleContentsPreviewHtml(bundle, { compact: true }) : ""}
+          <span class="meta dash-bundle-summary">${bundle && bundle.length ? bundle.length + " slot" + (bundle.length === 1 ? "" : "s") + " filled · public page: click bundle to view" : "Empty barrel"}</span>
         </div>
       </div>
       <div class="meta dash-listing-meta">${updatedHtml(l.updated_at)}</div>
@@ -1075,6 +1114,51 @@ document.getElementById("shops").addEventListener("click", async e => {
     return;
   }
 
+  if (act === "add-alt-want") {
+    const row = btn.closest(".dash-listing-row");
+    if (!row) return;
+    const list = row.querySelector(".dash-alt-wants-list");
+    if (!list) return;
+    if (list.querySelectorAll(".dash-alt-want").length >= 2) return;
+    list.insertAdjacentHTML("beforeend", dashAltWantRowHtml({ item: "", amount: 1, unit: "" }));
+    const addBtn = row.querySelector('[data-act="add-alt-want"]');
+    if (addBtn && list.querySelectorAll(".dash-alt-want").length >= 2) addBtn.hidden = true;
+    markDashDirty();
+    return;
+  }
+  if (act === "remove-alt-want") {
+    const row = btn.closest(".dash-listing-row");
+    const alt = btn.closest(".dash-alt-want");
+    if (!row || !alt) return;
+    alt.remove();
+    const addBtn = row.querySelector('[data-act="add-alt-want"]');
+    if (addBtn) addBtn.hidden = false;
+    markDashDirty();
+    const shopEl = row.closest("[data-shop]");
+    const shop = shopEl && shopsData[shopEl.dataset.shop];
+    if (shop) {
+      const r = await commitListingRow(row, shop, shopEl.dataset.shop);
+      if (r.ok && !r.skipped) setMsg(msg, "Alt price removed.", "ok");
+    }
+    return;
+  }
+  if (act === "dash-pick-alt-want") {
+    const row = btn.closest(".dash-listing-row");
+    const alt = btn.closest(".dash-alt-want");
+    const shopEl = btn.closest("[data-shop]");
+    if (!row || !alt || !shopEl) return;
+    const shop = shopsData[shopEl.dataset.shop];
+    openItemPicker(async name => {
+      alt.dataset.wantItem = name;
+      btn.innerHTML = itemIcon(name, false);
+      const lab = alt.querySelector(".dash-item-label");
+      if (lab) lab.textContent = name;
+      const r = await commitListingRow(row, shop, shopEl.dataset.shop);
+      if (r.ok && !r.skipped) setMsg(msg, "Listing updated.", "ok");
+    });
+    return;
+  }
+
   if (act === "edit-bundle") {
     const shopEl = btn.closest("[data-shop]");
     const row = btn.closest(".dash-listing-row");
@@ -1351,7 +1435,8 @@ document.getElementById("shops").addEventListener("click", async e => {
       group_name: src.group_name || null, sort_order,
       enchants: normalizeListingEnchants(src.enchants),
       notes: normalizeListingNotes(src.notes),
-      bundle_contents: isBundleItem(src.sell_item) ? normalizeBundleContents(src.bundle_contents) : null
+      bundle_contents: isBundleItem(src.sell_item) ? normalizeBundleContents(src.bundle_contents) : null,
+      alt_wants: normalizeAltWants(src.alt_wants)
     });
     if (!res.error) setMsg(msg, "Listing duplicated.", "ok");
   } else if (act === "toggle-stock") {
@@ -1409,7 +1494,7 @@ document.getElementById("newshop").addEventListener("input", e => {
 document.getElementById("shops").addEventListener("change", async e => {
   const t = e.target;
   if (t.matches("input, textarea, select")) markDashDirty();
-  if (!t.matches(".dash-wu, .dash-su")) return;
+  if (!t.matches(".dash-wu, .dash-su, .dash-alt-wu")) return;
   const row = t.closest(".dash-listing-row");
   const shopEl = t.closest("[data-shop]");
   if (!row || !shopEl) return;
@@ -1417,13 +1502,13 @@ document.getElementById("shops").addEventListener("change", async e => {
   const r = await commitListingRow(row, shop, shopEl.dataset.shop);
   if (r.ok && !r.skipped) {
     setMsg(msg, "Listing updated.", "ok");
-    render();
+    if (!t.matches(".dash-alt-wu")) render();
   }
 });
 
 document.getElementById("shops").addEventListener("focusout", async e => {
   const t = e.target;
-  if (!t.matches(".dash-wa, .dash-sa, .dash-stock-amt, .dash-enchants, .dash-notes")) return;
+  if (!t.matches(".dash-wa, .dash-sa, .dash-stock-amt, .dash-enchants, .dash-notes, .dash-alt-wa")) return;
   const row = t.closest(".dash-listing-row");
   const shopEl = t.closest("[data-shop]");
   if (!row || !shopEl) return;

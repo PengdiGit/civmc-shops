@@ -665,6 +665,93 @@ img.avatar {
 }
 .btns-start, .btns-end { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .btns-end { margin-left: auto; }
+/* Multi-price fork: prices list → join → arrow → sell */
+.trade.trade-fork {
+  align-items: center;
+}
+.trade-fork-wants {
+  display: grid;
+  grid-template-columns: auto 22px;
+  align-items: stretch;
+  min-width: 0;
+}
+.trade-fork-prices {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  padding-right: 2px;
+}
+.trade-fork-price {
+  display: flex;
+  align-items: center;
+  position: relative;
+  min-height: 28px;
+  padding-right: 12px;
+}
+.trade-fork-price::after {
+  content: "";
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  width: 14px;
+  height: 2px;
+  background: color-mix(in srgb, var(--dim) 60%, var(--line));
+  transform: translateY(-50%);
+}
+.trade-fork-join {
+  position: relative;
+  width: 22px;
+  align-self: stretch;
+}
+.trade-fork-join::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  background: color-mix(in srgb, var(--dim) 60%, var(--line));
+  border-radius: 1px;
+}
+.trade-fork-join::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 20px;
+  height: 2px;
+  background: color-mix(in srgb, var(--dim) 60%, var(--line));
+  transform: translateY(-50%);
+}
+.trade-side-bundle { min-width: 0; }
+.trade-bundle-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border: 1px dashed transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.trade-bundle-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.trade-bundle-hint {
+  font-size: .75rem;
+  opacity: .75;
+}
+.barrel-peek { max-width: 360px; }
+.barrel-peek-overlay { z-index: 85; }
+
 .listing-extras {
   margin-top: 6px;
   display: flex;
@@ -796,6 +883,25 @@ img.avatar {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+.dash-alt-wants {
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+.dash-alt-wants-list {
+  display: grid;
+  gap: 6px;
+}
+.dash-alt-want {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px dashed color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bg) 40%, var(--panel));
 }
 button.btn-timeout {
   color: var(--warn);
