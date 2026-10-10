@@ -665,11 +665,18 @@ img.avatar {
 }
 .btns-start, .btns-end { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .btns-end { margin-left: auto; }
-/* Multi-price fork: prices list → join → arrow → sell */
+/* Multi-price fork: prices list → join → arrow → sell (OR: pay any one) */
 .trade.trade-fork {
   align-items: center;
 }
 .trade-fork-wants {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+.trade-fork-body {
   display: grid;
   grid-template-columns: auto 22px;
   align-items: stretch;
@@ -679,9 +686,31 @@ img.avatar {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 8px;
+  gap: 2px;
   min-width: 0;
   padding-right: 2px;
+}
+.trade-fork-hint {
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--dim);
+  line-height: 1.2;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--dim) 35%, var(--line));
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+}
+.trade-fork-or {
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  line-height: 1;
+  padding: 1px 0 1px 2px;
+  opacity: .9;
 }
 .trade-fork-price {
   display: flex;

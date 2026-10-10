@@ -674,12 +674,18 @@ function tradeWantSideHtml(wants, big) {
     const w = list[0] || {};
     return `<div class="trade-side">${itemText(w.amount, w.item, w.unit, big)}</div>`;
   }
-  const rows = list.map(w =>
-    `<div class="trade-fork-price">${itemText(w.amount, w.item, w.unit, big)}</div>`
-  ).join("");
-  return `<div class="trade-fork-wants" aria-label="${list.length} price options">
-    <div class="trade-fork-prices">${rows}</div>
-    <div class="trade-fork-join" aria-hidden="true"></div>
+  const rows = list.map((w, i) => {
+    const price = `<div class="trade-fork-price">${itemText(w.amount, w.item, w.unit, big)}</div>`;
+    if (i === 0) return price;
+    return `<div class="trade-fork-or" aria-hidden="true">or</div>${price}`;
+  }).join("");
+  const aria = `Pay any one of ${list.length} prices`;
+  return `<div class="trade-fork-wants" role="group" aria-label="${aria}">
+    <span class="trade-fork-hint" aria-hidden="true">pay one of</span>
+    <div class="trade-fork-body">
+      <div class="trade-fork-prices">${rows}</div>
+      <div class="trade-fork-join" aria-hidden="true"></div>
+    </div>
   </div>`;
 }
 
