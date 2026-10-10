@@ -334,6 +334,16 @@ function isBundleItem(name) {
   return /\bbundle\b/i.test(String(name || ""));
 }
 
+/** Items that can carry listing-level enchants (not bundles — those use per-slot enchants). */
+function isEnchantableItem(name) {
+  const n = String(name || "").toLowerCase().trim();
+  if (!n || isBundleItem(n)) return false;
+  if (n === "enchanted book" || n === "book") return true;
+  // Word-boundary patterns: \baxe\b does not match inside "pickaxe".
+  if (/\b(helmet|chestplate|leggings|boots|sword|pickaxe|axe|shovel|hoe)\b/.test(n)) return true;
+  return /^(bow|crossbow|trident|mace|shield|elytra|fishing rod|shears|flint and steel|carrot on a stick|warped fungus on a stick|brush|turtle shell)$/.test(n);
+}
+
 function normalizeListingNotes(raw) {
   const t = String(raw == null ? "" : raw).trim();
   if (!t) return null;

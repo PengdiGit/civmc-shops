@@ -884,6 +884,10 @@ img.avatar {
   align-items: center;
   gap: 8px;
 }
+.dash-listing-extra label[hidden],
+.dash-bundle-row[hidden] {
+  display: none !important;
+}
 .dash-alt-wants {
   margin-top: 8px;
   display: grid;

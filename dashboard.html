@@ -377,6 +377,18 @@ function readAltWantsFromRow(root) {
   return normalizeAltWants(alts);
 }
 
+function syncDashListingExtraVisibility(row) {
+  const sell = row.dataset.sellItem || "";
+  const want = row.dataset.wantItem || "";
+  const showBundle = isBundleItem(sell) || isBundleItem(want);
+  const showEnchants = isEnchantableItem(sell) || isEnchantableItem(want);
+  const bundleRow = row.querySelector(".dash-bundle-row");
+  if (bundleRow) bundleRow.hidden = !showBundle;
+  if (!showBundle) row.dataset.bundleContents = "";
+  const enchLabel = row.querySelector(".dash-enchants-label");
+  if (enchLabel) enchLabel.hidden = !showEnchants;
+}
+
 function listingFieldsFromRow(root, shop) {
   const src = (shop.listings || []).find(x => listingIdEq(x.id, root.dataset.listing));
   const gn = src ? (src.group_name == null ? null : (String(src.group_name).trim() || null)) : null;
@@ -387,18 +399,21 @@ function listingFieldsFromRow(root, shop) {
   } else if (root.dataset.bundleContents === "") {
     bundle_contents = null;
   }
+  const wi = root.dataset.wantItem || "";
+  const si = root.dataset.sellItem || "";
+  const canEnchant = isEnchantableItem(si) || isEnchantableItem(wi);
+  const canBundle = isBundleItem(si) || isBundleItem(wi);
   return {
     wa: parseInt(root.querySelector(".dash-wa").value, 10),
     sa: parseInt(root.querySelector(".dash-sa").value, 10),
-    wi: root.dataset.wantItem || "",
-    si: root.dataset.sellItem || "",
+    wi, si,
     wu: root.querySelector(".dash-wu").value,
     su: root.querySelector(".dash-su").value,
     stock: parseStockInput(root.querySelector(".dash-stock-amt").value),
     group_name: gn,
-    enchants: normalizeListingEnchants(root.querySelector(".dash-enchants")?.value || ""),
+    enchants: canEnchant ? normalizeListingEnchants(root.querySelector(".dash-enchants")?.value || "") : null,
     notes: normalizeListingNotes(root.querySelector(".dash-notes")?.value || ""),
-    bundle_contents: isBundleItem(root.dataset.sellItem || "") ? bundle_contents : null,
+    bundle_contents: canBundle ? bundle_contents : null,
     alt_wants: readAltWantsFromRow(root)
   };
 }
@@ -481,7 +496,8 @@ function dashListingRow(l) {
   const timed = l.timed_out ? ' <span class="tag bad">timed out</span>' : "";
   const bundle = normalizeBundleContents(l.bundle_contents);
   const bundleAttr = bundle ? esc(JSON.stringify(bundle)) : "";
-  const showBundle = isBundleItem(l.sell_item);
+  const showBundle = isBundleItem(l.sell_item) || isBundleItem(l.want_item);
+  const showEnchants = isEnchantableItem(l.sell_item) || isEnchantableItem(l.want_item);
   const alts = normalizeAltWants(l.alt_wants) || [];
   return `<div class="listing-row dash-listing-row" data-listing="${l.id}" data-want-item="${esc(l.want_item)}" data-sell-item="${esc(l.sell_item)}" data-bundle-contents="${bundleAttr}">
     <div class="dash-listing-main">
@@ -511,7 +527,7 @@ function dashListingRow(l) {
         <p class="meta" style="margin:4px 0 0">Alt prices show as a fork into the item you sell (e.g. diamonds or essence).</p>
       </div>
       <div class="dash-listing-extra">
-        <label>Enchants
+        <label class="dash-enchants-label" ${showEnchants ? "" : "hidden"}>Enchants
           <input type="text" class="dash-enchants" maxlength="300" value="${esc(l.enchants || "")}" placeholder="Protection IV, Unbreaking III">
         </label>
         <label>Notes
@@ -1186,12 +1202,8 @@ document.getElementById("shops").addEventListener("click", async e => {
     const side = btn.dataset.side;
     openItemPicker(async name => {
       if (side === "want") row.dataset.wantItem = name;
-      else {
-        row.dataset.sellItem = name;
-        const bundleRow = row.querySelector(".dash-bundle-row");
-        if (bundleRow) bundleRow.hidden = !isBundleItem(name);
-        if (!isBundleItem(name)) row.dataset.bundleContents = "";
-      }
+      else row.dataset.sellItem = name;
+      syncDashListingExtraVisibility(row);
       const sideEl = btn.closest(".dash-trade-side");
       if (sideEl) sideEl.querySelector(".dash-item-label").textContent = name;
       btn.innerHTML = itemIcon(name, false);
@@ -1433,9 +1445,11 @@ document.getElementById("shops").addEventListener("click", async e => {
       want_item: src.want_item, want_amount: src.want_amount, want_unit: src.want_unit || "",
       stock: src.stock, in_stock: inStockFromStock(src.stock),
       group_name: src.group_name || null, sort_order,
-      enchants: normalizeListingEnchants(src.enchants),
+      enchants: (isEnchantableItem(src.sell_item) || isEnchantableItem(src.want_item))
+        ? normalizeListingEnchants(src.enchants) : null,
       notes: normalizeListingNotes(src.notes),
-      bundle_contents: isBundleItem(src.sell_item) ? normalizeBundleContents(src.bundle_contents) : null,
+      bundle_contents: (isBundleItem(src.sell_item) || isBundleItem(src.want_item))
+        ? normalizeBundleContents(src.bundle_contents) : null,
       alt_wants: normalizeAltWants(src.alt_wants)
     });
     if (!res.error) setMsg(msg, "Listing duplicated.", "ok");
