@@ -1516,19 +1516,57 @@ body.find-page > main {
   margin-bottom: 18px; padding: 18px; padding-right: 64px; background: var(--panel);
   border: 1px solid var(--line); border-radius: var(--radius);
 }
-.profile-hero > #avatar { display: block; line-height: 0; }
+.profile-hero-avcol {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 128px;
+}
+.profile-hero-avcol #avatar { display: block; line-height: 0; }
+.profile-hero-avcol .profile-follow-btn {
+  width: 100%;
+  justify-content: center;
+}
+.profile-hero-avcol .profile-follow-btn.following {
+  background: color-mix(in srgb, var(--panel) 88%, var(--line));
+  border-color: var(--line);
+  color: var(--text);
+}
+.profile-hero-avcol .profile-follow-btn.following:hover {
+  border-color: color-mix(in srgb, var(--danger, #c45c5c) 55%, var(--line));
+  color: var(--danger, #c45c5c);
+}
+.profile-follower-count {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--dim);
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--dim) 45%, transparent);
+}
+.profile-follower-count:hover,
+.profile-follower-count:focus-visible {
+  color: var(--text);
+  text-decoration-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  outline: none;
+}
 .profile-hero > .profile-hero-actions {
   position: absolute;
   top: 10px;
   right: 10px;
   z-index: 2;
 }
-.profile-hero:has(#toggledit:not([hidden])),
-.profile-hero:has(#favprof:not([hidden])) {
+.profile-hero:has(#toggledit:not([hidden])) {
   padding-right: 100px;
-}
-.profile-hero:has(#favprof:not([hidden])):has(#toggledit:not([hidden])) {
-  padding-right: 132px;
 }
 .profile-hero-actions #shareprof.primary {
   background: linear-gradient(165deg,
@@ -1751,8 +1789,36 @@ button.pickbtn img {
 .modal h2 { margin-top: 0; }
 .ui-modal-overlay { z-index: 80; }
 .ui-modal { max-width: 440px; box-shadow: 0 16px 40px rgba(0,0,0,.45); }
+.ui-modal-list { max-width: 420px; }
 .ui-modal-body { margin: 0 0 14px; color: var(--dim); line-height: 1.45; }
+.ui-modal-list-body { margin: 0 0 14px; max-height: min(52vh, 360px); overflow: auto; }
 .ui-modal-actions { justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.follow-modal-list { display: grid; gap: 6px; }
+.follow-modal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid transparent;
+}
+.follow-modal-row:hover {
+  background: color-mix(in srgb, var(--panel) 70%, var(--bg));
+  border-color: var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+.follow-modal-av { flex-shrink: 0; line-height: 0; }
+.follow-modal-av .avatar { width: 40px; height: 40px; border-radius: 6px; }
+.follow-modal-name {
+  font-weight: 650;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .ui-prompt-label {
   display: block;
   margin-top: 4px;
@@ -2282,27 +2348,24 @@ body.fav-page .fav-person-name {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-body.fav-page .fav-person .icon-btn { margin-left: auto; }
-/* Favourite stars: yellow hollow (off) / solid (on) */
-body.profile-page #favprof,
+body.fav-page .fav-person .icon-btn,
+body.fav-page .fav-person button.small { margin-left: auto; flex-shrink: 0; }
+/* Shop favourite stars: yellow hollow (off) / solid (on) */
 body.shop-page #favbtn {
   color: #e0b45a;
   border-color: color-mix(in srgb, #e0b45a 55%, var(--line));
   background: color-mix(in srgb, #e0b45a 12%, var(--panel));
 }
-body.profile-page #favprof:hover,
 body.shop-page #favbtn:hover {
   color: #f0c96a;
   border-color: #e0b45a;
   background: color-mix(in srgb, #e0b45a 20%, var(--panel));
 }
-body.profile-page #favprof.on,
 body.shop-page #favbtn.on {
   color: #e8bc4a;
   border-color: color-mix(in srgb, #e0b45a 75%, var(--line));
   background: color-mix(in srgb, #e0b45a 26%, var(--panel));
 }
-body.profile-page #favprof.on:hover,
 body.shop-page #favbtn.on:hover {
   color: #f0c96a;
   border-color: #e0b45a;
@@ -2985,6 +3048,7 @@ body.mod-page > main {
     align-self: start;
   }
   .profile-hero > #actions { grid-column: 1 / -1; }
+  .profile-hero-avcol { width: 96px; }
   .profile-hero img.avatar { width: 96px; height: 96px; }
   .mod-hero { padding: 16px 16px 14px; }
   .mod-section { padding: 12px 12px 14px; }

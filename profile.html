@@ -4,13 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=18">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
 <main class="profile-page" id="profile-page">
   <div class="profile-hero" id="hero">
-    <span id="avatar"></span>
+    <div class="profile-hero-avcol" id="avcol">
+      <span id="avatar"></span>
+      <button type="button" id="followbtn" class="small primary profile-follow-btn" hidden>Follow</button>
+      <button type="button" id="follower-count" class="profile-follower-count" hidden>0 Followers</button>
+    </div>
     <div class="profile-hero-identity">
       <h1 id="name">Loading...</h1>
       <div class="row" id="tags"></div>
@@ -22,7 +26,6 @@
     </div>
     <div class="inline-actions" id="actions"></div>
     <div class="action-cluster profile-hero-actions" id="hero-actions">
-      <button type="button" id="favprof" class="icon-btn" hidden title="Favourite this profile" aria-label="Favourite this profile" data-ico="star"></button>
       <button type="button" id="shareprof" class="primary" data-ico="share" title="Copy profile link" aria-label="Share profile"></button>
       <button type="button" id="toggledit" data-ico="pen" title="Edit profile" aria-label="Edit profile" hidden></button>
     </div>
@@ -96,7 +99,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="mock.js"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let id = params.get("id");
@@ -104,21 +107,27 @@ const nameParam = params.get("name");
 const msg = document.getElementById("msg");
 const factsEl = document.getElementById("facts");
 let own = false, myId = null, shown = null, myProfile = null;
-let isFavProf = false;
+let isFollowing = false;
+let followerCount = 0;
 let lastField = null;
 let activeTab = "shops";
 
-function paintFavProfBtn() {
-  const fb = document.getElementById("favprof");
-  if (!fb) return;
-  // Own profile only: never show. Others: show (login required to toggle).
-  const show = !own && !!shown;
-  fb.hidden = !show;
-  if (!show) return;
-  fb.className = "icon-btn" + (isFavProf ? " on" : "");
-  fb.title = isFavProf ? "Remove from favourites" : "Favourite this profile";
-  fb.setAttribute("aria-label", fb.title);
-  fb.innerHTML = uiIcon(isFavProf ? "starFill" : "star");
+function paintFollowUi() {
+  const btn = document.getElementById("followbtn");
+  const countBtn = document.getElementById("follower-count");
+  if (!btn || !countBtn) return;
+  const showFollow = !own && !!shown;
+  btn.hidden = !showFollow;
+  if (showFollow) {
+    btn.textContent = isFollowing ? "Following" : "Follow";
+    btn.className = "small profile-follow-btn" + (isFollowing ? " following" : " primary");
+    btn.title = isFollowing ? "Unfollow" : "Follow";
+    btn.setAttribute("aria-label", btn.title);
+  }
+  countBtn.hidden = !shown;
+  const n = followerCount;
+  countBtn.textContent = n + " Follower" + (n === 1 ? "" : "s");
+  countBtn.title = n ? "View followers" : "No followers yet";
 }
 
 async function copyFactValue(el) {
@@ -327,12 +336,17 @@ async function load() {
 
   document.getElementById("toggledit").hidden = !own;
   document.getElementById("edit-wrap").hidden = !own;
-  isFavProf = false;
-  if (!own && myId) {
-    const { data: f } = await sb.from("profile_favorites").select("id").eq("user_id", myId).eq("profile_id", p.id);
-    isFavProf = !!(f && f.length);
-  }
-  paintFavProfBtn();
+  isFollowing = false;
+  followerCount = 0;
+  const [{ count: fc }, followRes] = await Promise.all([
+    sb.from("follows").select("id", { count: "exact", head: true }).eq("following_id", p.id),
+    (!own && myId)
+      ? sb.from("follows").select("id").eq("follower_id", myId).eq("following_id", p.id).limit(1)
+      : Promise.resolve({ data: [] })
+  ]);
+  followerCount = typeof fc === "number" ? fc : 0;
+  isFollowing = !!(followRes.data && followRes.data.length);
+  paintFollowUi();
   if (own) {
     const bioEdit = document.getElementById("bioedit");
     bioEdit.value = clampBioLines(p.bio || "");
@@ -429,16 +443,38 @@ async function load() {
   switchTab(activeTab);
 }
 
-document.getElementById("favprof").onclick = async () => {
+document.getElementById("followbtn").onclick = async () => {
   if (!shown || own) return;
   if (!myId) { location.href = loginHref(); return; }
-  const res = isFavProf
-    ? await sb.from("profile_favorites").delete().eq("user_id", myId).eq("profile_id", shown.id)
-    : await sb.from("profile_favorites").insert({ user_id: myId, profile_id: shown.id });
+  const res = isFollowing
+    ? await sb.from("follows").delete().eq("follower_id", myId).eq("following_id", shown.id)
+    : await sb.from("follows").insert({ follower_id: myId, following_id: shown.id });
   if (res.error) { setMsg(msg, res.error.message, "err"); return; }
-  isFavProf = !isFavProf;
-  paintFavProfBtn();
-  setMsg(msg, isFavProf ? "Saved to favourites." : "Removed from favourites.", "ok");
+  isFollowing = !isFollowing;
+  followerCount = Math.max(0, followerCount + (isFollowing ? 1 : -1));
+  paintFollowUi();
+  setMsg(msg, isFollowing ? "Following." : "Unfollowed.", "ok");
+};
+
+document.getElementById("follower-count").onclick = async () => {
+  if (!shown) return;
+  const { data, error } = await sb.from("follows")
+    .select("follower_id, created_at, profiles!follows_follower_id_fkey(id, username, mc_username, discord_username, avatar_path, verified_at, timed_out)")
+    .eq("following_id", shown.id)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) { setMsg(msg, error.message, "err"); return; }
+  const people = (data || []).map(r => r.profiles).filter(p => p && !p.timed_out);
+  const body = people.length
+    ? `<div class="follow-modal-list">${people.map(p => {
+        const name = profileDisplayName(p);
+        return `<a class="follow-modal-row" href="profile.html?id=${esc(p.id)}">
+          <span class="follow-modal-av">${avatarImg(p, 40)}</span>
+          <span class="follow-modal-name">${esc(name)}</span>
+        </a>`;
+      }).join("")}</div>`
+    : '<p class="meta" style="margin:0">No followers yet.</p>';
+  await listModal({ title: "Followers", body, closeLabel: "Close" });
 };
 
 document.getElementById("shareprof").onclick = async () => {

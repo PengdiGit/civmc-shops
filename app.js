@@ -1558,6 +1558,33 @@ function confirmModal(opts) {
   });
 }
 
+/** Info / list dialog (same overlay as confirmModal). Resolves when closed. */
+function listModal(opts) {
+  const o = opts || {};
+  closeUiModal();
+  return new Promise(resolve => {
+    const root = document.createElement("div");
+    root.id = "ui-modal-root";
+    root.className = "modal-overlay ui-modal-overlay";
+    root.innerHTML = `<div class="modal ui-modal ui-modal-list" role="dialog" aria-modal="true" aria-labelledby="ui-modal-title">
+      <h2 id="ui-modal-title">${esc(o.title || "List")}</h2>
+      <div class="ui-modal-list-body">${o.body || ""}</div>
+      <div class="ui-modal-actions row">
+        <button type="button" class="primary small" data-ui-ok>${esc(o.closeLabel || "Close")}</button>
+      </div>
+    </div>`;
+    document.body.appendChild(root);
+    document.body.classList.add("ui-modal-open");
+    const done = () => { closeUiModal(); resolve(); };
+    root.querySelector("[data-ui-ok]").onclick = done;
+    root.addEventListener("click", e => { if (e.target === root) done(); });
+    root.addEventListener("keydown", e => {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); done(); }
+    });
+    root.querySelector("[data-ui-ok]").focus();
+  });
+}
+
 /** Text input dialog. Returns string (maybe empty) or null if cancelled. */
 function promptModal(opts) {
   const o = opts || {};
