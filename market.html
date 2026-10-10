@@ -83,7 +83,7 @@ const DAYMS = 86400000;
 let byItem = {};          // item -> { sell: row|null, buy: row|null }
 let sparkByItem = {};     // item -> [median...] oldest\u2192newest (sell side)
 let selected = null;
-let history = { sell: [], buy: [] };
+let itemHistory = { sell: [], buy: [] };
 let rangeDays = 30;
 let allShops = [];
 let allListings = [];
@@ -165,7 +165,7 @@ function syncMarketScopeUrl() {
   else u.searchParams.delete("nation");
   if (city) u.searchParams.set("city", city);
   else u.searchParams.delete("city");
-  history.replaceState(null, "", u.pathname + u.search + u.hash);
+  window.history.replaceState(null, "", u.pathname + u.search + u.hash);
 }
 
 async function loadSparks() {
@@ -300,7 +300,7 @@ async function openItem(item) {
 
   const { data, error } = await sb.from("market_history").select("*").eq("item", item).order("day", { ascending: true });
   if (error) { document.getElementById("chart").innerHTML = '<p class="meta">Couldn\'t load history.</p>'; return; }
-  history = { sell: (data || []).filter(h => h.side === "sell"), buy: (data || []).filter(h => h.side === "buy") };
+  itemHistory = { sell: (data || []).filter(h => h.side === "sell"), buy: (data || []).filter(h => h.side === "buy") };
   renderDetail();
 }
 
@@ -321,11 +321,11 @@ function renderDetail() {
   const cut = rangeDays ? Date.now() - rangeDays * DAYMS : 0;
   const pick = rows => rows.filter(h => Date.parse(h.day) >= cut)
     .map(h => ({ d: h.day, m: Number(h.median), lo: Number(h.low), hi: Number(h.high), n: h.n }));
-  const series = [{ name: "Selling for", color: SELL, pts: pick(history.sell) }, { name: "Buying at", color: BUY, pts: pick(history.buy) }]
+  const series = [{ name: "Selling for", color: SELL, pts: pick(itemHistory.sell) }, { name: "Buying at", color: BUY, pts: pick(itemHistory.buy) }]
     .filter(s => s.pts.length);
   drawChart(document.getElementById("chart"), series);
   document.getElementById("legend").innerHTML = series.map(s => `<span><i style="background:${s.color}"></i>${s.name} (line = typical, shading = usual range)</span>`).join("");
-  const days = new Set([...history.sell, ...history.buy].map(h => h.day)).size;
+  const days = new Set([...itemHistory.sell, ...itemHistory.buy].map(h => h.day)).size;
   const { nation, city } = marketPlaceFilter();
   const scopeBits = [city, nation].filter(Boolean);
   const scopeNote = scopeBits.length
