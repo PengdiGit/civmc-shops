@@ -439,6 +439,12 @@ a.small:hover { border-color: var(--accent); color: var(--accent); }
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   font-weight: 600;
 }
+.tag.role-nation {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 75%, var(--line));
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  font-weight: 600;
+}
 .chip {
   font-size: .72rem; padding: 2px 7px; border-radius: 3px;
   background: var(--bg); border: 1px solid var(--line); color: var(--accent); white-space: nowrap;

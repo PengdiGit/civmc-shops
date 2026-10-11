@@ -12,7 +12,7 @@
 <meta property="og:description" content="CivMC shop page — listings, reviews, and location.">
 <meta property="og:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/chest.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="../style.css?v=19">
+<link rel="stylesheet" href="../style.css?v=20">
 </head>
 <body class="shop-page">
 <nav id="nav"></nav>
@@ -85,7 +85,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=17"></script>
+<script src="../app.js?v=18"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const shopId = params.get("id");
@@ -512,6 +512,7 @@ function commentHtml(c, rootId, staff) {
       <div class="head">
         <span class="cname">${avatarImg(pr, 24)}<a href="../profile/?id=${c.author_id}">${esc(userName(pr))}</a>
           ${isOwnerAuthor ? '<span class="tag owner">owner</span>' : ""}
+          ${pr && pr.is_nation ? '<span class="tag role-nation">nation</span>' : ""}
           ${pr && pr.is_business ? '<span class="tag role-business">business</span>' : ""}
           <span class="meta">\u00b7 ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
         <span class="action-cluster">${b}</span>

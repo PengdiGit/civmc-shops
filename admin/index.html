@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin - CivMC Shops</title>
-<link rel="stylesheet" href="../style.css?v=10">
+<link rel="stylesheet" href="../style.css?v=11">
 </head>
 <body class="admin-page">
 <nav id="nav"></nav>
@@ -109,12 +109,10 @@
           <label for="dc">Discord username (optional)</label>
           <input id="dc" type="text" maxlength="40">
         </div>
-        <div id="biz-fields" hidden>
-          <label for="biz-city">City</label>
-          <input id="biz-city" class="place-city" type="text" maxlength="60" placeholder="Search cities…">
-          <label for="biz-nation">Nation</label>
-          <input id="biz-nation" class="place-nation" type="text" maxlength="60" placeholder="Search nations…">
-          <p class="meta">At least one of city or nation. This labels the profile. Shops are still created or transferred onto the account.</p>
+        <div id="nation-fields" hidden>
+          <label for="acct-nation">Nation</label>
+          <input id="acct-nation" class="place-nation" type="text" maxlength="60" placeholder="Search nations…" required>
+          <p class="meta">This nation is the label on the account. Shops are still created or transferred onto it.</p>
         </div>
         <label for="un">Login username</label>
         <input id="un" type="text" required placeholder="3-20 letters, numbers or _">
@@ -224,7 +222,7 @@
 <script src="../config.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=17"></script>
+<script src="../app.js?v=18"></script>
 <script>
 const msg = document.getElementById("msg");
 const usermsg = document.getElementById("usermsg");
@@ -243,7 +241,7 @@ async function load() {
   if (!ctx) return;
   me = ctx.profile;
   if (me.is_head) {
-    document.getElementById("role").innerHTML += '<option value="business">Business</option><option value="mod">Mod</option><option value="admin">Admin</option>';
+    document.getElementById("role").innerHTML += '<option value="business">Business</option><option value="nation">Nation</option><option value="mod">Mod</option><option value="admin">Admin</option>';
     syncCreateRole();
     document.getElementById("role").addEventListener("change", syncCreateRole);
     if (typeof bindPlaceFieldsIn === "function") bindPlaceFieldsIn(document.getElementById("form"));
@@ -264,21 +262,27 @@ async function load() {
 }
 
 function syncCreateRole() {
-  const biz = document.getElementById("role").value === "business";
+  const role = document.getElementById("role").value;
+  const shared = role === "business" || role === "nation";
+  const nation = role === "nation";
   const player = document.getElementById("player-fields");
-  const bizFields = document.getElementById("biz-fields");
+  const nationFields = document.getElementById("nation-fields");
   const mc = document.getElementById("mc");
-  if (player) player.hidden = biz;
-  if (bizFields) bizFields.hidden = !biz;
-  if (mc) mc.required = !biz;
+  const nationInput = document.getElementById("acct-nation");
+  if (player) player.hidden = shared;
+  if (nationFields) nationFields.hidden = !nation;
+  if (mc) mc.required = !shared;
+  if (nationInput) nationInput.required = nation;
   const note = document.getElementById("create-note");
   const pwLabel = document.getElementById("pw-label");
   if (note) {
-    note.textContent = biz
-      ? "Shared login. The password you set is the one people use — it is not forced to change on first login."
-      : "Starts verified. They get a prompt to set their own password.";
+    note.textContent = role === "business"
+      ? "Shared login. Username and password only — a place can go in the bio later. The password is not forced to change on first login."
+      : role === "nation"
+        ? "Shared login for one nation. The password you set is the one people use — it is not forced to change on first login."
+        : "Starts verified. They get a prompt to set their own password.";
   }
-  if (pwLabel) pwLabel.textContent = biz ? "Password" : "Temporary password";
+  if (pwLabel) pwLabel.textContent = shared ? "Password" : "Temporary password";
 }
 
 function setupSalesUi() {
@@ -349,15 +353,9 @@ function roleLabel(a) {
   if (a.is_head) return "head admin";
   if (a.is_admin) return "admin";
   if (a.is_mod) return "mod";
+  if (a.is_nation) return "nation";
   if (a.is_business) return "business";
   return "user";
-}
-
-function accountPlace(a) {
-  const city = (a.place_city || "").trim();
-  const nation = (a.place_nation || "").trim();
-  if (city && nation && city !== nation) return city + " · " + nation;
-  return city || nation || "";
 }
 
 function loginName(a) { return (a && (a.login_username || a.username)) || ""; }
@@ -381,7 +379,7 @@ function accountOpen(a, extra) {
 }
 
 function roleBadge(a) {
-  const cls = a.is_head ? "role-head" : a.is_admin ? "role-admin" : a.is_mod ? "role-mod" : a.is_business ? "role-business" : "role-user";
+  const cls = a.is_head ? "role-head" : a.is_admin ? "role-admin" : a.is_mod ? "role-mod" : a.is_nation ? "role-nation" : a.is_business ? "role-business" : "role-user";
   return `<span class="tag ${cls}">${roleLabel(a)}</span>`;
 }
 
@@ -403,7 +401,7 @@ function roleButtons(u) {
   const b = (act, text, cls) => `<button class="small ${cls}" data-act="${act}" data-id="${u.id}">${text}</button>`;
   const del = iconBtn("trash", { danger: true, cls: "btn-report", title: "Delete account", attrs: `data-act="delete-account" data-id="${u.id}"` });
   const imp = impersonateBtn(u);
-  if (u.is_business) return imp + del;
+  if (u.is_business || u.is_nation) return imp + del;
   if (u.is_admin) return b("remove_admin", "Remove admin", "btn-role-admin") + imp + b("make_mod", "Make mod", "btn-role-mod") + del;
   if (u.is_mod) return b("make_admin", "Make admin", "btn-role-admin") + imp + b("remove_mod", "Remove mod", "btn-role-mod") + del;
   return b("make_admin", "Make admin", "btn-role-admin") + imp + b("make_mod", "Make mod", "btn-role-mod") + del;
@@ -418,7 +416,7 @@ function paintLists() {
       .filter(a => hit(userName(a), a.mc_username, a.discord_username, a.login_username, a.place_city, a.place_nation))
       .map(a => `<div class="listing">
         ${accountOpen(a, `${roleBadge(a)} ${statusBadge(a)}
-          <span class="meta">\u00b7 ${a.is_business ? esc(accountPlace(a) || "no place") : "MC " + esc(a.mc_username || "—") + " \u00b7 " + esc(a.discord_username || "-")} \u00b7 made ${fmtDate(a.created_at)} \u00b7 last ${fmtDate(a.last_sign_in_at)}</span>`)}
+          <span class="meta">\u00b7 ${a.is_nation ? esc(a.place_nation || "no nation") : a.is_business ? "shared login" : "MC " + esc(a.mc_username || "—") + " \u00b7 " + esc(a.discord_username || "-")} \u00b7 made ${fmtDate(a.created_at)} \u00b7 last ${fmtDate(a.last_sign_in_at)}</span>`)}
         <div class="acct-actions">${roleButtons(a)}</div>
       </div>`).join("") || '<p class="meta">None.</p>';
   } else {
@@ -512,6 +510,8 @@ function openAccountEditor(id) {
   const editable = canEditAccount(a);
   const self = a.id === me.id;
   const biz = !!a.is_business;
+  const nationAcct = !!a.is_nation;
+  const shared = biz || nationAcct;
   closeUiModal();
   const root = document.createElement("div");
   root.id = "ui-modal-root";
@@ -519,8 +519,10 @@ function openAccountEditor(id) {
   const lock = editable ? "" : " disabled";
   const pwNote = !editable
     ? "Only the head admin can change this account."
-    : biz
-      ? "The current password can't be shown. A new password replaces the shared login and is not forced to change on next login."
+    : shared
+      ? (nationAcct
+        ? "The current password can't be shown. A new password replaces the shared login and is not forced to change on next login."
+        : "The current password can't be shown. A new password replaces the shared login. A place can go in the bio.")
       : "The current password can't be shown. Leave it blank to keep it, or type a new one (8+ characters).";
   root.innerHTML = `<div class="modal ui-modal ui-modal-account" role="dialog" aria-modal="true" aria-labelledby="acct-edit-title">
     <h2 id="acct-edit-title">${editable ? "Edit account" : "Account"}</h2>
@@ -531,12 +533,10 @@ function openAccountEditor(id) {
       <input id="edit-un" type="text" maxlength="20" autocomplete="off" required${lock} value="${esc(loginName(a))}">
       <label for="edit-dc">Discord username</label>
       <input id="edit-dc" type="text" maxlength="40" autocomplete="off"${lock} value="${esc(a.discord_username || "")}">
-      <label for="edit-mc">Minecraft username${biz ? " (optional)" : ""}</label>
-      <input id="edit-mc" type="text" maxlength="32" autocomplete="off"${biz ? "" : " required"}${lock} value="${esc(a.mc_username || "")}">
-      ${biz ? `<label for="edit-city">City</label>
-      <input id="edit-city" class="place-city" type="text" maxlength="60" autocomplete="off"${lock} value="${esc(a.place_city || "")}">
-      <label for="edit-nation">Nation</label>
-      <input id="edit-nation" class="place-nation" type="text" maxlength="60" autocomplete="off"${lock} value="${esc(a.place_nation || "")}">` : ""}
+      <label for="edit-mc">Minecraft username${shared ? " (optional)" : ""}</label>
+      <input id="edit-mc" type="text" maxlength="32" autocomplete="off"${shared ? "" : " required"}${lock} value="${esc(a.mc_username || "")}">
+      ${nationAcct ? `<label for="edit-nation">Nation</label>
+      <input id="edit-nation" class="place-nation" type="text" maxlength="60" autocomplete="off" required${lock} value="${esc(a.place_nation || "")}">` : ""}
       <label for="edit-pw">Password</label>
       <input id="edit-pw" type="text" maxlength="72" autocomplete="new-password"${lock} placeholder="${editable ? "Leave blank to keep the current password" : "Can't be shown"}" value="">
       <div class="msg" id="acct-edit-msg"></div>
@@ -557,7 +557,7 @@ function openAccountEditor(id) {
   root.addEventListener("keydown", e => {
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); done(); }
   });
-  if (biz && typeof bindPlaceFieldsIn === "function") bindPlaceFieldsIn(form);
+  if (nationAcct && typeof bindPlaceFieldsIn === "function") bindPlaceFieldsIn(form);
   if (!editable) {
     root.querySelector("[data-ui-cancel]").focus();
     return;
@@ -569,21 +569,20 @@ function openAccountEditor(id) {
     const discord = root.querySelector("#edit-dc").value.trim();
     const mc = root.querySelector("#edit-mc").value.trim();
     const password = root.querySelector("#edit-pw").value;
-    const city = biz ? root.querySelector("#edit-city").value.trim() : "";
-    const nation = biz ? root.querySelector("#edit-nation").value.trim() : "";
+    const nation = nationAcct ? root.querySelector("#edit-nation").value.trim() : "";
     if (!/^[a-z0-9_]{3,20}$/.test(username)) { setMsg(errEl, "Login username: 3-20 letters, numbers or _.", "err"); return; }
     if (mc.length > 32) { setMsg(errEl, "Minecraft name is too long (max 32 characters).", "err"); return; }
-    if (!biz && !mc) { setMsg(errEl, "Need a Minecraft name (max 32 characters).", "err"); return; }
+    if (!shared && !mc) { setMsg(errEl, "Need a Minecraft name (max 32 characters).", "err"); return; }
     if (discord.length > 40) { setMsg(errEl, "Discord username is too long (max 40).", "err"); return; }
-    if (biz && !city && !nation) { setMsg(errEl, "Need a city, a nation, or both.", "err"); return; }
-    if (city.length > 60 || nation.length > 60) { setMsg(errEl, "City and nation can be at most 60 characters.", "err"); return; }
+    if (nationAcct && !nation) { setMsg(errEl, "Need a nation.", "err"); return; }
+    if (nation.length > 60) { setMsg(errEl, "Nation can be at most 60 characters.", "err"); return; }
     if (password && (password.length < 8 || password.length > 72)) { setMsg(errEl, "Password needs 8-72 characters.", "err"); return; }
     saving = true;
     const saveBtn = root.querySelector("[data-ui-save]");
     saveBtn.disabled = true;
     setMsg(errEl, "Saving...");
     const payload = { action: "update_account", user_id: a.id, username, mc_username: mc, discord_username: discord };
-    if (biz) { payload.place_city = city; payload.place_nation = nation; }
+    if (nationAcct) payload.place_nation = nation;
     if (password) payload.password = password;
     const r = await callFn("manage-user", payload);
     saving = false;
@@ -773,11 +772,10 @@ document.getElementById("form").addEventListener("submit", async e => {
   const made = { un: document.getElementById("un").value.trim().toLowerCase(), pw: document.getElementById("pw").value };
   const role = document.getElementById("role").value;
   const payload = { username: made.un, password: made.pw, role };
-  if (role === "business") {
-    payload.place_city = document.getElementById("biz-city").value.trim();
-    payload.place_nation = document.getElementById("biz-nation").value.trim();
-    if (!payload.place_city && !payload.place_nation) { setMsg(msg, "Need a city, a nation, or both.", "err"); return; }
-  } else {
+  if (role === "nation") {
+    payload.place_nation = document.getElementById("acct-nation").value.trim();
+    if (!payload.place_nation) { setMsg(msg, "Need a nation.", "err"); return; }
+  } else if (role !== "business") {
     payload.mc_username = document.getElementById("mc").value.trim();
     payload.discord_username = document.getElementById("dc").value.trim();
   }

@@ -1169,7 +1169,10 @@ function emptyState(text, actionHref, actionLabel) {
   return `<div class="empty"><p>${text}</p>${btn}</div>`;
 }
 function businessTag(p) {
-  return p && p.is_business ? ' <span class="tag role-business">business</span>' : "";
+  if (!p) return "";
+  if (p.is_nation) return ' <span class="tag role-nation">nation</span>';
+  if (p.is_business) return ' <span class="tag role-business">business</span>';
+  return "";
 }
 function ownerChip(p, ownerId) {
   if (!p || !ownerId) return '<span class="meta">owner: ?</span>';

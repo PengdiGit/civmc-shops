@@ -1,7 +1,7 @@
-// Admin-created accounts. Only the head admin can make mod, admin, or business accounts.
+// Admin-created accounts. Only the head admin can make mod, admin, business, or nation accounts.
 // Player / mod / admin accounts start VERIFIED and get the "pick your own password" popup.
-// Business accounts are a shared login: username, password, and a city and/or nation label.
-// They start verified with no password-change nag, so the password the head sets is the one people share.
+// Business and nation accounts are shared logins. They start verified with no password-change nag.
+// Business needs username and password only. Nation also needs the nation it belongs to.
 // Deploy: supabase functions deploy create-user
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -38,31 +38,30 @@ Deno.serve(async (req) => {
   const mc_username = String(body.mc_username || "").trim();
   const discord_username = String(body.discord_username || "").trim();
 
-  if (!["user", "mod", "admin", "business"].includes(role)) return json({ error: "Bad account type." }, 400);
+  if (!["user", "mod", "admin", "business", "nation"].includes(role)) return json({ error: "Bad account type." }, 400);
   if (role !== "user" && !prof.is_head) {
-    return json({
-      error: role === "business"
-        ? "Only the head admin can create business accounts."
-        : "Only the head admin can create mods or admins.",
-    }, 403);
+    const headOnly: Record<string, string> = {
+      business: "Only the head admin can create business accounts.",
+      nation: "Only the head admin can create nation accounts.",
+    };
+    return json({ error: headOnly[role] || "Only the head admin can create mods or admins." }, 403);
   }
   if (!/^[a-z0-9_]{3,20}$/.test(username)) return json({ error: "Login username: 3-20 letters, numbers or _." }, 400);
   if (!password || password.length < 8 || password.length > 72) return json({ error: "Password needs 8-72 characters." }, 400);
 
   const business = role === "business";
-  let place_city: string | null = null;
+  const nation = role === "nation";
+  const shared = business || nation;
   let place_nation: string | null = null;
-  if (business) {
-    const cityRaw = String(body.place_city ?? "").trim();
+  if (nation) {
     const nationRaw = String(body.place_nation ?? "").trim();
-    if (cityRaw.length > 60 || nationRaw.length > 60) return json({ error: "City and nation can be at most 60 characters." }, 400);
-    place_city = cleanPlace(cityRaw);
+    if (nationRaw.length > 60) return json({ error: "Nation can be at most 60 characters." }, 400);
     place_nation = cleanPlace(nationRaw);
-    if (!place_city && !place_nation) return json({ error: "Need a city, a nation, or both." }, 400);
-  } else if (!mc_username || mc_username.length > 32) {
+    if (!place_nation) return json({ error: "Need a nation." }, 400);
+  } else if (!shared && (!mc_username || mc_username.length > 32)) {
     return json({ error: "Need a Minecraft name (max 32 characters)." }, 400);
   }
-  if (!business && discord_username.length > 40) return json({ error: "Discord username is too long (max 40)." }, 400);
+  if (!shared && discord_username.length > 40) return json({ error: "Discord username is too long (max 40)." }, 400);
 
   const { data: created, error } = await admin.auth.admin.createUser({
     email: username + "@civmc.local", password, email_confirm: true,
@@ -72,15 +71,16 @@ Deno.serve(async (req) => {
   const { error: pErr } = await admin.from("profiles").insert({
     id: created.user.id,
     username,
-    mc_username: business ? null : mc_username,
-    discord_username: business ? null : (discord_username.slice(0, 40) || null),
+    mc_username: shared ? null : mc_username,
+    discord_username: shared ? null : (discord_username.slice(0, 40) || null),
     is_mod: role === "mod",
     is_admin: role === "admin",
     is_business: business,
-    place_city,
+    is_nation: nation,
+    place_city: null,
     place_nation,
     verified_at: new Date().toISOString(),
-    must_change_password: !business,
+    must_change_password: !shared,
   });
   if (pErr) {
     await admin.auth.admin.deleteUser(created.user.id); // roll back
