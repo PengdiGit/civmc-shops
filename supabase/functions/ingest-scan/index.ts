@@ -19,7 +19,13 @@ const json = (body: unknown, status = 200) =>
 
 const MAX_AGE_MS = 2 * 60 * 1000;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
-const RATE_MAX = 30;
+/** Soft cap per Minecraft player name (spoofable — IP cap is the real brake). */
+const RATE_MAX_PLAYER = 40;
+/** Harder cap per client IP hash. */
+const RATE_MAX_IP = 80;
+/** Reject closest listing if farther than this (blocks). Prevents cross-shop bleed. */
+const MAX_MATCH_DIST = 48;
+const LOG_PRUNE_HOURS = 24;
 
 type ScanBody = {
   time?: string;
@@ -80,6 +86,10 @@ function normText(s: unknown): string {
   return String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function normNl(s: unknown): string {
+  return String(s ?? "").trim().toLowerCase();
+}
+
 function enchantKey(s: unknown): string {
   return normText(s)
     .split(",")
@@ -92,6 +102,15 @@ function enchantKey(s: unknown): string {
 function liveMode(): boolean {
   const v = String(Deno.env.get("AUTO_STOCK_LIVE") ?? "true").trim().toLowerCase();
   return !(v === "0" || v === "false" || v === "no");
+}
+
+function asInt(n: unknown): number | null {
+  if (typeof n === "number" && Number.isFinite(n)) return Math.trunc(n);
+  if (typeof n === "string" && n.trim() !== "") {
+    const v = Number(n);
+    if (Number.isFinite(v)) return Math.trunc(v);
+  }
+  return null;
 }
 
 async function hashIp(ip: string): Promise<string> {
@@ -131,50 +150,60 @@ Deno.serve(async (req) => {
 
   const player = String(body.player || "").trim();
   const nl = String(body.nl || "").trim();
-  const stock = body.stock;
-  const blockX = body.block_x;
-  const blockZ = body.block_z;
-  const inAmt = body.input_amount;
+  const stock = asInt(body.stock);
+  const blockX = asInt(body.block_x);
+  const blockZ = asInt(body.block_z);
+  const inAmt = asInt(body.input_amount);
   const inItem = normItem(body.input_item);
   const inUnit = normUnit(body.input_unit);
-  const outAmt = body.output_amount;
+  const outAmt = asInt(body.output_amount);
   const outItem = normItem(body.output_item);
   const outUnit = normUnit(body.output_unit);
   const scanEnchants = enchantKey(body.enchants);
   const scanNotes = normText(body.notes);
 
   if (!player || player.length > 32) return json({ error: "Need player name." }, 400);
+  if (!/^[A-Za-z0-9_]{1,32}$/.test(player)) return json({ error: "Bad player name." }, 400);
   if (!nl || nl.length > 64) return json({ error: "Need nl." }, 400);
-  if (stock == null || !Number.isFinite(stock) || stock < 0 || stock > 1_000_000) {
+  if (stock == null || stock < 0 || stock > 1_000_000) {
     return json({ error: "Need stock >= 0." }, 400);
   }
-  if (blockX == null || blockZ == null || !Number.isFinite(blockX) || !Number.isFinite(blockZ)) {
+  if (blockX == null || blockZ == null) {
     return json({ error: "Need block_x and block_z." }, 400);
   }
-  if (!(inAmt! > 0) || !inItem) return json({ error: "Need input item/amount." }, 400);
-  if (!(outAmt! > 0) || !outItem) return json({ updated: false, reason: "donation_or_no_output" });
-
-  if (body.time) {
-    const t = Date.parse(String(body.time));
-    if (Number.isFinite(t) && Date.now() - t > MAX_AGE_MS) {
-      return json({ updated: false, reason: "scan_too_old" });
-    }
+  if (inAmt == null || !(inAmt > 0) || !inItem) return json({ error: "Need input item/amount." }, 400);
+  if (outAmt == null || !(outAmt > 0) || !outItem) {
+    return json({ updated: false, reason: "donation_or_no_output" });
   }
+
+  if (!body.time) return json({ updated: false, reason: "missing_time" });
+  const t = Date.parse(String(body.time));
+  if (!Number.isFinite(t)) return json({ updated: false, reason: "bad_time" });
+  const age = Date.now() - t;
+  if (age > MAX_AGE_MS) return json({ updated: false, reason: "scan_too_old" });
+  if (age < -30_000) return json({ updated: false, reason: "scan_from_future" });
 
   const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
     req.headers.get("cf-connecting-ip") || "unknown";
   const ipHash = await hashIp(ip);
   const cutoff = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
-  const { count } = await admin
-    .from("scan_ingest_log")
-    .select("id", { count: "exact", head: true })
-    .eq("player", player)
-    .gte("created_at", cutoff);
-  if ((count || 0) >= RATE_MAX) {
+
+  const [{ count: playerCount }, { count: ipCount }] = await Promise.all([
+    admin.from("scan_ingest_log").select("id", { count: "exact", head: true })
+      .eq("player", player).gte("created_at", cutoff),
+    admin.from("scan_ingest_log").select("id", { count: "exact", head: true })
+      .eq("ip_hash", ipHash).gte("created_at", cutoff),
+  ]);
+  if ((playerCount || 0) >= RATE_MAX_PLAYER || (ipCount || 0) >= RATE_MAX_IP) {
     return json({ updated: false, reason: "rate_limited" }, 429);
   }
   await admin.from("scan_ingest_log").insert({ player, ip_hash: ipHash });
+  // Best-effort prune so the log cannot grow forever.
+  const pruneBefore = new Date(Date.now() - LOG_PRUNE_HOURS * 3600_000).toISOString();
+  void admin.from("scan_ingest_log").delete().lt("created_at", pruneBefore);
 
+  // Do NOT use PostgREST ilike(nl): `_` and `%` are LIKE wildcards (Civ NL often ends in `_`).
+  // Load opted-in shops and match NL exactly (case-insensitive) in JS.
   const { data: shops, error: sErr } = await admin
     .from("shops")
     .select(
@@ -185,25 +214,27 @@ Deno.serve(async (req) => {
     .eq("timed_out", false)
     .not("x", "is", null)
     .not("z", "is", null)
-    .not("stock_nl", "is", null)
-    .ilike("stock_nl", nl);
+    .not("stock_nl", "is", null);
 
   if (sErr) return json({ error: sErr.message }, 400);
-  const shopRows = (shops || []) as ShopRow[];
+  const nlKey = normNl(nl);
+  const shopRows = ((shops || []) as ShopRow[]).filter((s) => normNl(s.stock_nl) === nlKey);
   if (!shopRows.length) return json({ updated: false, reason: "no_shops_for_nl", dry_run: !liveMode() });
 
-  type Cand = { listing: ListingRow; shop: ShopRow };
+  type Cand = { listing: ListingRow; shop: ShopRow; d2: number };
   let cands: Cand[] = [];
   for (const shop of shopRows) {
     for (const l of shop.listings || []) {
       if (l.timed_out) continue;
       if (normItem(l.want_item) !== inItem) continue;
-      if (l.want_amount !== inAmt) continue;
+      if (Number(l.want_amount) !== inAmt) continue;
       if (normUnit(l.want_unit) !== inUnit) continue;
       if (normItem(l.sell_item) !== outItem) continue;
-      if (l.sell_amount !== outAmt) continue;
+      if (Number(l.sell_amount) !== outAmt) continue;
       if (normUnit(l.sell_unit) !== outUnit) continue;
-      cands.push({ listing: l, shop });
+      const c = listingCoords(l, shop);
+      const d2 = c ? dist2(c.x, c.z, blockX, blockZ) : Number.POSITIVE_INFINITY;
+      cands.push({ listing: l, shop, d2 });
     }
   }
 
@@ -218,21 +249,46 @@ Deno.serve(async (req) => {
     if (narrowed.length > 0) cands = narrowed;
   }
 
-  if (cands.length > 1) {
-    cands.sort((a, b) => {
-      const ca = listingCoords(a.listing, a.shop);
-      const cb = listingCoords(b.listing, b.shop);
-      const da = ca ? dist2(ca.x, ca.z, blockX, blockZ) : Number.POSITIVE_INFINITY;
-      const db = cb ? dist2(cb.x, cb.z, blockX, blockZ) : Number.POSITIVE_INFINITY;
-      return da - db || a.listing.id - b.listing.id;
+  cands.sort((a, b) => a.d2 - b.d2 || a.listing.id - b.listing.id);
+
+  const best = cands[0];
+  const maxD2 = MAX_MATCH_DIST * MAX_MATCH_DIST;
+  if (!Number.isFinite(best.d2) || best.d2 > maxD2) {
+    return json({
+      updated: false,
+      reason: "too_far",
+      distance: Number.isFinite(best.d2) ? Math.sqrt(best.d2) : null,
+      max_distance: MAX_MATCH_DIST,
+      dry_run: !liveMode(),
     });
   }
 
-  const pick = cands[0];
-  const listingId = pick.listing.id;
-  const nextStock = Math.floor(Number(stock));
+  // Same distance to two listings → refuse rather than guess (prevents mixed stock).
+  if (cands.length > 1 && cands[1].d2 === best.d2) {
+    return json({
+      updated: false,
+      reason: "ambiguous_match",
+      candidates: cands.filter((c) => c.d2 === best.d2).map((c) => c.listing.id),
+      dry_run: !liveMode(),
+    });
+  }
+
+  const listingId = best.listing.id;
+  const nextStock = stock;
   const in_stock = nextStock > 0;
   const isLive = liveMode();
+
+  if (best.listing.stock === nextStock && !!best.listing.in_stock === in_stock) {
+    return json({
+      updated: false,
+      reason: "same_stock",
+      listing_id: listingId,
+      shop_id: best.shop.id,
+      stock: nextStock,
+      in_stock,
+      dry_run: !isLive,
+    });
+  }
 
   if (!isLive) {
     return json({
@@ -240,10 +296,11 @@ Deno.serve(async (req) => {
       dry_run: true,
       would_update: true,
       listing_id: listingId,
-      shop_id: pick.shop.id,
+      shop_id: best.shop.id,
       stock: nextStock,
       in_stock,
       candidates: cands.length,
+      distance: Math.sqrt(best.d2),
     });
   }
 
@@ -262,8 +319,9 @@ Deno.serve(async (req) => {
     updated: true,
     dry_run: false,
     listing_id: listingId,
-    shop_id: pick.shop.id,
+    shop_id: best.shop.id,
     stock: nextStock,
     in_stock,
+    distance: Math.sqrt(best.d2),
   });
 });
