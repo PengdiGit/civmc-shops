@@ -35,6 +35,12 @@ function PlaceLine($city, $nation) {
   if ($c) { return $c }
   return $n
 }
+function ShopSlugBase([string]$name) {
+  $s = (StripMc $name).ToLower() -replace "[''""`]", "" -replace "[^a-z0-9]+", "-" -replace "^-+|-+$", ""
+  if (-not $s -or $s -eq "index" -or $s -match '^\d+$') { return "" }
+  if ($s.Length -gt 48) { $s = $s.Substring(0, 48) }
+  return $s
+}
 
 function PageHtml($title, $description, $url, $image, $authorName, $redirectUrl) {
   if (-not $redirectUrl) { $redirectUrl = $url }
@@ -90,8 +96,7 @@ function Clean-Landers([string]$dir, [string]$mode) {
   Get-ChildItem $dir -Directory | ForEach-Object {
     $n = $_.Name
     $drop = $false
-    if ($mode -eq "shops" -and $n -match '^\d+$') { $drop = $true }
-    # profiles: drop uuid landers and username landers (regenerated below)
+    if ($mode -eq "shops") { $drop = $true }
     if ($mode -eq "profile" -and ($n -match '^[0-9a-f-]{36}$' -or $n -match '^[a-z0-9_]{3,20}$')) { $drop = $true }
     if ($drop) { Remove-Item $_.FullName -Recurse -Force }
   }
@@ -101,11 +106,26 @@ Clean-Landers (Join-Path $Root "shops") "shops"
 Clean-Landers (Join-Path $Root "profile") "profile"
 
 $shops = SbGet "shops?select=id,name,styled_name,description,city,nation,icon_item,icon_path,x,z,owner_id,archived,is_open,timed_out,profiles!shops_owner_id_fkey(username,mc_username,timed_out)&archived=eq.false&is_open=eq.true&timed_out=eq.false&order=id"
-$shopN = 0
+$visible = @()
 foreach ($s in $shops) {
   $owner = $s.profiles
   if ($owner -is [array]) { $owner = $owner[0] }
   if ($owner -and $owner.timed_out) { continue }
+  $visible += $s
+}
+
+$baseCounts = @{}
+foreach ($s in $visible) {
+  $base = ShopSlugBase $s.name
+  if (-not $base) { $base = "shop-$($s.id)" }
+  if (-not $baseCounts.ContainsKey($base)) { $baseCounts[$base] = 0 }
+  $baseCounts[$base]++
+}
+
+$shopN = 0
+foreach ($s in $visible) {
+  $owner = $s.profiles
+  if ($owner -is [array]) { $owner = $owner[0] }
   $name = StripMc ($(if ($s.styled_name) { $s.styled_name } else { $s.name }))
   if (-not $name) { $name = "Shop" }
   $ownerName = ""
@@ -120,9 +140,12 @@ foreach ($s in $shops) {
   if (-not $desc) { $desc = if ($bits.Count) { $bits -join " | " } else { "CivMC shop on CivMC Shops." } }
   elseif ($bits.Count) { $desc = "$desc | $($bits -join ' | ')" }
   $image = if ($s.icon_path) { StorageUrl $s.icon_path } else { ItemImg $(if ($s.icon_item) { $s.icon_item } else { "chest" }) }
-  $landerUrl = "$Site/shops/$($s.id)/"
+  $base = ShopSlugBase $s.name
+  if (-not $base) { $base = "shop-$($s.id)" }
+  $slug = if ($baseCounts[$base] -gt 1) { "$base-$($s.id)" } else { $base }
+  $landerUrl = "$Site/shops/$([uri]::EscapeDataString($slug))/"
   $spaUrl = "$Site/shops/?id=$($s.id)"
-  $dir = Join-Path $Root "shops\$($s.id)"
+  $dir = Join-Path $Root "shops\$slug"
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
   $html = PageHtml $name $desc.Substring(0, [Math]::Min(300, $desc.Length)) $landerUrl $image $ownerName $spaUrl
   $utf8 = New-Object System.Text.UTF8Encoding $false
@@ -155,7 +178,6 @@ foreach ($p in $profiles) {
   $image = if ($p.avatar_path) { StorageUrl $p.avatar_path } else { "https://minotar.net/avatar/$([uri]::EscapeDataString($(if ($mc) { $mc } else { 'steve' })))/128" }
   $loginKey = $login.Trim().ToLower()
   if ($loginKey -notmatch '^[a-z0-9_]{3,20}$') { continue }
-  # Lander at /profile/{username}/ ; humans redirect into the SPA via ?name=
   $landerUrl = "$Site/profile/$loginKey/"
   $spaUrl = "$Site/profile/?name=$([uri]::EscapeDataString($loginKey))"
   $dir = Join-Path $Root "profile\$loginKey"
@@ -166,4 +188,4 @@ foreach ($p in $profiles) {
   $profN++
 }
 
-Write-Host "Generated OG landers: $shopN shops, $profN profiles"
+Write-Host "Generated OG landers: $shopN shops → shops/{slug}/, $profN profiles → profile/{username}/"

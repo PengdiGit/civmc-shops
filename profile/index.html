@@ -107,7 +107,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=20"></script>
+<script src="../app.js?v=21"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let id = params.get("id");
@@ -467,7 +467,7 @@ async function load() {
         <div class="review">
           <div class="top">
             <span><span class="stars">${starsText(r.rating)}</span>
-              <a href="../shops/?id=${r.shop_id}">${r.shops ? shopName(r.shops) : "shop"}</a>
+              <a href="${r.shops ? shopPath(r.shops) : pageHref("shops", { id: r.shop_id })}">${r.shops ? shopName(r.shops) : "shop"}</a>
               ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
               <span class="meta">\u00b7 ${agoText(r.created_at)}</span></span>
           </div>

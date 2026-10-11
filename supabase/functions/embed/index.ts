@@ -146,11 +146,21 @@ function parseFromPageUrl(page: string) {
   try {
     const u = new URL(page);
     const path = u.pathname.replace(/\/+$/, "") || "/";
-    const shopPath = path.match(/\/shops\/(\d+)$/);
+    const shopPath = path.match(/\/shops\/([^/]+)$/);
     if (shopPath) {
+      const slug = decodeURIComponent(shopPath[1]);
+      if (/^\d+$/.test(slug)) {
+        return {
+          kind: "shop" as const,
+          id: slug,
+          slug: null as string | null,
+          listing: u.searchParams.get("listing"),
+        };
+      }
       return {
         kind: "shop" as const,
-        id: shopPath[1],
+        id: null as string | null,
+        slug,
         listing: u.searchParams.get("listing"),
       };
     }
@@ -158,6 +168,7 @@ function parseFromPageUrl(page: string) {
       return {
         kind: "shop" as const,
         id: u.searchParams.get("id") || u.searchParams.get("shop"),
+        slug: null as string | null,
         listing: u.searchParams.get("listing"),
       };
     }
@@ -205,11 +216,12 @@ function parseTarget(url: URL) {
   const q = url.searchParams;
 
   if (q.get("shop") || (parts[0] === "shop" && parts[1])) {
-    return {
-      kind: "shop" as const,
-      id: q.get("shop") || parts[1],
-      listing: q.get("listing") || (parts[2] === "listing" ? parts[3] : null),
-    };
+    const raw = q.get("shop") || parts[1] || "";
+    const listing = q.get("listing") || (parts[2] === "listing" ? parts[3] : null);
+    if (/^\d+$/.test(raw)) {
+      return { kind: "shop" as const, id: raw, slug: null as string | null, listing };
+    }
+    return { kind: "shop" as const, id: null as string | null, slug: raw.toLowerCase(), listing };
   }
   if (q.get("profile") || q.get("user") || (parts[0] === "profile" && parts[1])) {
     return { kind: "profile" as const, id: q.get("profile") || q.get("user") || parts[1], name: q.get("name") };
@@ -254,7 +266,30 @@ Deno.serve(async (req) => {
     wantOembed ? jsonResponse(oembedJson(e), status) : htmlResponse(e, status);
 
   if (target.kind === "shop") {
-    const id = Number(target.id);
+    let id = Number(target.id);
+    if (!Number.isFinite(id) && target.slug) {
+      const slug = String(target.slug).toLowerCase();
+      const { data: rows } = await admin
+        .from("shops")
+        .select("id, name")
+        .eq("archived", false)
+        .limit(500);
+      const strip = (n: string) =>
+        String(n || "").replace(/[&§][0-9a-fk-or]/gi, "").toLowerCase()
+          .replace(/[''"`]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
+      const list = rows || [];
+      const bases = list.map((s) => ({ s, base: strip(s.name) || ("shop-" + s.id) }));
+      const counts: Record<string, number> = {};
+      for (const { base } of bases) counts[base] = (counts[base] || 0) + 1;
+      let hit = bases.find(({ s, base }) =>
+        (counts[base] > 1 ? base + "-" + s.id : base) === slug
+      );
+      if (!hit) {
+        const m = slug.match(/-(\d+)$/);
+        if (m) hit = bases.find(({ s }) => String(s.id) === m[1]);
+      }
+      if (hit) id = Number(hit.s.id);
+    }
     if (!Number.isFinite(id)) return respond({ ...defaultEmbed(), title: "Shop not found · CivMC Shops" }, 404);
 
     const { data: s } = await admin

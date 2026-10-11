@@ -1,7 +1,7 @@
 /**
  * Generate static Open Graph landing pages next to the SPA routes:
- *   /shops/{id}/     → shop card (name, icon, description, owner) then redirect to /shops/?id=
- *   /profile/{id}/   → profile card then redirect to /profile/?id=
+ *   /shops/{name-slug}/  → shop card then redirect to /shops/?id=
+ *   /profile/{username}/ → profile card then redirect to /profile/?name=
  *
  * Discord/Slack read the static HTML (no JS). Humans get redirected to the app.
  *
@@ -49,6 +49,27 @@ function placeLine(city, nation) {
   const n = (nation || "").trim();
   if (c && n && c.toLowerCase() !== n.toLowerCase()) return c + " / " + n;
   return c || n || "";
+}
+
+function shopSlugBase(name) {
+  let s = stripMc(name).toLowerCase().replace(/[''"`]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!s || s === "index" || /^\d+$/.test(s)) return "";
+  return s.slice(0, 48);
+}
+
+/** Unique name slugs; name clashes get -{id} suffix. */
+function assignShopSlugs(shops) {
+  const bases = (shops || []).map(s => ({
+    s,
+    base: shopSlugBase(s.name) || ("shop-" + s.id),
+  }));
+  const counts = {};
+  for (const { base } of bases) counts[base] = (counts[base] || 0) + 1;
+  const map = new Map();
+  for (const { s, base } of bases) {
+    map.set(s.id, counts[base] > 1 ? base + "-" + s.id : base);
+  }
+  return map;
 }
 
 function pageHtml({ title, description, url, image, authorName, redirectUrl }) {
@@ -112,10 +133,13 @@ async function cleanLanders(dir, mode) {
     const full = join(dir, name);
     const st = await stat(full);
     if (!st.isDirectory()) continue;
-    const drop = mode === "shops"
-      ? /^\d+$/.test(name)
-      : (/^[0-9a-f-]{36}$/i.test(name) || /^[a-z0-9_]{3,20}$/.test(name));
-    if (drop) await rm(full, { recursive: true, force: true });
+    if (mode === "shops") {
+      await rm(full, { recursive: true, force: true });
+      continue;
+    }
+    if (/^[0-9a-f-]{36}$/i.test(name) || /^[a-z0-9_]{3,20}$/.test(name)) {
+      await rm(full, { recursive: true, force: true });
+    }
   }
 }
 
@@ -127,10 +151,17 @@ async function main() {
     "shops?select=id,name,styled_name,description,city,nation,icon_item,icon_path,x,z,owner_id,archived,is_open,timed_out,profiles!shops_owner_id_fkey(username,mc_username,timed_out)&archived=eq.false&is_open=eq.true&timed_out=eq.false&order=id",
   );
 
-  let shopN = 0;
+  const visible = [];
   for (const s of shops || []) {
     const owner = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
     if (owner && owner.timed_out) continue;
+    visible.push(s);
+  }
+  const slugById = assignShopSlugs(visible);
+
+  let shopN = 0;
+  for (const s of visible) {
+    const owner = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
     const name = stripMc(s.styled_name || s.name || "Shop") || "Shop";
     const ownerName = (owner && (owner.username || owner.mc_username)) || "";
     const place = placeLine(s.city, s.nation);
@@ -142,9 +173,10 @@ async function main() {
     if (!desc) desc = bits.join(" | ") || "CivMC shop on CivMC Shops.";
     else if (bits.length) desc = desc + " | " + bits.join(" | ");
     const image = s.icon_path ? storageUrl(s.icon_path) : itemImg(s.icon_item || "chest");
-    const landerUrl = SITE + "/shops/" + s.id + "/";
+    const slug = slugById.get(s.id) || ("shop-" + s.id);
+    const landerUrl = SITE + "/shops/" + encodeURIComponent(slug) + "/";
     const spaUrl = SITE + "/shops/?id=" + s.id;
-    const dir = join(ROOT, "shops", String(s.id));
+    const dir = join(ROOT, "shops", slug);
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, "index.html"), pageHtml({
       title: name,
@@ -200,7 +232,7 @@ async function main() {
     profN++;
   }
 
-  console.log("Generated OG landers: " + shopN + " shops → shops/{id}/, " + profN + " profiles → profile/{id}/");
+  console.log("Generated OG landers: " + shopN + " shops → shops/{slug}/, " + profN + " profiles → profile/{username}/");
 }
 
 main().catch((e) => {

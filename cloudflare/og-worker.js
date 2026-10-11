@@ -30,6 +30,9 @@ function embedUrlFor(requestUrl) {
 
   const path = url.pathname.replace(/\/+$/, "") || "/";
   if (path.endsWith("/shops") || path.includes("/shops/")) {
+    const slug = (path.match(/\/shops\/([^/]+)$/) || [])[1];
+    if (slug && /^\d+$/.test(slug)) embed.searchParams.set("shop", slug);
+    // Name slugs are resolved via the full page URL on the embed function
     const id = url.searchParams.get("id");
     if (id) embed.searchParams.set("shop", id);
     const listing = url.searchParams.get("listing");

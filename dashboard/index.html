@@ -71,7 +71,7 @@
 <script src="../item-picker.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=20"></script>
+<script src="../app.js?v=21"></script>
 <script>
 let me = null;
 let shopsData = {};                 // shop id -> shop (with listings), from the last load
@@ -164,7 +164,7 @@ function paintOwnerAlerts(shops) {
     <a class="small" href="../settings/">Settings</a></div>` +
     ownerAlertList.map((a, i) => `<div class="owner-alert" data-alert="${i}">
       <span class="tag ${kindTag(a.kind)}">${kindLabel(a.kind)}</span>
-      <span class="owner-alert-body"><a href="../shops/?id=${a.shop.id}&listing=${a.listing.id}">${esc(a.shop.name)}</a>
+      <span class="owner-alert-body"><a href="${shopPath(a.shop, { listing: a.listing.id })}">${esc(a.shop.name)}</a>
         \u00b7 ${esc(a.text)}</span>
       <button type="button" class="small" data-act="ignore-alert" data-i="${i}">Ignore</button>
     </div>`).join("");
@@ -785,7 +785,7 @@ async function render(resetShop) {
             <span class="collapse-chevron" aria-hidden="true"></span>
           </button>
           ${shopIcon(s, "card")}
-          <div><a href="../shops/?id=${s.id}" style="color:inherit"><b>${shopName(s)}</b></a>
+          <div><a href="${shopPath(s)}" style="color:inherit"><b>${shopName(s)}</b></a>
             ${saleBadgeHtml(s)}
             ${creator ? "" : '<span class="tag">co-owner</span>'}
             ${s.is_open === false ? '<span class="tag warn">closed - hidden from public</span>' : ""}
@@ -794,7 +794,7 @@ async function render(resetShop) {
             ${dashCoOwnerHtml(s)}</div>
         </div>
         <div class="action-cluster dash-shop-actions">
-          ${iconBtn("external", { tag: "a", title: "Preview shop", attrs: `href="../shops/?id=${s.id}" target="_blank" rel="noopener"` })}
+          ${iconBtn("external", { tag: "a", title: "Preview shop", attrs: `href="${shopPath(s)}" target="_blank" rel="noopener"` })}
           ${iconBtn("check", { title: "Mark all in stock", attrs: 'data-act="mark-all-in"' })}
           ${iconBtn("ban", { title: "Mark all out of stock", attrs: 'data-act="mark-all-out"' })}
           ${stockUndo[s.id] ? iconBtn("undo", { title: "Undo stock change", attrs: 'data-act="undo-stock"' }) : ""}

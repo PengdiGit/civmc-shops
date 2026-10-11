@@ -82,7 +82,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=20"></script>
+<script src="../app.js?v=21"></script>
 <script>
 const msg = document.getElementById("msg");
 const unitSel = document.getElementById("unit");
@@ -448,7 +448,7 @@ function renderItemListings(item) {
     const side = selling ? "sells" : "buys";
     const ench = normalizeListingEnchants(l.enchants);
     const tip = [shopName, side, ench || "no enchants"].filter(Boolean).join(" · ");
-    return `<a class="chip" href="../shops/?id=${esc(String(l.shop_id))}" title="${esc(tip)}">${esc(shopName)} · ${rate != null ? fmtD(rate * k()) + " d" : "—"}</a>`;
+    return `<a class="chip" href="${l.shops ? shopPath(l.shops) : pageHref("shops", { id: l.shop_id })}" title="${esc(tip)}">${esc(shopName)} · ${rate != null ? fmtD(rate * k()) + " d" : "—"}</a>`;
   }).join("");
   box.hidden = false;
   box.innerHTML = `<div class="meta" style="margin:0 0 6px">${rows.length} listing${rows.length === 1 ? "" : "s"} · ${esc(label)}</div>

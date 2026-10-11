@@ -86,14 +86,19 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=20"></script>
+<script src="../app.js?v=21"></script>
 <script>
 const params = new URLSearchParams(location.search);
-// Support both /shops/?id=1 (SPA) and /shops/1/ (share / Discord lander → redirect here)
+// /shops/?id=1 · /shops/1/ · /shops/pfa-exchange/
 let shopId = params.get("id");
-if (!shopId) {
-  const pathId = (location.pathname.match(/\/shops\/(\d+)\/?$/) || [])[1];
-  if (pathId) shopId = pathId;
+let shopSlugParam = null;
+{
+  const pathSlug = (location.pathname.match(/\/shops\/([^/]+)\/?$/) || [])[1];
+  if (pathSlug) {
+    const slug = decodeURIComponent(pathSlug);
+    if (/^\d+$/.test(slug)) shopId = shopId || slug;
+    else shopSlugParam = slug.toLowerCase();
+  }
 }
 const inviteToken = params.get("invite");
 const focusId = params.get("listing");
@@ -290,7 +295,30 @@ async function castTip(listingId, vote) {
   paintListings(isStaff(me), viewerOwnsShop());
 }
 
+let shopSlugPeers = null;
+async function loadShopSlugPeers() {
+  if (shopSlugPeers) return shopSlugPeers;
+  const { data: rows } = await sb.from("shops").select("id, name").eq("archived", false).limit(500);
+  shopSlugPeers = rows || [];
+  return shopSlugPeers;
+}
+
+async function resolveShopIdFromSlug(slug) {
+  if (!slug) return null;
+  if (/^\d+$/.test(slug)) return slug;
+  const m = slug.match(/-(\d+)$/);
+  const list = await loadShopSlugPeers();
+  // Prefer unique name-slug; collision landers use name-id
+  let hit = list.find(s => shopSlug(s, list) === slug);
+  if (!hit) hit = list.find(s => (shopSlugBase(s.name) + "-" + s.id) === slug);
+  if (!hit && m) hit = list.find(s => String(s.id) === m[1]);
+  return hit ? String(hit.id) : null;
+}
+
 async function load() {
+  if (!shopId && shopSlugParam) {
+    shopId = await resolveShopIdFromSlug(shopSlugParam);
+  }
   if (!shopId) { setMsg(msg, "No shop picked.", "err"); return; }
 
   const session = await getSession();
@@ -313,19 +341,19 @@ async function load() {
   }
   shop = s;
   document.title = s.name + " - CivMC Shops";
-  // Pretty share URL in the address bar: /shops/1/ (same link Discord unfurls)
+  const peers = await loadShopSlugPeers();
+  // Pretty share URL in the address bar: /shops/pfa-exchange/
   try {
-    const pretty = "/shops/" + encodeURIComponent(String(s.id)) + "/" +
-      (hlListingId ? "?listing=" + encodeURIComponent(String(hlListingId)) : "");
-    if (location.pathname + location.search !== pretty) {
-      history.replaceState(null, "", (typeof siteBase === "function" ? siteBase() : "") + pretty);
+    const pretty = shopPath(s, hlListingId ? { listing: hlListingId } : null, peers);
+    if ((location.pathname + location.search) !== pretty) {
+      history.replaceState(null, "", pretty);
     }
   } catch (e) {}
   const placePlain = [canonicalPlace(s.city), canonicalPlace(s.nation)].filter(Boolean)
     .filter((v, i, a) => a.findIndex(x => String(x).toLowerCase() === String(v).toLowerCase()) === i)
     .join(" · ");
   const placeBits = [placePlain, s.x != null && s.z != null ? s.x + ", " + s.z : ""].filter(Boolean).join(" · ");
-  const shareUrl = "https://civshops.pengworld.net/shops/" + encodeURIComponent(String(s.id)) + "/";
+  const shareUrl = shopShareUrl(s, null, peers);
   setPageMeta({
     title: s.name + " - CivMC Shops",
     description: (stripCodes(s.description || "") || placeBits || "CivMC shop").replace(/\s+/g, " ").slice(0, 180),
@@ -581,10 +609,9 @@ document.querySelector("main").addEventListener("click", async e => {
     return;
   }
   if (act === "share") {
-    // Always the civshops lander URL (not Supabase). Hard-coded so a stale app.js cache can't break it.
-    const shareUrl = shopId
-      ? ("https://civshops.pengworld.net/shops/" + encodeURIComponent(String(shopId)) + "/" +
-        (hlListingId ? "?listing=" + encodeURIComponent(String(hlListingId)) : ""))
+    const peers = await loadShopSlugPeers();
+    const shareUrl = shop
+      ? shopShareUrl(shop, hlListingId ? { listing: hlListingId } : null, peers)
       : "https://civshops.pengworld.net/shops/";
     const ok = await copyText(shareUrl);
     setMsg(msg, ok ? "Shop link copied." : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");

@@ -221,15 +221,73 @@ function profileShareUrl(p, idFallback) {
   if (id) return SITE_PUBLIC + "/profile/" + encodeURIComponent(String(id)) + "/";
   return SITE_PUBLIC + "/profile/";
 }
+/** URL slug from a shop name: "PFA Exchange" → "pfa-exchange" */
+function shopSlugBase(name) {
+  let s = String(name || "");
+  if (typeof stripCodes === "function") s = stripCodes(s);
+  else s = s.replace(/[&§][0-9a-fk-or]/gi, "");
+  s = s.toLowerCase().replace(/[''"`]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!s || s === "index" || /^\d+$/.test(s)) return "";
+  return s.slice(0, 48);
+}
+/** Pretty slug for a shop row (name-based; falls back to shop-{id}). Pass peers to suffix -{id} on name clashes. */
+function shopSlug(shop, peers) {
+  if (!shop || shop.id == null) return "";
+  const base = shopSlugBase(shop.name) || ("shop-" + shop.id);
+  if (!peers || !peers.length) return base;
+  const clash = peers.some(o =>
+    String(o.id) !== String(shop.id) &&
+    (shopSlugBase(o.name) || ("shop-" + o.id)) === base
+  );
+  return clash ? base + "-" + shop.id : base;
+}
+/** Site-relative shop path: /shops/pfa-exchange/ */
+function shopPath(shop, search, peers) {
+  if (!shop || shop.id == null) return pageHref("shops");
+  let path = siteBase() + "/shops/" + encodeURIComponent(shopSlug(shop, peers)) + "/";
+  if (search != null && search !== "") {
+    if (typeof search === "string") path += search.startsWith("?") ? search : "?" + search;
+    else {
+      const ps = search instanceof URLSearchParams ? search : new URLSearchParams(search);
+      // Never put id in query when using slug path — listing/q/invite still ok
+      ps.delete("id");
+      const str = ps.toString();
+      if (str) path += "?" + str;
+    }
+  }
+  return path;
+}
+function shopShareUrl(shop, search, peers) {
+  if (!shop || shop.id == null) return SITE_PUBLIC + "/shops/";
+  let url = SITE_PUBLIC + "/shops/" + encodeURIComponent(shopSlug(shop, peers)) + "/";
+  if (search && typeof search === "object") {
+    const ps = new URLSearchParams(search);
+    ps.delete("id");
+    const str = ps.toString();
+    if (str) url += "?" + str;
+  }
+  return url;
+}
 /**
  * Shareable URL on civshops.pengworld.net.
- * Shops: /shops/{id}/ · Profiles: /profile/{username}/
- * params: { shop, listing, profile, name, username, item, enchant, q, mode }
+ * Shops: /shops/{name-slug}/ · Profiles: /profile/{username}/
+ * params: { shop, shopName, listing, profile, name, username, item, enchant, q, mode }
  */
 function embedHref(params) {
   const p = params || {};
+  if (p.shop != null && p.shop !== "" && typeof p.shop === "object") {
+    return shopShareUrl(p.shop, p.listing != null ? { listing: p.listing } : null);
+  }
+  if (p.shopName || (p.shop != null && p.shop !== "" && isNaN(Number(p.shop)))) {
+    const slug = shopSlugBase(p.shopName || p.shop) || String(p.shop);
+    let url = SITE_PUBLIC + "/shops/" + encodeURIComponent(slug) + "/";
+    if (p.listing != null && p.listing !== "") url += "?listing=" + encodeURIComponent(String(p.listing));
+    return url;
+  }
   if (p.shop != null && p.shop !== "") {
-    let url = SITE_PUBLIC + "/shops/" + encodeURIComponent(String(p.shop)) + "/";
+    // Numeric id fallback (old callers) — prefer name when shopName is passed
+    const slug = shopSlugBase(p.shopName) || ("shop-" + p.shop);
+    let url = SITE_PUBLIC + "/shops/" + encodeURIComponent(slug) + "/";
     if (p.listing != null && p.listing !== "") url += "?listing=" + encodeURIComponent(String(p.listing));
     return url;
   }
@@ -1411,7 +1469,7 @@ function paintCompareTray(pins, opts) {
       <div class="meta">${r != null ? fmtRate(r) : "barter"} \u00b7 ${stockHtml(l)} \u00b7 ${updatedHtml(l.updated_at, { prefix: false })}</div>
       <div class="meta">${place || "-"}${dist}</div>
       <div class="action-cluster" style="margin-top:8px">
-        ${iconBtn("external", { tag: "a", title: "Open shop", attrs: `href="${pageHref("shops", { id: l.shop_id, listing: l.id })}"` })}
+        ${iconBtn("external", { tag: "a", title: "Open shop", attrs: `href="${l.shops ? shopPath(l.shops, { listing: l.id }) : pageHref("shops", { id: l.shop_id, listing: l.id })}"` })}
         ${s.x != null && s.z != null ? iconBtn("map", { tag: "a", title: "Open on map", attrs: `href="${esc(mapUrl(s.x, s.z))}" target="_blank" rel="noopener"` }) : ""}
         ${iconBtn("x", { title: "Remove from compare", attrs: `data-unpin="${i}"` })}
       </div>
@@ -1621,7 +1679,7 @@ function shopCardHtml(s, opts) {
   const where = (place || (s.x != null && s.z != null ? coordsHtml(s.x, s.z) : "no location")) + (o.distText || "");
   const owner = cardOwnersHtml(s, o.ownerId);
   const sale = saleBadgeHtml(s);
-  return `<div class="card shop-card" data-href="${pageHref("shops", { id: s.id })}">
+  return `<div class="card shop-card" data-href="${shopPath(s)}">
     <div class="cardrow">${shopIcon(s, "card")}<div class="grow">
       <div class="title">${shopName(s)}${sale ? " " + sale : ""}</div>
       <div class="meta meta-line">${ratingHtml(s.reviews)} \u00b7 ${n} listing${n === 1 ? "" : "s"}${honesty ? " \u00b7 " + honesty : ""}</div>
