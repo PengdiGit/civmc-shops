@@ -2277,6 +2277,12 @@ svg.chart text { fill: var(--dim); font-size: 11px; font-family: system-ui, sans
   margin-right: 5px; vertical-align: -1px;
 }
 .rangebtns button.on { background: var(--accent); color: #12150f; border-color: var(--accent); font-weight: 600; }
+.market-enchant-modes { margin: 8px 0 4px; align-items: center; }
+.market-enchant-modes > .meta { margin-right: 2px; }
+.market-item-listings { margin: 8px 0 4px; }
+.market-listing-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.market-listing-chips .chip { text-decoration: none; }
+.market-listing-chips .chip:hover { border-color: var(--accent); }
 
 /* ---- compare tray ---- */
 .compare-tray {

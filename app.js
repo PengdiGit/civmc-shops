@@ -364,6 +364,221 @@ function parseEnchantTokens(raw) {
     .filter(Boolean);
 }
 
+// ---- market enchant modes (item detail filters on market.html)
+// Matching: listing must include every required enchant (name + level as used on site)
+// and none of the forbidden ones. Extra non-forbidden enchants are OK.
+const _ENCHANT_ROMAN = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10 };
+
+/** Parse "Protection IV" / "protection 4" / "Silk Touch" → { name, level }. */
+function parseEnchantEntry(token) {
+  const t = String(token || "").trim().replace(/\s+/g, " ");
+  if (!t) return null;
+  const m = t.match(/^(.*?)(?:\s+(?:([ivxlcdm]+)|(\d+)))$/i);
+  if (m) {
+    const name = m[1].trim().toLowerCase();
+    if (!name) return null;
+    let level = 1;
+    if (m[3]) level = parseInt(m[3], 10) || 1;
+    else if (m[2]) level = _ENCHANT_ROMAN[m[2].toLowerCase()] || 1;
+    return { name, level };
+  }
+  return { name: t.toLowerCase(), level: 1 };
+}
+
+/** Map of enchant name (lower) → max level found on the listing. */
+function listingEnchantMap(listing) {
+  const map = new Map();
+  parseEnchantTokens(listing && listing.enchants).forEach(tok => {
+    const e = parseEnchantEntry(tok);
+    if (!e) return;
+    const prev = map.get(e.name) || 0;
+    if (e.level >= prev) map.set(e.name, e.level);
+  });
+  return map;
+}
+
+function listingHasEnchant(map, name, minLevel) {
+  const lv = map.get(String(name).toLowerCase());
+  if (lv == null) return false;
+  return minLevel == null || minLevel <= 1 ? true : lv >= minLevel;
+}
+
+function listingHasAnyEnchant(map, names) {
+  return (names || []).some(n => map.has(String(n).toLowerCase()));
+}
+
+/**
+ * Build a mode matcher from required [{name, level?}] and forbidden name list.
+ * required levels use site-typical max (Protection IV, Unbreaking III, …).
+ */
+function makeEnchantMode(id, label, required, forbidden) {
+  const req = (required || []).map(r =>
+    typeof r === "string" ? { name: r.toLowerCase(), level: 1 } : { name: String(r.name).toLowerCase(), level: r.level || 1 }
+  );
+  const forbid = (forbidden || []).map(n => String(n).toLowerCase());
+  return {
+    id,
+    label,
+    required: req,
+    forbidden: forbid,
+    match(listing) {
+      const map = listingEnchantMap(listing);
+      if (!req.every(r => listingHasEnchant(map, r.name, r.level))) return false;
+      if (listingHasAnyEnchant(map, forbid)) return false;
+      return true;
+    }
+  };
+}
+
+function plainEnchantMode() {
+  return {
+    id: "plain",
+    label: "Unenchanted",
+    required: [],
+    forbidden: [],
+    match(listing) {
+      return !normalizeListingEnchants(listing && listing.enchants);
+    }
+  };
+}
+
+function itemEnchantKind(itemName) {
+  const n = String(itemName || "").toLowerCase().trim();
+  if (!n || !isEnchantableItem(n)) return null;
+  if (/\bhelmet\b/.test(n) || n === "turtle shell") return "helmet";
+  if (/\bchestplate\b/.test(n)) return "chestplate";
+  if (/\bleggings\b/.test(n)) return "leggings";
+  if (/\bboots\b/.test(n)) return "boots";
+  if (/\bsword\b/.test(n)) return "sword";
+  if (/\bpickaxe\b/.test(n)) return "pickaxe";
+  if (/\bshovel\b/.test(n)) return "shovel";
+  if (/\bhoe\b/.test(n)) return "hoe";
+  if (/\baxe\b/.test(n)) return "axe"; // after pickaxe
+  if (n === "bow") return "bow";
+  if (n === "crossbow") return "crossbow";
+  if (n === "trident") return "trident";
+  if (n === "mace") return "mace";
+  if (n === "shield") return "shield";
+  if (n === "elytra") return "elytra";
+  if (n === "fishing rod") return "fishing_rod";
+  if (n === "shears") return "shears";
+  if (n === "enchanted book" || n === "book") return "book";
+  return "other";
+}
+
+/**
+ * Enchant filter modes for a market item page.
+ * Returns [{ id, label, match(listing) }, ...] — first is Unenchanted (default).
+ *
+ * Expected max sets (CivMC / site labels; "everything but X" = required max minus exclusions):
+ * - Helmet: Prot IV, Unb III, Respiration III, Aqua Affinity — no Mending, no Thorns
+ * - Chestplate: Prot IV, Unb III — no Mending, no Thorns
+ * - Leggings: Prot IV, Unb III — no Mending, no Thorns, no Swift Sneak
+ * - Boots: Prot IV, Unb III, Feather Falling IV, Depth Strider III — no Mending/Thorns/Frost Walker/Soul Speed
+ * - Sword: Sharp V, Unb III, Looting III, Sweeping Edge III, Fire Aspect II — no Mending; KB mode adds Knockback II
+ * - Pickaxe: Eff V + Unb III + Silk|Fortune III; debris = Eff III + Unb III (+ silk/fortune variants)
+ * - Shovel/Axe: Eff V + Unb III + silk|fortune|neither; Hoe: Eff V + Unb III + Fortune III
+ * - Else: sensible max without Mending; mace Density vs Breach; crossbow Multishot vs Piercing; etc.
+ */
+function marketEnchantModesForItem(itemName) {
+  const kind = itemEnchantKind(itemName);
+  if (!kind || kind === "book") return []; // books are free-form; no preset modes
+  const modes = [plainEnchantMode()];
+  const noMend = ["mending"];
+  const armorNo = ["mending", "thorns"];
+
+  if (kind === "helmet") {
+    modes.push(makeEnchantMode("max", "Max enchants", [
+      { name: "protection", level: 4 }, { name: "unbreaking", level: 3 },
+      { name: "respiration", level: 3 }, { name: "aqua affinity", level: 1 }
+    ], armorNo));
+  } else if (kind === "chestplate") {
+    modes.push(makeEnchantMode("max", "Max enchants", [
+      { name: "protection", level: 4 }, { name: "unbreaking", level: 3 }
+    ], armorNo));
+  } else if (kind === "leggings") {
+    modes.push(makeEnchantMode("max", "Max enchants", [
+      { name: "protection", level: 4 }, { name: "unbreaking", level: 3 }
+    ], [...armorNo, "swift sneak"]));
+  } else if (kind === "boots") {
+    modes.push(makeEnchantMode("max", "Max enchants", [
+      { name: "protection", level: 4 }, { name: "unbreaking", level: 3 },
+      { name: "feather falling", level: 4 }, { name: "depth strider", level: 3 }
+    ], [...armorNo, "frost walker", "soul speed"]));
+  } else if (kind === "sword") {
+    const swordMax = [
+      { name: "sharpness", level: 5 }, { name: "unbreaking", level: 3 },
+      { name: "looting", level: 3 }, { name: "sweeping edge", level: 3 },
+      { name: "fire aspect", level: 2 }
+    ];
+    modes.push(makeEnchantMode("max", "Max (no KB)", swordMax, [...noMend, "knockback"]));
+    modes.push(makeEnchantMode("kb", "Max + Knockback", [
+      ...swordMax, { name: "knockback", level: 2 }
+    ], noMend));
+  } else if (kind === "pickaxe") {
+    const tools = [{ name: "efficiency", level: 5 }, { name: "unbreaking", level: 3 }];
+    modes.push(makeEnchantMode("silk", "Silk Touch", [...tools, { name: "silk touch", level: 1 }], [...noMend, "fortune"]));
+    modes.push(makeEnchantMode("fortune", "Fortune", [...tools, { name: "fortune", level: 3 }], [...noMend, "silk touch"]));
+    const debris = [{ name: "efficiency", level: 3 }, { name: "unbreaking", level: 3 }];
+    modes.push(makeEnchantMode("debris", "Debris miner", debris, [...noMend, "fortune", "silk touch"]));
+    modes.push(makeEnchantMode("debris_silk", "Debris + Silk", [...debris, { name: "silk touch", level: 1 }], [...noMend, "fortune"]));
+    modes.push(makeEnchantMode("debris_fortune", "Debris + Fortune", [...debris, { name: "fortune", level: 3 }], [...noMend, "silk touch"]));
+  } else if (kind === "shovel") {
+    const tools = [{ name: "efficiency", level: 5 }, { name: "unbreaking", level: 3 }];
+    modes.push(makeEnchantMode("max", "Max (no silk/fortune)", tools, [...noMend, "silk touch", "fortune"]));
+    modes.push(makeEnchantMode("silk", "Silk Touch", [...tools, { name: "silk touch", level: 1 }], [...noMend, "fortune"]));
+    modes.push(makeEnchantMode("fortune", "Fortune", [...tools, { name: "fortune", level: 3 }], [...noMend, "silk touch"]));
+  } else if (kind === "hoe") {
+    modes.push(makeEnchantMode("fortune", "Max + Fortune", [
+      { name: "efficiency", level: 5 }, { name: "unbreaking", level: 3 }, { name: "fortune", level: 3 }
+    ], noMend));
+  } else if (kind === "axe") {
+    const tools = [{ name: "efficiency", level: 5 }, { name: "unbreaking", level: 3 }];
+    modes.push(makeEnchantMode("silk", "Silk Touch", [...tools, { name: "silk touch", level: 1 }], [...noMend, "fortune"]));
+    modes.push(makeEnchantMode("fortune", "Fortune", [...tools, { name: "fortune", level: 3 }], [...noMend, "silk touch"]));
+  } else if (kind === "bow") {
+    modes.push(makeEnchantMode("max", "Max enchants", [
+      { name: "power", level: 5 }, { name: "unbreaking", level: 3 },
+      { name: "punch", level: 2 }, { name: "flame", level: 1 }, { name: "infinity", level: 1 }
+    ], noMend));
+  } else if (kind === "crossbow") {
+    const base = [{ name: "quick charge", level: 3 }, { name: "unbreaking", level: 3 }];
+    modes.push(makeEnchantMode("multishot", "Multishot", [...base, { name: "multishot", level: 1 }], [...noMend, "piercing"]));
+    modes.push(makeEnchantMode("piercing", "Piercing", [...base, { name: "piercing", level: 4 }], [...noMend, "multishot"]));
+  } else if (kind === "trident") {
+    const base = [{ name: "impaling", level: 5 }, { name: "unbreaking", level: 3 }];
+    modes.push(makeEnchantMode("loyalty", "Loyalty", [
+      ...base, { name: "loyalty", level: 3 }, { name: "channeling", level: 1 }
+    ], [...noMend, "riptide"]));
+    modes.push(makeEnchantMode("riptide", "Riptide", [...base, { name: "riptide", level: 3 }], [...noMend, "loyalty", "channeling"]));
+  } else if (kind === "mace") {
+    const base = [{ name: "unbreaking", level: 3 }, { name: "wind burst", level: 3 }];
+    modes.push(makeEnchantMode("density", "Density", [...base, { name: "density", level: 5 }], [...noMend, "breach"]));
+    modes.push(makeEnchantMode("breach", "Breach", [...base, { name: "breach", level: 4 }], [...noMend, "density"]));
+  } else if (kind === "elytra" || kind === "shield") {
+    modes.push(makeEnchantMode("max", "Max enchants", [{ name: "unbreaking", level: 3 }], noMend));
+  } else if (kind === "fishing_rod") {
+    modes.push(makeEnchantMode("max", "Max enchants", [
+      { name: "luck of the sea", level: 3 }, { name: "lure", level: 3 }, { name: "unbreaking", level: 3 }
+    ], noMend));
+  } else if (kind === "shears") {
+    modes.push(makeEnchantMode("max", "Max enchants", [
+      { name: "efficiency", level: 5 }, { name: "unbreaking", level: 3 }
+    ], noMend));
+  } else {
+    // Generic enchantable leftovers (brush, flint and steel, …): Unbreaking III, no Mending
+    modes.push(makeEnchantMode("max", "Max enchants", [{ name: "unbreaking", level: 3 }], noMend));
+  }
+  return modes;
+}
+
+/** True if listing.enchants matches the given mode object (from marketEnchantModesForItem). */
+function listingMatchesEnchantMode(listing, mode) {
+  if (!mode) return true;
+  if (typeof mode.match === "function") return !!mode.match(listing);
+  return true;
+}
+
 /** Common Minecraft enchant names (base + frequent levels) so Find has options even on an empty DB. */
 const COMMON_MC_ENCHANTS = [
   "Aqua Affinity", "Bane of Arthropods", "Bane of Arthropods V", "Binding Curse", "Blast Protection",
@@ -2138,6 +2353,8 @@ function computeMarketNow(listings, shops, profiles, placeFilter) {
   };
   for (const l of listings || []) {
     if (!(l.in_stock && !l.timed_out && shopOk[String(l.shop_id)])) continue;
+    // Match market_now(): skip bundle sell/want (incl. colored "red bundle")
+    if (isBundleItem(l.sell_item) || isBundleItem(l.want_item)) continue;
     if (CURRENCY[l.want_item] != null && CURRENCY[l.sell_item] == null)
       push(l.sell_item, "sell", l.shop_id, rawCount(l.want_amount, l.want_unit) * CURRENCY[l.want_item] / rawCount(l.sell_amount, l.sell_unit));
     if (CURRENCY[l.sell_item] != null && CURRENCY[l.want_item] == null)
