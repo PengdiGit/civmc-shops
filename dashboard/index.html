@@ -87,7 +87,7 @@ const msg = document.getElementById("msg");
 
 /** Head-admin-only gate for auto-stock opt-in UI (DB trigger also enforces is_head). */
 function autoStockUi() {
-  return typeof AUTO_STOCK_UI !== "undefined" && !!AUTO_STOCK_UI && !!(me && me.is_head);
+  return typeof AUTO_STOCK_UI !== "undefined" && !!AUTO_STOCK_UI && !!(me && me.profile && me.profile.is_head);
 }
 
 function markDashDirty() { dashDirty = true; }
