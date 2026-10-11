@@ -85,6 +85,11 @@ let myNotifications = [];
 let dashDirty = false;              // unsaved listing / shop-detail edits
 const msg = document.getElementById("msg");
 
+/** Head-admin-only gate for auto-stock opt-in UI (DB trigger also enforces is_head). */
+function autoStockUi() {
+  return typeof AUTO_STOCK_UI !== "undefined" && !!AUTO_STOCK_UI && !!(me && me.is_head);
+}
+
 function markDashDirty() { dashDirty = true; }
 function clearDashDirty() { dashDirty = false; }
 async function confirmLeaveDash() {
@@ -330,6 +335,17 @@ function panelHtml(s) {
       <div><label>X</label><input type="number" class="p-x" value="${s.x ?? ""}" style="width:90px"></div>
       <div><label>Z</label><input type="number" class="p-z" value="${s.z ?? ""}" style="width:90px"></div>
     </div>
+    ${autoStockUi() ? `
+    <div class="dash-auto-stock" style="margin-top:10px">
+      <label class="find-filter-check" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" class="p-auto-stock" ${s.auto_stock_enabled ? "checked" : ""}>
+        Auto stock updates (CivMC Shop Scan mod)
+      </label>
+      <label style="display:block;margin-top:6px">Stock NameLayer group
+        <input type="text" class="p-stock-nl" maxlength="64" value="${esc(s.stock_nl || "")}" placeholder="e.g. Pengdi_" style="width:100%;max-width:280px">
+      </label>
+      <p class="meta" style="margin:4px 0 0">Head admin only for now. Reinforce exchanges on this NL with public info. Needs shop X/Z. Crowd-sourced stock from the mod.</p>
+    </div>` : ""}
 
     <label>Fancy name (optional). Minecraft colour codes: <b>&amp;6</b> gold, <b>&amp;l</b> bold, <b>&amp;r</b> reset...</label>
     <div class="palette">${paletteHtml()}</div>
@@ -413,7 +429,19 @@ function listingFieldsFromRow(root, shop) {
     enchants: canEnchant ? normalizeListingEnchants(root.querySelector(".dash-enchants")?.value || "") : null,
     notes: normalizeListingNotes(root.querySelector(".dash-notes")?.value || ""),
     bundle_contents: canBundle ? bundle_contents : null,
-    alt_wants: readAltWantsFromRow(root)
+    alt_wants: readAltWantsFromRow(root),
+    x: (() => {
+      const el = root.querySelector(".dash-lx");
+      if (!el || el.value === "") return null;
+      const n = parseInt(el.value, 10);
+      return Number.isFinite(n) ? n : null;
+    })(),
+    z: (() => {
+      const el = root.querySelector(".dash-lz");
+      if (!el || el.value === "") return null;
+      const n = parseInt(el.value, 10);
+      return Number.isFinite(n) ? n : null;
+    })()
   };
 }
 
@@ -426,7 +454,7 @@ function listingAltKey(v) {
 }
 
 function listingRowMatchesFields(l, f) {
-  return l.want_amount === f.wa && l.sell_amount === f.sa
+  let ok = l.want_amount === f.wa && l.sell_amount === f.sa
     && (l.want_unit || "") === f.wu && (l.sell_unit || "") === f.su
     && l.want_item === f.wi && l.sell_item === f.si
     && (l.stock ?? null) === (f.stock ?? null)
@@ -436,6 +464,10 @@ function listingRowMatchesFields(l, f) {
     && (normalizeListingNotes(l.notes) || null) === (f.notes || null)
     && listingBundleKey(l.bundle_contents) === listingBundleKey(f.bundle_contents)
     && listingAltKey(l.alt_wants) === listingAltKey(f.alt_wants);
+  if (autoStockUi()) {
+    ok = ok && (l.x ?? null) === (f.x ?? null) && (l.z ?? null) === (f.z ?? null);
+  }
+  return ok;
 }
 
 async function commitListingRow(root, shop, shopId) {
@@ -451,14 +483,19 @@ async function commitListingRow(root, shop, shopId) {
   if (!await dupOk(shop, f, lid, "Save")) return { ok: false };
   if (!await marketPriceWarnOk(f)) return { ok: false };
   const in_stock = inStockFromStock(f.stock);
-  const res = await sb.from("listings").update({
+  const patch = {
     sell_item: f.si, sell_amount: f.sa, sell_unit: f.su,
     want_item: f.wi, want_amount: f.wa, want_unit: f.wu,
     stock: f.stock, in_stock, group_name: f.group_name,
     enchants: f.enchants, notes: f.notes, bundle_contents: f.bundle_contents,
     alt_wants: f.alt_wants,
     updated_at: new Date().toISOString()
-  }).eq("id", lid);
+  };
+  if (autoStockUi()) {
+    patch.x = f.x;
+    patch.z = f.z;
+  }
+  const res = await sb.from("listings").update(patch).eq("id", lid);
   if (res.error) {
     setMsg(msg, res.error.message, "err");
     return { ok: false };
@@ -470,6 +507,10 @@ async function commitListingRow(root, shop, shopId) {
     enchants: f.enchants, notes: f.notes, bundle_contents: f.bundle_contents,
     alt_wants: f.alt_wants
   });
+  if (autoStockUi()) {
+    src.x = f.x;
+    src.z = f.z;
+  }
   return { ok: true };
 }
 
@@ -544,6 +585,13 @@ function dashListingRow(l) {
       <label class="dash-stock-label meta">Stock left</label>
       <input type="number" min="0" class="dash-stock-amt" placeholder="\u221e" value="${stockVal}" title="Exchanges left (blank = unlimited)">
       <span class="meta dash-stock-hint">blank = unlimited</span>
+      ${autoStockUi() ? `
+      <label class="meta" style="margin-top:8px;display:block">Listing X
+        <input type="number" class="dash-lx" value="${l.x ?? ""}" placeholder="shop" style="width:72px" title="Optional; blank = shop X">
+      </label>
+      <label class="meta" style="display:block">Listing Z
+        <input type="number" class="dash-lz" value="${l.z ?? ""}" placeholder="shop" style="width:72px" title="Optional; blank = shop Z">
+      </label>` : ""}
     </div>
   </div>`;
 }
@@ -1618,6 +1666,20 @@ document.getElementById("shops").addEventListener("click", async e => {
     const name = panel.querySelector(".p-name").value.trim();
     if (!name) { setMsg(msg, "The shop needs a plain name.", "err"); return; }
     const x = panel.querySelector(".p-x").value, z = panel.querySelector(".p-z").value;
+    const shopX = x === "" ? null : parseInt(x, 10);
+    const shopZ = z === "" ? null : parseInt(z, 10);
+    let auto_stock_enabled = !!shop.auto_stock_enabled;
+    let stock_nl = shop.stock_nl || null;
+    if (autoStockUi()) {
+      const nlEl = panel.querySelector(".p-stock-nl");
+      const autoEl = panel.querySelector(".p-auto-stock");
+      stock_nl = (nlEl && nlEl.value.trim()) || null;
+      auto_stock_enabled = !!(autoEl && autoEl.checked);
+      if (auto_stock_enabled && (shopX == null || shopZ == null || Number.isNaN(shopX) || Number.isNaN(shopZ) || !stock_nl)) {
+        setMsg(msg, "Auto stock needs shop X/Z and a Stock NameLayer group.", "err");
+        return;
+      }
+    }
     let icon_path = panel.dataset.removePic ? null : shop.icon_path;
     const file = panel.querySelector(".p-file").files[0];
     btn.disabled = true;
@@ -1627,16 +1689,21 @@ document.getElementById("shops").addEventListener("click", async e => {
       if (!up.ok) { setMsg(msg, up.message, "err"); btn.disabled = false; return; }
       icon_path = up.path;
     }
-    const r = await sb.from("shops").update({
+    const shopPatch = {
       name,
       city: panel.querySelector(".p-city").value.trim() || null,
       nation: panel.querySelector(".p-nation").value.trim() || null,
-      x: x === "" ? null : parseInt(x), z: z === "" ? null : parseInt(z),
+      x: shopX, z: shopZ,
       styled_name: panel.querySelector(".p-styled").value.trim() || null,
       description: panel.querySelector(".p-desc").value.trim() || null,
       find_note: panel.querySelector(".p-find").value.trim() || null,
       icon_item: panel.dataset.iconItem || null, icon_path
-    }).eq("id", shopId);
+    };
+    if (autoStockUi()) {
+      shopPatch.auto_stock_enabled = auto_stock_enabled;
+      shopPatch.stock_nl = stock_nl;
+    }
+    const r = await sb.from("shops").update(shopPatch).eq("id", shopId);
     btn.disabled = false;
     if (r.error) { setMsg(msg, r.error.message, "err"); return; }
     if (shop.icon_path && shop.icon_path !== icon_path) sb.storage.from("uploads").remove([shop.icon_path]);
