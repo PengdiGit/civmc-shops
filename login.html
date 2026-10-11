@@ -3,60 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Log in - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=7">
-</head>
-<body class="auth-page">
-<nav id="nav"></nav>
-<main>
-  <div class="auth-wrap">
-    <span class="page-eyebrow">Account</span>
-    <h1>Log in</h1>
-    <p class="sub">No account yet? <a id="signup-link" href="signup.html">Sign up</a>.</p>
-
-    <form class="stack" id="form">
-      <label for="u">Username</label>
-      <input id="u" type="text" autocomplete="username" required>
-      <label for="p">Password</label>
-      <input id="p" type="password" autocomplete="current-password" required>
-      <div class="msg" id="msg"></div>
-      <button class="primary" type="submit">Log in</button>
-    </form>
-  </div>
-</main>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
-<script src="mock.js"></script>
-<script src="app.js?v=12"></script>
+<title>Redirecting...</title>
+<link rel="canonical" href="login/">
+<meta http-equiv="refresh" content="0;url=login/">
 <script>
-if (location.search.includes("timedout")) {
-  setMsg(document.getElementById("msg"), "You were logged out. If your account was timed out, ask a mod or admin.", "err");
-}
 (function () {
-  const q = new URLSearchParams(location.search);
-  const safe = safeAuthReturn(q.get("next") || q.get("return") || q.get("redirect"));
-  if (safe) {
-    const a = document.getElementById("signup-link");
-    if (a) a.href = "signup.html?next=" + encodeURIComponent(safe);
-  }
+  var dest = "login/";
+  location.replace(dest + location.search + location.hash);
 })();
-getSession().then(s => { if (s) goPostAuth(); });
-
-document.getElementById("form").addEventListener("submit", async e => {
-  e.preventDefault();
-  const msg = document.getElementById("msg");
-  setMsg(msg, "Logging in...");
-  const username = document.getElementById("u").value.trim().toLowerCase();
-  const password = document.getElementById("p").value;
-  const { error } = await sb.auth.signInWithPassword({ email: username + FAKE_DOMAIN, password });
-  if (error) {
-    const banned = /banned/i.test(error.message);
-    setMsg(msg, banned ? "This account is timed out. Ask a mod or admin." : "Wrong username or password.", "err");
-    return;
-  }
-  goPostAuth();
-});
 </script>
+</head>
+<body>
+<p><a href="login/">Continue</a></p>
 </body>
 </html>

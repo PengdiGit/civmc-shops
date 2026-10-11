@@ -3,117 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Settings - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=8">
-</head>
-<body class="settings-page">
-<nav id="nav"></nav>
-<main>
-  <header class="page-hero settings-hero">
-    <div class="settings-hero-copy">
-      <span class="page-eyebrow">Account</span>
-      <h1>Settings</h1>
-      <p class="sub">Theme, password, and owner alerts.</p>
-    </div>
-    <button type="button" class="primary" id="save" hidden>Save settings</button>
-  </header>
-  <div class="msg" id="msg"></div>
-
-  <div class="panel settings-panel">
-    <h2 style="margin-top:0">Appearance</h2>
-    <label class="settings-toggle">
-      <span>Colour mode</span>
-    </label>
-    <div class="row theme-picker" style="margin-top:8px;gap:8px;flex-wrap:wrap">
-      <button type="button" class="small" data-theme-pick="dark" data-ico="moon" id="theme-dark">Dark</button>
-      <button type="button" class="small" data-theme-pick="light" data-ico="sun" id="theme-light">Light</button>
-    </div>
-  </div>
-
-  <div class="panel settings-panel" id="pw-panel" hidden>
-    <h2 style="margin-top:0">Change password</h2>
-    <p class="meta" style="margin-top:0">Use at least 8 characters.</p>
-    <div class="row" style="flex-wrap:wrap">
-      <input type="password" id="pw" placeholder="New password (8+ characters)" autocomplete="new-password">
-      <button id="savepw">Change password</button>
-    </div>
-  </div>
-
-  <div class="panel settings-panel" id="panel" hidden>
-    <h2 style="margin-top:0">Owner alerts</h2>
-    <p class="meta" style="margin-top:0">Warns on My shops for stale listings, prices far above market, and restock needs. Ignore snoozes an alert for 7 days.</p>
-    <label class="settings-toggle">
-      <input type="checkbox" id="alerts-enabled">
-      <span>Enable owner alerts on My shops</span>
-    </label>
-    <p class="meta" id="alerts-hint"></p>
-  </div>
-</main>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
-<script src="mock.js"></script>
-<script src="app.js?v=12"></script>
+<title>Redirecting...</title>
+<link rel="canonical" href="settings/">
+<meta http-equiv="refresh" content="0;url=settings/">
 <script>
-const msg = document.getElementById("msg");
-let me = null;
-
-function syncThemeUi() {
-  const t = getTheme();
-  document.querySelectorAll("[data-theme-pick]").forEach(btn => {
-    btn.classList.toggle("primary", btn.dataset.themePick === t);
-  });
-}
-
-document.querySelector(".theme-picker").addEventListener("click", e => {
-  const btn = e.target.closest("[data-theme-pick]");
-  if (!btn) return;
-  applyTheme(btn.dataset.themePick);
-  syncThemeUi();
-  setMsg(msg, "Theme updated.", "ok");
-});
-
-async function load() {
-  syncThemeUi();
-  const ctx = await requireLogin();
-  if (!ctx) return;
-  me = ctx.profile;
-  document.getElementById("pw-panel").hidden = false;
-  document.getElementById("panel").hidden = false;
-  document.getElementById("save").hidden = false;
-  const on = alertsEnabled(me);
-  document.getElementById("alerts-enabled").checked = on;
-  document.getElementById("alerts-hint").textContent = on
-    ? "Alerts are on. You'll see them at the top of My shops."
-    : "Alerts are off. Nothing will be flagged on My shops.";
-}
-
-document.getElementById("alerts-enabled").addEventListener("change", () => {
-  const on = document.getElementById("alerts-enabled").checked;
-  document.getElementById("alerts-hint").textContent = on
-    ? "Alerts are on. You'll see them at the top of My shops."
-    : "Alerts are off. Nothing will be flagged on My shops.";
-});
-
-document.getElementById("save").onclick = async () => {
-  const alerts_enabled = !!document.getElementById("alerts-enabled").checked;
-  const { error } = await sb.from("profiles").update({ alerts_enabled }).eq("id", me.id);
-  if (error) { setMsg(msg, error.message, "err"); return; }
-  me.alerts_enabled = alerts_enabled;
-  setMsg(msg, "Alert settings saved.", "ok");
-};
-
-document.getElementById("savepw").onclick = async () => {
-  const pw = document.getElementById("pw").value;
-  if (pw.length < 8) { setMsg(msg, "Use at least 8 characters.", "err"); return; }
-  const { error } = await sb.auth.updateUser({ password: pw });
-  if (error) { setMsg(msg, error.message, "err"); return; }
-  await sb.from("profiles").update({ must_change_password: false }).eq("id", me.id);
-  document.getElementById("pw").value = "";
-  setMsg(msg, "Password changed.", "ok");
-};
-
-load();
+(function () {
+  var dest = "settings/";
+  location.replace(dest + location.search + location.hash);
+})();
 </script>
+</head>
+<body>
+<p><a href="settings/">Continue</a></p>
 </body>
 </html>

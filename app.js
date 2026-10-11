@@ -131,21 +131,71 @@ function pickTimeoutDuration(opts) {
   });
 }
 
+/** Clean folder URLs on GitHub Pages / custom domain (no *.html in the address bar). */
+const PAGE_SLUGS = new Set([
+  "home", "market", "dashboard", "shops", "profile", "favourites",
+  "settings", "moderation", "admin", "login", "signup", "verify"
+]);
+const LEGACY_PAGE = {
+  "index.html": "home",
+  "market.html": "market",
+  "dashboard.html": "dashboard",
+  "shop.html": "shops",
+  "profile.html": "profile",
+  "favourites.html": "favourites",
+  "settings.html": "settings",
+  "mod.html": "moderation",
+  "admin.html": "admin",
+  "login.html": "login",
+  "signup.html": "signup",
+  "verify.html": "verify"
+};
+function siteBase() {
+  const path = location.pathname || "/";
+  if (path === "/civmc-shops" || path.startsWith("/civmc-shops/")) return "/civmc-shops";
+  return "";
+}
+function currentPageSlug() {
+  const parts = (location.pathname || "/").split("/").filter(Boolean);
+  let i = 0;
+  if (parts[0] === "civmc-shops") i = 1;
+  let slug = (parts[i] || "home").toLowerCase();
+  if (slug === "index.html") return "home";
+  if (LEGACY_PAGE[slug]) return LEGACY_PAGE[slug];
+  if (slug.endsWith(".html")) slug = slug.slice(0, -5);
+  return PAGE_SLUGS.has(slug) ? slug : "home";
+}
+/** Build /home/, /shops/?id=1, etc. search: string|URLSearchParams|object; hash optional. */
+function pageHref(slug, search, hash) {
+  const s = String(slug || "home").replace(/^\/+|\/+$/g, "").toLowerCase();
+  let q = "";
+  if (search != null && search !== "") {
+    if (typeof search === "string") q = search.startsWith("?") ? search : "?" + search;
+    else {
+      const ps = search instanceof URLSearchParams ? search : new URLSearchParams(search);
+      const str = ps.toString();
+      q = str ? "?" + str : "";
+    }
+  }
+  let h = "";
+  if (hash != null && hash !== "") h = String(hash).startsWith("#") ? String(hash) : "#" + hash;
+  return siteBase() + "/" + s + "/" + q + h;
+}
 function navPageKey() {
-  const p = (location.pathname.split("/").pop() || "index.html").toLowerCase();
-  if (!p || p === "index.html") return "find";
-  if (p === "market.html") return "market";
+  const slug = currentPageSlug();
+  if (slug === "home") return "find";
+  if (slug === "market") return "market";
   return "";
 }
 const PFA_DISCORD_INVITE = "https://discord.com/invite/cNHvQb567c";
 function brandHtml() {
-  return '<a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">CivShops</span></a>';
+  return `<a class="brand" href="${pageHref("home")}"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">CivShops</span></a>`;
 }
 function navLeftHtml() {
   const k = navPageKey();
   return '<span class="nav-left">' +
-    `<a href="index.html"${k === "find" ? ' class="nav-active" aria-current="page"' : ""}>Find shops</a>` +
-    `<a href="market.html"${k === "market" ? ' class="nav-active" aria-current="page"' : ""}>Market</a>` +
+    `<a href="${pageHref("home")}"${k === "find" ? ' class="nav-active" aria-current="page"' : ""}>Find shops</a>` +
+    `<a href="${pageHref("market")}"${k === "market" ? ' class="nav-active" aria-current="page"' : ""}>Market</a>` +
     "</span>";
 }
 function navDiscordHtml() {
@@ -175,8 +225,8 @@ function navDiscordHtml() {
     '</span>';
   ensureNavChrome();
   paintNavDrawer(`
-    <a class="nav-drawer-link" href="login.html">Log in</a>
-    <a class="nav-drawer-link nav-drawer-primary" href="signup.html">Sign up</a>
+    <a class="nav-drawer-link" href="${pageHref("login")}">Log in</a>
+    <a class="nav-drawer-link nav-drawer-primary" href="${pageHref("signup")}">Sign up</a>
   `);
   wireNavMenu();
 })();
@@ -364,7 +414,7 @@ function parseEnchantTokens(raw) {
     .filter(Boolean);
 }
 
-// ---- market enchant modes (item detail filters on market.html)
+// ---- market enchant modes (item detail filters on /market/)
 // Matching: listing must include every required enchant (name + level as used on site)
 // and none of the forbidden ones. Extra non-forbidden enchants are OK.
 const _ENCHANT_ROMAN = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10 };
@@ -1016,7 +1066,7 @@ function emptyState(text, actionHref, actionLabel) {
 }
 function ownerChip(p, ownerId) {
   if (!p || !ownerId) return '<span class="meta">owner: ?</span>';
-  return `<a class="owner-chip" href="profile.html?id=${esc(ownerId)}">${avatarImg(p, 22)} ${esc(userName(p))}</a>`;
+  return `<a class="owner-chip" href="${pageHref("profile", { id: ownerId })}">${avatarImg(p, 22)} ${esc(userName(p))}</a>`;
 }
 // "Mount Augusta \u00b7 Commonwealth" style place line for cards / meta
 // Soft city/nation aliases (display + filter matching without rewriting DB rows)
@@ -1125,8 +1175,7 @@ function syncCompareStore(pins) {
 }
 function compareShareUrl(pins) {
   const hash = encodeCompareHash(pins);
-  const dir = location.pathname.replace(/[^/]*$/, "");
-  return location.origin + dir + "index.html" + (hash || "");
+  return location.origin + pageHref("home", "", hash || "");
 }
 function mergeCompareSpecs(...lists) {
   const out = [], seen = new Set();
@@ -1181,7 +1230,7 @@ function paintCompareTray(pins, opts) {
       <div class="meta">${r != null ? fmtRate(r) : "barter"} \u00b7 ${stockHtml(l)} \u00b7 ${updatedHtml(l.updated_at, { prefix: false })}</div>
       <div class="meta">${place || "-"}${dist}</div>
       <div class="action-cluster" style="margin-top:8px">
-        ${iconBtn("external", { tag: "a", title: "Open shop", attrs: `href="shop.html?id=${l.shop_id}&listing=${l.id}"` })}
+        ${iconBtn("external", { tag: "a", title: "Open shop", attrs: `href="${pageHref("shops", { id: l.shop_id, listing: l.id })}"` })}
         ${s.x != null && s.z != null ? iconBtn("map", { tag: "a", title: "Open on map", attrs: `href="${esc(mapUrl(s.x, s.z))}" target="_blank" rel="noopener"` }) : ""}
         ${iconBtn("x", { title: "Remove from compare", attrs: `data-unpin="${i}"` })}
       </div>
@@ -1375,7 +1424,7 @@ function compareMarkdown(pins) {
     lines.push(`   - ${l.want_amount}${l.want_unit ? " " + l.want_unit.toUpperCase() : ""} ${l.want_item} → ${l.sell_amount}${l.sell_unit ? " " + l.sell_unit.toUpperCase() : ""} ${l.sell_item}`);
     if (r != null) lines.push(`   - ${fmtRate(r)}`);
     if (s.x != null && s.z != null) lines.push(`   - coords \`${s.x}, ${s.z}\` \u00b7 ${mapUrl(s.x, s.z)}`);
-    lines.push(`   - shop: shop.html?id=${l.shop_id}&listing=${l.id}`);
+    lines.push(`   - shop: ${pageHref("shops", { id: l.shop_id, listing: l.id })}`);
     lines.push("");
   });
   return lines.join("\n").trim();
@@ -1393,7 +1442,7 @@ function shopCardHtml(s, opts) {
     ? ownerChip(s.profiles, s.owner_id || o.ownerId)
     : '<span class="meta">-</span>';
   const sale = saleBadgeHtml(s);
-  return `<div class="card shop-card" data-href="shop.html?id=${s.id}">
+  return `<div class="card shop-card" data-href="${pageHref("shops", { id: s.id })}">
     <div class="cardrow">${shopIcon(s, "card")}<div class="grow">
       <div class="title">${shopName(s)}${sale ? " " + sale : ""}</div>
       <div class="meta meta-line">${ratingHtml(s.reviews)} \u00b7 ${n} listing${n === 1 ? "" : "s"}${honesty ? " \u00b7 " + honesty : ""}</div>
@@ -1471,7 +1520,7 @@ function linkMentions(text) {
   // turn @McName into profile search links (resolved later if we have a map); plain escaped with @Name as link to search
   const escText = esc(text);
   return escText.replace(/@([A-Za-z0-9_]{2,32})/g, (m, name) =>
-    `<a class="mention" href="profile.html?name=${encodeURIComponent(name)}">@${esc(name)}</a>`);
+    `<a class="mention" href="${pageHref("profile", { name })}">@${esc(name)}</a>`);
 }
 async function copyText(text) {
   const value = text == null ? "" : String(text);
@@ -1834,7 +1883,7 @@ async function exitImpersonation() {
   try { restore = JSON.parse(sessionStorage.getItem(IMP_RESTORE_KEY) || "null"); } catch (e) {}
   if (!restore || !restore.access_token) {
     clearImpersonationStorage();
-    location.href = "admin.html";
+    location.href = pageHref("admin");
     return;
   }
   const { error } = await sb.auth.setSession({
@@ -1844,42 +1893,66 @@ async function exitImpersonation() {
   clearImpersonationStorage();
   if (error) {
     await sb.auth.signOut();
-    location.href = "login.html";
+    location.href = pageHref("login");
     return;
   }
-  location.href = "admin.html";
+  location.href = pageHref("admin");
 }
 
-// Post-auth landing: honor ?next= / ?return= / ?redirect= only for safe same-origin *.html pages.
+function slugFromPathname(pathname) {
+  const parts = (pathname || "/").split("/").filter(Boolean);
+  let i = 0;
+  if (parts[0] === "civmc-shops") i = 1;
+  let slug = (parts[i] || "").toLowerCase();
+  if (!slug || slug === "index.html") return "home";
+  if (LEGACY_PAGE[slug]) return LEGACY_PAGE[slug];
+  if (slug.endsWith(".html")) {
+    const mapped = LEGACY_PAGE[slug];
+    if (mapped) return mapped;
+    slug = slug.slice(0, -5);
+  }
+  return PAGE_SLUGS.has(slug) ? slug : null;
+}
+
+// Post-auth landing: honor ?next= / ?return= / ?redirect= for safe same-origin app pages.
 function safeAuthReturn(raw) {
   if (!raw || typeof raw !== "string") return null;
   const s = raw.trim();
-  if (!s || s.startsWith("//") || s.includes("..") || /[\\]/.test(s)) return null;
+  if (!s || s.startsWith("//") || /[\\]/.test(s)) return null;
   try {
     const u = new URL(s, location.href);
     if (u.origin !== location.origin) return null;
-    const file = (u.pathname.split("/").pop() || "").toLowerCase();
-    if (!/^[a-z0-9._-]+\.html$/.test(file)) return null;
-    if (file === "login.html" || file === "signup.html") return null;
-    return file + u.search + u.hash;
+    const base = siteBase();
+    if (base && !(u.pathname === base || u.pathname.startsWith(base + "/"))) return null;
+    if (!base && u.pathname.startsWith("/civmc-shops")) return null;
+    const slug = slugFromPathname(u.pathname);
+    if (!slug || slug === "login" || slug === "signup") return null;
+    return pageHref(slug, u.search, u.hash);
   } catch (e) {
     return null;
   }
 }
-function postAuthDest(fallback = "index.html") {
+function postAuthDest(fallback = "home") {
   const q = new URLSearchParams(location.search);
-  return safeAuthReturn(q.get("next") || q.get("return") || q.get("redirect")) || fallback;
+  return safeAuthReturn(q.get("next") || q.get("return") || q.get("redirect")) || pageHref(fallback || "home");
 }
-function goPostAuth(fallback = "index.html") {
+function goPostAuth(fallback = "home") {
   location.href = postAuthDest(fallback);
 }
 function loginHref(extraParams) {
   const params = new URLSearchParams(extraParams || {});
-  const here = (location.pathname.split("/").pop() || "index.html") + location.search + location.hash;
-  const next = safeAuthReturn(here);
-  if (next && !params.has("next")) params.set("next", next);
-  const qs = params.toString();
-  return qs ? "login.html?" + qs : "login.html";
+  if (params.has("next")) {
+    const n = safeAuthReturn(params.get("next"));
+    if (n) params.set("next", n);
+    else params.delete("next");
+  }
+  if (!params.has("next")) {
+    const slug = currentPageSlug();
+    if (slug !== "login" && slug !== "signup") {
+      params.set("next", pageHref(slug, location.search, location.hash));
+    }
+  }
+  return pageHref("login", params);
 }
 
 async function getSession() {
@@ -1900,7 +1973,7 @@ async function kickTimedOut() {
     return;
   }
   await sb.auth.signOut();
-  location.href = "login.html?timedout=1";
+  location.href = pageHref("login", { timedout: "1" });
 }
 
 // need = "admin" | "head" | "staff" | null.  returns {session, profile} or redirects
@@ -1914,7 +1987,7 @@ async function requireLogin(need = null) {
     (need === "head" && profile && profile.is_head && !stillTimedOut(profile)) ||
     ((need === "admin" || need === true) && profile && profile.is_admin && !stillTimedOut(profile)) ||
     (need === "staff" && isStaff(profile));
-  if (!ok) { location.href = "index.html"; return null; }
+  if (!ok) { location.href = pageHref("home"); return null; }
   return { session, profile };
 }
 
@@ -1940,18 +2013,19 @@ async function renderNav() {
     } catch (e) {}
 
     const name = profile ? esc(userName(profile)) : "Account";
+    const dashHref = pageHref("dashboard");
     drawer += `<div class="nav-drawer-user"><span class="nav-drawer-user-label">Signed in</span><strong>${name}</strong></div>`;
-    drawer += `<a class="nav-drawer-link" href="dashboard.html">My shops</a>`;
-    drawer += `<a class="nav-drawer-link" href="favourites.html">Favourites</a>`;
-    drawer += `<a class="nav-drawer-link" href="settings.html">Settings</a>`;
-    drawer += `<a class="nav-drawer-link" href="profile.html?id=${esc(session.user.id)}">My profile</a>`;
+    drawer += `<a class="nav-drawer-link" href="${dashHref}">My shops</a>`;
+    drawer += `<a class="nav-drawer-link" href="${pageHref("favourites")}">Favourites</a>`;
+    drawer += `<a class="nav-drawer-link" href="${pageHref("settings")}">Settings</a>`;
+    drawer += `<a class="nav-drawer-link" href="${pageHref("profile", { id: session.user.id })}">My profile</a>`;
     if (needsVerification(profile)) {
-      drawer += `<a class="nav-drawer-link nav-drawer-primary" href="verify.html">Verify account</a>`;
+      drawer += `<a class="nav-drawer-link nav-drawer-primary" href="${pageHref("verify")}">Verify account</a>`;
     }
     if (isStaff(profile) || (profile && (profile.is_admin || profile.is_head))) {
       drawer += `<div class="nav-drawer-sep" role="separator"></div>`;
-      if (isStaff(profile)) drawer += `<a class="nav-drawer-link" href="mod.html">Moderation</a>`;
-      if (profile && (profile.is_admin || profile.is_head)) drawer += `<a class="nav-drawer-link" href="admin.html">Admin</a>`;
+      if (isStaff(profile)) drawer += `<a class="nav-drawer-link" href="${pageHref("moderation")}">Moderation</a>`;
+      if (profile && (profile.is_admin || profile.is_head)) drawer += `<a class="nav-drawer-link" href="${pageHref("admin")}">Admin</a>`;
     }
     drawer += `<div class="nav-drawer-sep" role="separator"></div>`;
     if (isImpersonating()) {
@@ -1962,16 +2036,17 @@ async function renderNav() {
     try {
       const unread = await countUnreadNotifications(session.user.id);
       if (unread > 0) {
-        rightExtra += `<a class="nav-note-badge" href="dashboard.html#notifications" title="${unread} unread notification${unread === 1 ? "" : "s"}">${unread > 9 ? "9+" : unread}</a>`;
+        const dashNotes = pageHref("dashboard", "", "#notifications");
+        rightExtra += `<a class="nav-note-badge" href="${dashNotes}" title="${unread} unread notification${unread === 1 ? "" : "s"}">${unread > 9 ? "9+" : unread}</a>`;
         drawer = drawer.replace(
-          'href="dashboard.html">My shops</a>',
-          `href="dashboard.html#notifications">My shops <span class="tag warn">${unread}</span></a>`
+          `href="${dashHref}">My shops</a>`,
+          `href="${dashNotes}">My shops <span class="tag warn">${unread}</span></a>`
         );
       }
     } catch (e) {}
   } else {
-    drawer += `<a class="nav-drawer-link" href="login.html">Log in</a>`;
-    drawer += `<a class="nav-drawer-link nav-drawer-primary" href="signup.html">Sign up</a>`;
+    drawer += `<a class="nav-drawer-link" href="${pageHref("login")}">Log in</a>`;
+    drawer += `<a class="nav-drawer-link nav-drawer-primary" href="${pageHref("signup")}">Sign up</a>`;
   }
 
   if (USE_MOCK) {
@@ -2002,7 +2077,7 @@ async function renderNav() {
     lo.onclick = async () => {
       if (isImpersonating()) { await exitImpersonation(); return; }
       await sb.auth.signOut();
-      location.href = "index.html";
+      location.href = pageHref("home");
     };
   }
   // Don't nag the impersonated user to change "their" password.
@@ -2012,8 +2087,7 @@ async function renderNav() {
 /** Fixed top banner for logged-in unverified accounts subject to 24h purge. */
 function renderVerifyBanner(profile) {
   const existing = document.getElementById("verify-banner");
-  const page = (location.pathname.split("/").pop() || "").toLowerCase();
-  const onVerifyPage = page === "verify.html";
+  const onVerifyPage = currentPageSlug() === "verify";
   if (!needsVerification(profile) || onVerifyPage) {
     if (existing) existing.remove();
     document.body.classList.remove("has-verify-banner");
@@ -2037,7 +2111,7 @@ function renderVerifyBanner(profile) {
   const countdown = deleteCountdownText(profile.created_at);
   bar.innerHTML =
     `<span class="verify-banner-text">Not verified - <b>${esc(countdown)}</b>.</span>` +
-    `<a class="primary small verify-banner-cta" href="verify.html">verify here</a>`;
+    `<a class="primary small verify-banner-cta" href="${pageHref("verify")}">verify here</a>`;
   syncTopChromeOffset();
   observeTopChrome();
   requestAnimationFrame(() => {
@@ -2051,7 +2125,7 @@ setInterval(async () => {
   const s = await getSession();
   if (!s) {
     if (isImpersonating()) { exitImpersonation(); return; }
-    if (hadSession) location.href = "login.html?timedout=1";
+    if (hadSession) location.href = pageHref("login", { timedout: "1" });
     return;
   }
   const p = await getProfile(s.user.id);
@@ -2113,7 +2187,7 @@ function setMsg(el, text, kind) {
 // "Owner: <profile link> \u00b7 Discord: name" (plain meta line)
 function ownerHtml(p, ownerId) {
   if (!p) return "owner: ?";
-  const link = ownerId ? `<a href="profile.html?id=${esc(ownerId)}">${esc(userName(p))}</a>` : esc(userName(p));
+  const link = ownerId ? `<a href="${pageHref("profile", { id: ownerId })}">${esc(userName(p))}</a>` : esc(userName(p));
   return "owner: " + link + (p.discord_username ? " \u00b7 Discord: " + esc(p.discord_username) : "");
 }
 

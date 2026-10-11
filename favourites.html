@@ -3,133 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Favourites - CivMC Shops</title>
-<link rel="stylesheet" href="style.css?v=19">
-</head>
-<body class="fav-page">
-<nav id="nav"></nav>
-<main>
-  <header class="page-hero">
-    <span class="page-eyebrow">Collection</span>
-    <h1>Favourites</h1>
-    <p class="sub">Shops you've starred and people you follow. Private to you.</p>
-  </header>
-  <div class="msg" id="msg"></div>
-
-  <section class="fav-section" id="sec-shops" aria-labelledby="fav-shops-h">
-    <div class="profile-section-head">
-      <h2 id="fav-shops-h">Shops</h2>
-      <p class="meta" id="shops-sub"></p>
-    </div>
-    <div id="list" class="shop-grid"></div>
-  </section>
-
-  <section class="fav-section" id="sec-people" aria-labelledby="fav-people-h">
-    <div class="profile-section-head">
-      <h2 id="fav-people-h">People you follow</h2>
-      <p class="meta" id="people-sub"></p>
-    </div>
-    <div id="people" class="fav-people"></div>
-  </section>
-</main>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="config.js"></script>
-<script src="mock.js"></script>
-<script src="app.js?v=12"></script>
+<title>Redirecting...</title>
+<link rel="canonical" href="favourites/">
+<meta http-equiv="refresh" content="0;url=favourites/">
 <script>
-const msg = document.getElementById("msg");
-let me = null;
-
-function personCardHtml(p) {
-  const name = profileDisplayName(p);
-  const login = userName(p);
-  const mc = (p.mc_username || "").trim();
-  const meta = [];
-  if (mc && mc.toLowerCase() !== String(login).toLowerCase()) meta.push("MC " + mc);
-  if (p.verified_at) meta.push("verified");
-  return `<a class="fav-person card" href="profile.html?id=${esc(p.id)}">
-    <span class="fav-person-av">${avatarImg(p, 48)}</span>
-    <span class="fav-person-body">
-      <span class="fav-person-name">${esc(name)}</span>
-      ${meta.length ? `<span class="meta">${esc(meta.join(" · "))}</span>` : ""}
-    </span>
-    <button type="button" class="small" data-unfollow="${esc(p.id)}" title="Unfollow">Unfollow</button>
-  </a>`;
-}
-
-async function load() {
-  const ctx = await requireLogin();
-  if (!ctx) return;
-  me = ctx.session.user.id;
-
-  const [{ data, error }, { data: peopleData, error: peopleErr }] = await Promise.all([
-    sb.from("favorites")
-      .select("id, shop_id, created_at, shops(id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out), listings(id, updated_at, stock, in_stock, timed_out), reviews(rating, traded, timed_out))")
-      .eq("user_id", me).order("created_at", { ascending: false }),
-    sb.from("follows")
-      .select("id, following_id, created_at, profiles!follows_following_id_fkey(id, username, mc_username, discord_username, avatar_path, verified_at, timed_out)")
-      .eq("follower_id", me).order("created_at", { ascending: false })
-  ]);
-  if (error) { setMsg(msg, error.message, "err"); return; }
-  if (peopleErr) { setMsg(msg, peopleErr.message, "err"); return; }
-
-  const rows = (data || []).filter(f => f.shops && shopListedPublicly(f.shops, f.shops.profiles));
-  const box = document.getElementById("list");
-  document.getElementById("shops-sub").textContent = rows.length
-    ? rows.length + " shop" + (rows.length === 1 ? "" : "s")
-    : "";
-  if (!rows.length) {
-    box.className = "";
-    box.innerHTML = emptyState("No favourite shops yet. Star a shop to save it here.", "index.html", "Browse shops");
-  } else {
-    box.className = "shop-grid";
-    box.innerHTML = rows.map(f => {
-      const s = f.shops;
-      const ls = s.listings || [];
-      return shopCardHtml({
-        ...s,
-        listings: [{ count: ls.length }]
-      }, {
-        listingCount: ls.length,
-        actions: iconBtn("starFill", { on: true, title: "Remove from favourites", attrs: `data-unfav="${s.id}"` })
-      });
-    }).join("");
-  }
-
-  const people = (peopleData || []).map(f => f.profiles).filter(p => p && !p.timed_out);
-  const peopleBox = document.getElementById("people");
-  document.getElementById("people-sub").textContent = people.length
-    ? people.length + " following"
-    : "";
-  if (!people.length) {
-    peopleBox.innerHTML = emptyState("You're not following anyone yet. Follow someone from their profile.");
-  } else {
-    peopleBox.innerHTML = people.map(personCardHtml).join("");
-  }
-}
-
-document.getElementById("list").addEventListener("click", async e => {
-  const b = e.target.closest("button[data-unfav]");
-  if (!b) return;
-  e.preventDefault();
-  e.stopPropagation();
-  const { error } = await sb.from("favorites").delete().eq("user_id", me).eq("shop_id", b.dataset.unfav);
-  if (error) { setMsg(msg, error.message, "err"); return; }
-  load();
-});
-
-document.getElementById("people").addEventListener("click", async e => {
-  const b = e.target.closest("button[data-unfollow]");
-  if (!b) return;
-  e.preventDefault();
-  e.stopPropagation();
-  const { error } = await sb.from("follows").delete().eq("follower_id", me).eq("following_id", b.dataset.unfollow);
-  if (error) { setMsg(msg, error.message, "err"); return; }
-  load();
-});
-
-load();
+(function () {
+  var dest = "favourites/";
+  location.replace(dest + location.search + location.hash);
+})();
 </script>
+</head>
+<body>
+<p><a href="favourites/">Continue</a></p>
 </body>
 </html>

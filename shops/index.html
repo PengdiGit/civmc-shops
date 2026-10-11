@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shop - CivMC Shops</title>
+<link rel="stylesheet" href="../style.css?v=18">
+</head>
+<body class="shop-page">
+<nav id="nav"></nav>
+<main>
+  <header class="page-hero shop-storefront">
+    <a class="back" href="../home/">&larr; Back to search</a>
+    <div class="action-cluster shop-hero-actions" id="shop-actions">
+      <button type="button" id="favbtn" class="icon-btn" data-act="fav" hidden title="Favourite this shop" aria-label="Favourite this shop" data-ico="star"></button>
+      <button type="button" id="sharebtn" data-act="share" data-ico="share" title="Copy link to this shop" aria-label="Share shop"></button>
+      <span id="shop-mod-actions"></span>
+    </div>
+    <div class="top">
+      <div class="shophead"><span id="shopicon"></span><div><h1 id="name">Loading...</h1><div id="rating"></div></div></div>
+    </div>
+    <div class="glance" id="glance"></div>
+    <div class="shopdesc" id="desc" hidden></div>
+  </header>
+  <div id="banner"></div>
+  <div class="msg" id="msg"></div>
+
+  <div class="shop-catalog" id="shop-catalog" hidden>
+    <nav class="shop-group-sidebar" id="shop-group-sidebar" aria-label="Shop groups" hidden></nav>
+    <div class="shop-catalog-main">
+      <div class="shop-filter" id="listingfilter" hidden>
+        <div class="row">
+          <input type="search" id="lq" placeholder="Filter listings in this shop..." style="flex:1;min-width:160px">
+          <select id="lstock">
+            <option value="all" selected>All listings</option>
+            <option value="in">In stock only</option>
+            <option value="hide">Hide out of stock</option>
+            <option value="out">Out of stock only</option>
+          </select>
+          <span class="meta" id="lcount"></span>
+        </div>
+      </div>
+      <p class="meta shop-catalog-hint" style="margin:0 0 8px">Buy &rarr; sell. Out-of-stock rows stay visible but faded.</p>
+      <div class="offers" id="offers"></div>
+    </div>
+  </div>
+
+  <div class="row" style="align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:18px 0 8px">
+    <h2 style="margin:0">Reviews</h2>
+    <label class="meta" style="display:flex;align-items:center;gap:6px">Sort
+      <select id="rsort" aria-label="Sort reviews">
+        <option value="newest" selected>Newest</option>
+        <option value="oldest">Oldest</option>
+        <option value="rating-high">Highest rating</option>
+        <option value="rating-low">Lowest rating</option>
+      </select>
+    </label>
+  </div>
+  <div id="reviews"></div>
+  <div id="rform"></div>
+
+  <h2>Comments</h2>
+  <div id="comments"></div>
+  <div id="cform"></div>
+
+  <div class="compare-tray" id="compare" hidden>
+    <div class="compare-head">
+      <b>Compare</b>
+      <span class="meta" id="compare-count">0 / 4</span>
+      <button type="button" id="compare-md" data-ico="copy" title="Copy markdown for Discord" aria-label="Copy markdown"></button>
+      <button type="button" id="compare-share" data-ico="link" title="Copy compare link" aria-label="Share tray"></button>
+      <button type="button" id="compare-clear" data-ico="x" title="Clear compare" aria-label="Clear compare tray"></button>
+    </div>
+    <div class="compare-body" id="compare-body"></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+<script src="../mock.js"></script>
+<script src="../app.js?v=13"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const shopId = params.get("id");
+const focusId = params.get("listing");
+const findQ = norm(params.get("q") || "");
+const msg = document.getElementById("msg");
+let firstLoad = true;
+let me = null;
+let shop = null;
+let isFav = false;
+let allListings = [];
+let tipByListing = {}; // listingId -> [{vote, user_id}]
+let honestyHistory = [];
+let comparePins = [];
+let hlListingId = focusId ? String(focusId) : null;
+let reviewCache = [];
+let reviewSort = "newest";
+
+const verifyHelp = () => `Verified accounts only. <a href="../verify/">Verify here</a> (${PFA_HELP}).`;
+
+function paintFavBtn() {
+  const fb = document.getElementById("favbtn");
+  if (!fb) return;
+  // Always show once a shop is loaded — owners can favourite their own shop too.
+  fb.hidden = !shop;
+  if (!shop) return;
+  fb.className = "icon-btn" + (isFav ? " on" : "");
+  fb.title = isFav ? "Remove from favourites" : "Favourite this shop";
+  fb.setAttribute("aria-label", fb.title);
+  fb.setAttribute("data-ico", isFav ? "starFill" : "star");
+  fb.innerHTML = uiIcon(isFav ? "starFill" : "star");
+}
+
+function listingMatchesFind(l) {
+  if (!findQ) return false;
+  return norm(l.sell_item + " " + l.want_item).includes(findQ);
+}
+function isFindHighlight(l) {
+  if (hlListingId && String(l.id) === hlListingId) return true;
+  if (!hlListingId && firstLoad && listingMatchesFind(l)) return true;
+  return false;
+}
+
+function renderShopCompare() {
+  paintCompareTray(comparePins, { here: loadHereCoords() });
+  paintListings(isStaff(me), !!(me && shop && shop.owner_id === me.id));
+}
+
+function buildGroupNavEntries(list) {
+  const counts = {};
+  list.forEach(l => {
+    const key = String(l.group_name || "").trim();
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const inFilter = new Set(Object.keys(counts));
+  const entries = [];
+  orderedListingGroupKeys(allListings, shop).forEach(key => {
+    if (!inFilter.has(key) || !counts[key]) return;
+    entries.push({
+      key,
+      label: groupNavLabel(key),
+      count: counts[key],
+      sectionId: groupSectionId(key)
+    });
+  });
+  const named = entries.filter(e => e.key);
+  if (!named.length) return [];
+  return entries;
+}
+
+function paintGroupSidebar(list) {
+  const nav = document.getElementById("shop-group-sidebar");
+  const catalog = document.getElementById("shop-catalog");
+  const entries = buildGroupNavEntries(list);
+  if (!entries.length) {
+    nav.hidden = true;
+    nav.innerHTML = "";
+    catalog.classList.remove("has-group-sidebar");
+    return;
+  }
+  nav.hidden = false;
+  catalog.classList.add("has-group-sidebar");
+  nav.innerHTML = entries.map(e => `<button type="button" class="shop-group-nav-item" data-group-jump="${esc(e.sectionId)}" title="Jump to ${esc(e.label)}">
+    ${groupIconHtml(shop, e.key, "sm")}<span class="shop-group-nav-label">${esc(e.label)}</span><span class="meta shop-group-nav-count">${e.count}</span>
+  </button>`).join("");
+}
+
+function jumpToGroupSection(sectionId) {
+  const el = document.getElementById(sectionId);
+  if (!el) return;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  document.querySelectorAll(".shop-group-nav-item.is-active").forEach(n => n.classList.remove("is-active"));
+  const btn = document.querySelector('.shop-group-nav-item[data-group-jump="' + sectionId.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"]');
+  if (btn) btn.classList.add("is-active");
+}
+
+function groupLabelHtml(g) {
+  const label = g ? esc(g) : "Other";
+  return `<div class="listing-group-label" id="${groupSectionId(g)}">${groupIconHtml(shop, g, "sm")}<span>${label}</span></div>`;
+}
+
+function paintListings(staff, isOwner) {
+  const q = norm(document.getElementById("lq").value);
+  const stock = document.getElementById("lstock").value;
+  let list = sortListingsOwnerOrder(allListings, shop);
+  if (q) list = list.filter(l => (l.sell_item + " " + l.want_item).includes(q));
+  if (stock === "hide" || stock === "in") list = list.filter(l => !listingIsOut(l) && !l.timed_out);
+  if (stock === "out") list = list.filter(l => listingIsOut(l) || l.timed_out);
+  document.getElementById("lcount").textContent = list.length + " shown";
+  const catalog = document.getElementById("shop-catalog");
+  if (!allListings.length) {
+    catalog.hidden = true;
+    document.getElementById("listingfilter").hidden = true;
+    document.getElementById("offers").innerHTML = emptyState("This shop has no listings yet.");
+    paintGroupSidebar([]);
+    return;
+  }
+  catalog.hidden = false;
+  document.getElementById("listingfilter").hidden = false;
+  if (!list.length) {
+    document.getElementById("offers").innerHTML = emptyState("No listings match that filter.");
+    paintGroupSidebar([]);
+    return;
+  }
+  paintGroupSidebar(list);
+  let html = "";
+  let lastGroup = null;
+  list.forEach(l => {
+    const g = String(l.group_name || "").trim();
+    if (g !== (lastGroup || "") && g) {
+      html += groupLabelHtml(g);
+      lastGroup = g;
+    } else if (!g && lastGroup) {
+      html += groupLabelHtml("");
+      lastGroup = "";
+    } else if (g) lastGroup = g;
+    const stale = daysAgo(l.updated_at) >= STALE_DAYS && l.in_stock;
+    let tags = stockHtml(l);
+    if (l.timed_out) tags += ' <span class="tag bad">timed out</span>';
+    if (stale) tags += ' <span class="tag warn">might be out of date</span>';
+    const quietDays = daysAgo(l.updated_at);
+    if (l.in_stock && quietDays >= 14) tags += ' <span class="tag warn" title="Listing is old - stock may be stale">quiet + stock</span>';
+    const tip = tipDisplayForListing(l.id, tipByListing[String(l.id)] || [], me);
+    const pinned = comparePins.some(p => String(p.listing.id) === String(l.id));
+    let end = `<span class="action-cluster">`;
+    end += iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-act="compare" data-id="${l.id}"` });
+    if (staff) end += iconBtn("clock", { cls: "btn-timeout", title: l.timed_out ? "Remove timeout" : "Timeout listing", attrs: `data-act="listing-timeout" data-id="${l.id}" data-to="${l.timed_out ? 0 : 1}"` });
+    if (!isOwner) end += iconBtn("flag", { cls: "btn-report", title: "Report listing", attrs: `data-act="report" data-type="listing" data-id="${l.id}"` });
+    end += `</span>`;
+    const hl = isFindHighlight(l);
+    html += tradeRow(l, {
+      big: true,
+      stale: listingIsOut(l) || l.timed_out || stale,
+      hl,
+      id: "listing-" + l.id,
+      cls: (listingIsOut(l) || l.timed_out ? "out" : "") + (hl ? " find-hl" : ""),
+      tags,
+      meta: updatedHtml(l.updated_at) + (g ? ` \u00b7 <span class="meta">${esc(g)}</span>` : ""),
+      btns: tipVotesHtml(l.id, tip.votes, tip.myVote),
+      btnsEnd: end
+    });
+  });
+  document.getElementById("offers").innerHTML = html;
+}
+
+async function loadTips() {
+  tipByListing = {};
+  if (!allListings.length) return;
+  const { data } = await sb.from("tip_votes").select("listing_id, vote, user_id");
+  (data || []).forEach(v => {
+    if (!allListings.some(l => String(l.id) === String(v.listing_id))) return;
+    const k = String(v.listing_id);
+    (tipByListing[k] = tipByListing[k] || []).push(v);
+  });
+}
+
+async function castTip(listingId, vote) {
+  if (!me) { location.href = loginHref(); return; }
+  const votes = tipByListing[String(listingId)] || [];
+  const mine = votes.find(v => v.user_id === me.id);
+  if (mine && mine.vote === vote) {
+    const { error } = await sb.from("tip_votes").delete().eq("user_id", me.id).eq("listing_id", listingId);
+    if (error) { setMsg(msg, error.message, "err"); return; }
+  } else if (mine) {
+    const { error } = await sb.from("tip_votes").update({ vote }).eq("user_id", me.id).eq("listing_id", listingId);
+    if (error) { setMsg(msg, error.message, "err"); return; }
+  } else {
+    const { error } = await sb.from("tip_votes").insert({ user_id: me.id, listing_id: Number(listingId), vote });
+    if (error) { setMsg(msg, error.message, "err"); return; }
+  }
+  await loadTips();
+  paintListings(isStaff(me), !!(me && shop && shop.owner_id === me.id));
+}
+
+async function load() {
+  if (!shopId) { setMsg(msg, "No shop picked.", "err"); return; }
+
+  const session = await getSession();
+  me = session ? await getProfile(session.user.id) : null;
+  const staff = isStaff(me);
+
+  const { data: s, error } = await sb
+    .from("shops")
+    .select("*, listings(*), profiles(username, mc_username, discord_username, avatar_path, timed_out)")
+    .eq("id", shopId)
+    .single();
+
+  const isOwner = !!(s && me && s.owner_id === me.id);
+  const hidden = s && (s.timed_out || s.archived || s.is_open === false || (s.profiles && s.profiles.timed_out));
+  if (error || !s || (hidden && !staff && !isOwner)) {
+    document.getElementById("name").textContent = "Shop not found";
+    ["glance", "banner", "shop-mod-actions", "offers", "reviews", "rform", "comments", "cform", "rating", "shopicon", "desc"].forEach(id => document.getElementById(id).innerHTML = "");
+    setMsg(msg, "That shop doesn't exist or isn't available.", "err");
+    return;
+  }
+  shop = s;
+
+  document.title = s.name + " - CivMC Shops";
+  document.getElementById("name").innerHTML = shopName(s) + (saleBadgeHtml(s) ? " " + saleBadgeHtml(s) : "");
+  document.getElementById("shopicon").innerHTML = shopIcon(s, "hero");
+  const dEl = document.getElementById("desc");
+  dEl.hidden = !s.description;
+  dEl.innerHTML = s.description ? mcText(s.description) : "";
+
+  allListings = sortListingsOwnerOrder(s.listings || [], s);
+  // If Find landed without listing=, prefer the best matching listing for highlight
+  if (!hlListingId && findQ) {
+    const hit = allListings.find(listingMatchesFind);
+    if (hit) hlListingId = String(hit.id);
+  }
+  const newest = allListings.reduce((m, l) => (!m || l.updated_at > m ? l.updated_at : m), null);
+  const parts = [];
+  parts.push(ownerChip(s.profiles, s.owner_id));
+  const place = placeHtml(s);
+  if (place) parts.push(place);
+  parts.push(coordsHtml(s.x, s.z) + (s.x != null && s.z != null
+    ? " " + iconBtn("copy", { title: "Copy coordinates", attrs: `data-act="copy-coords" data-x="${esc(s.x)}" data-z="${esc(s.z)}"` }) : ""));
+  if (s.find_note) parts.push('<span title="How to find the shop">' + esc(s.find_note) + "</span>");
+  parts.push(allListings.length + " listing" + (allListings.length === 1 ? "" : "s"));
+  if (newest) parts.push(updatedHtml(newest));
+  const quiet = shopFreshnessHtml(allListings);
+  if (quiet) parts.push(quiet);
+  document.getElementById("glance").innerHTML = parts.join('<span class="sep">\u00b7</span>');
+
+  if (me) {
+    const { data: f } = await sb.from("favorites").select("id").eq("user_id", me.id).eq("shop_id", shopId);
+    isFav = !!(f && f.length);
+  } else {
+    isFav = false;
+  }
+  paintFavBtn();
+
+  const p = s.profiles || {};
+  let banner = "";
+  if (s.is_open === false) banner += `<div class="banner"><span class="tag warn">closed</span> Hidden from Find. Open it from your dashboard when ready.</div>`;
+  if (s.archived) banner += `<div class="banner"><span class="tag warn">archived</span> Hidden from Find. Only you and staff can see it.</div>`;
+  if (s.timed_out) banner += `<div class="banner"><span class="tag bad">shop timed out</span> Hidden except from staff and the owner.</div>`;
+  if (p.timed_out) banner += `<div class="banner"><span class="tag bad">owner account timed out</span> Hidden because the owner is timed out.</div>`;
+  if (shopSaleActive(s)) banner += `<div class="banner"><span class="tag sale">(${esc(shopSaleLabel(s))}) sale!</span> ${s.sale_percent != null ? esc(s.sale_percent + "% off diamond prices") : "Special sale prices"}.</div>`;
+  let btns = "";
+  if (staff) btns += iconBtn("clock", { cls: "btn-timeout", title: s.timed_out ? "Remove shop timeout" : "Timeout shop", attrs: `data-act="shop-timeout" data-to="${s.timed_out ? 0 : 1}"` });
+  if (!isOwner) btns += iconBtn("flag", { cls: "btn-report", title: "Report shop", attrs: `data-act="report" data-type="shop" data-id="${s.id}"` });
+  document.getElementById("shop-mod-actions").innerHTML = btns;
+  document.getElementById("banner").innerHTML = banner;
+
+  setMsg(msg, "");
+  await loadTips();
+  const histMap = await loadHonestyHistory([shopId]);
+  honestyHistory = histMap[String(shopId)] || [];
+  if (firstLoad) {
+    const specs = mergeCompareSpecs(loadCompareSpecs(), parseCompareHash(location.hash));
+    comparePins = await fetchComparePins(specs);
+    wireCompareTray(() => comparePins, pins => { comparePins = pins; }, {
+      msgEl: msg,
+      onChange: renderShopCompare
+    });
+  }
+  paintListings(staff, isOwner);
+  paintCompareTray(comparePins, { here: loadHereCoords() });
+
+  if (firstLoad && hlListingId) {
+    const el = document.getElementById("listing-" + hlListingId);
+    if (el) {
+      el.classList.add("hl", "offer", "find-hl");
+      el.scrollIntoView({ block: "center" });
+    }
+  }
+
+  await loadReviews(staff, isOwner);
+  await loadComments(staff);
+  if (firstLoad && location.hash && !location.hash.startsWith("#cmp=")) {
+    const t = document.getElementById(location.hash.slice(1));
+    if (t) t.scrollIntoView({ block: "center" });
+  }
+  firstLoad = false;
+}
+
+document.getElementById("lq").addEventListener("input", () => paintListings(isStaff(me), !!(me && shop && shop.owner_id === me.id)));
+document.getElementById("lstock").addEventListener("change", () => paintListings(isStaff(me), !!(me && shop && shop.owner_id === me.id)));
+document.getElementById("shop-group-sidebar").addEventListener("click", e => {
+  const b = e.target.closest("[data-group-jump]");
+  if (b) jumpToGroupSection(b.dataset.groupJump);
+});
+
+function sortedReviews(list) {
+  const out = (list || []).slice();
+  const t = r => new Date(r.created_at).getTime() || 0;
+  if (reviewSort === "oldest") out.sort((a, b) => t(a) - t(b));
+  else if (reviewSort === "rating-high") out.sort((a, b) => (b.rating - a.rating) || (t(b) - t(a)));
+  else if (reviewSort === "rating-low") out.sort((a, b) => (a.rating - b.rating) || (t(b) - t(a)));
+  else out.sort((a, b) => t(b) - t(a));
+  return out;
+}
+
+function paintReviewList(staff, isOwner) {
+  const box = document.getElementById("reviews");
+  const list = sortedReviews(reviewCache);
+  const traded = tradedHereCount(reviewCache);
+  document.getElementById("rating").innerHTML = ratingHtml(reviewCache) + " " + trustedBadge(reviewCache) +
+    " " + honestyBadge(allListings, honestyHistory) +
+    (traded ? ` <span class="tag ok" title="Reviewers who checked I traded here">${traded} traded here</span>` : "");
+
+  box.innerHTML = list.length ? list.map(r => {
+    const mine = me && r.author_id === me.id;
+    let b = "";
+    if (isOwner && !r.timed_out) {
+      b += r.owner_reply
+        ? iconBtn("pen", { title: "Edit reply", attrs: `data-act="review-reply" data-id="${r.id}"` })
+          + iconBtn("x", { title: "Clear reply", attrs: `data-act="review-reply-clear" data-id="${r.id}"` })
+        : iconBtn("reply", { title: "Reply", attrs: `data-act="review-reply" data-id="${r.id}"` });
+    }
+    if (!mine) b += iconBtn("flag", { cls: "btn-report", title: "Report review", attrs: `data-act="report" data-type="review" data-id="${r.id}"` });
+    if (staff) b += iconBtn(r.timed_out ? "eye" : "eyeOff", { cls: "btn-timeout", title: r.timed_out ? "Unhide review" : "Hide review", attrs: `data-act="review-timeout" data-id="${r.id}" data-to="${r.timed_out ? 0 : 1}"` });
+    if (me && (me.is_admin || mine)) b += iconBtn("trash", { danger: true, title: "Delete review", attrs: `data-act="review-delete" data-id="${r.id}"` });
+    const pr = r.profiles;
+    return `
+      <div class="review" id="review-${r.id}">
+        <div class="top">
+          <span class="cname">${avatarImg(pr, 24)}<a href="../profile/?id=${r.author_id}">${esc(userName(pr))}</a>
+            <span class="stars">${starsText(r.rating)}</span>
+            ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
+            <span class="meta">\u00b7 ${agoText(r.created_at)}</span> ${r.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
+          <span class="action-cluster">${b}</span>
+        </div>
+        ${r.body ? `<p class="body">${linkMentions(r.body)}</p>` : ""}
+        ${r.owner_reply ? `<div class="owner-reply"><span class="tag owner">owner reply</span>
+          <p class="body">${esc(r.owner_reply)}</p>
+          ${r.owner_reply_at ? `<span class="meta">${agoText(r.owner_reply_at)}</span>` : ""}</div>` : ""}
+        <div class="replybox" id="rrb-${r.id}"></div>
+      </div>`;
+  }).join("") : emptyState("No reviews yet. Be the first to rate this shop.");
+}
+
+async function loadReviews(staff, isOwner) {
+  const { data, error } = await sb.from("reviews").select("*, profiles(username, mc_username, avatar_path)")
+    .eq("shop_id", shopId).order("created_at", { ascending: false });
+  const box = document.getElementById("reviews");
+  if (error) { box.innerHTML = '<p class="meta">Couldn\'t load reviews.</p>'; return; }
+  reviewCache = data || [];
+  const sortEl = document.getElementById("rsort");
+  if (sortEl) sortEl.value = reviewSort;
+  paintReviewList(staff, isOwner);
+
+  const mineExists = me && reviewCache.some(r => r.author_id === me.id);
+  const form = document.getElementById("rform");
+  if (!me) form.innerHTML = `<p class="meta"><a href="${loginHref()}">Log in</a> to review this shop.</p>`;
+  else if (isOwner) form.innerHTML = `<p class="meta">You can't review your own shop. Use Reply on a review to respond.</p>`;
+  else if (!isVerified(me)) form.innerHTML = `<p class="note">${verifyHelp()}</p>`;
+  else if (mineExists) form.innerHTML = `<p class="meta">You've reviewed this shop. Delete your review to write a new one.</p>`;
+  else if (!form.querySelector("textarea")) {
+    form.innerHTML = `
+      <div class="composer">
+        <div class="row" style="margin-bottom:6px"><span class="meta">Your rating</span>
+          <select class="rating" id="rrating">
+            <option value="5">\u2605\u2605\u2605\u2605\u2605 (5)</option><option value="4">\u2605\u2605\u2605\u2605\u2606 (4)</option><option value="3">\u2605\u2605\u2605\u2606\u2606 (3)</option>
+            <option value="2">\u2605\u2605\u2606\u2606\u2606 (2)</option><option value="1">\u2605\u2606\u2606\u2606\u2606 (1)</option>
+          </select></div>
+        <label class="meta" style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <input type="checkbox" id="rtraded"> I traded here
+        </label>
+        <textarea id="rbody" maxlength="500" placeholder="What was it like trading here? (optional, 500 characters max)"></textarea>
+        <button class="primary" data-act="post-review">Post review</button>
+      </div>`;
+  }
+}
+
+document.getElementById("rsort").addEventListener("change", () => {
+  reviewSort = document.getElementById("rsort").value || "newest";
+  const isOwner = !!(me && shop && shop.owner_id === me.id);
+  paintReviewList(isStaff(me), isOwner);
+});
+
+function composerHtml(parent, placeholder) {
+  return `<div class="composer" data-parent="${parent || ""}">
+    <textarea maxlength="500" placeholder="${esc(placeholder)}"></textarea>
+    <div class="row"><input type="file" accept="image/png,image/jpeg,image/webp"><button class="primary small" data-act="post">Post</button></div>
+  </div>`;
+}
+
+function commentHtml(c, rootId, staff) {
+  const mine = me && c.author_id === me.id;
+  const pr = c.profiles;
+  const isOwnerAuthor = shop && c.author_id === shop.owner_id;
+  let b = "";
+  if (isVerified(me)) b += iconBtn("reply", { title: "Reply", attrs: `data-act="reply" data-root="${rootId}" data-name="${esc(userName(pr))}"` });
+  if (!mine) b += iconBtn("flag", { cls: "btn-report", title: "Report comment", attrs: `data-act="report" data-type="comment" data-id="${c.id}"` });
+  if (staff) b += iconBtn(c.timed_out ? "eye" : "eyeOff", { cls: "btn-timeout", title: c.timed_out ? "Unhide comment" : "Hide comment", attrs: `data-act="comment-timeout" data-id="${c.id}" data-to="${c.timed_out ? 0 : 1}"` });
+  if (me && (me.is_admin || mine)) b += iconBtn("trash", { danger: true, title: "Delete comment", attrs: `data-act="comment-delete" data-id="${c.id}" data-path="${esc(c.image_path || "")}"` });
+  const img = c.image_path ? `<a href="${esc(publicUrl(c.image_path))}" target="_blank" rel="noopener"><img class="cimg" src="${esc(publicUrl(c.image_path))}" alt="picture in comment"></a>` : "";
+  return `
+    <div class="comment" id="comment-${c.id}">
+      <div class="head">
+        <span class="cname">${avatarImg(pr, 24)}<a href="../profile/?id=${c.author_id}">${esc(userName(pr))}</a>
+          ${isOwnerAuthor ? '<span class="tag owner">owner</span>' : ""}
+          <span class="meta">\u00b7 ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
+        <span class="action-cluster">${b}</span>
+      </div>
+      ${c.body ? `<p class="body">${linkMentions(c.body)}</p>` : ""}${img}
+    </div>`;
+}
+
+async function loadComments(staff) {
+  const { data, error } = await sb.from("comments").select("*, profiles(username, mc_username, avatar_path)")
+    .eq("shop_id", shopId).order("created_at", { ascending: true });
+  const box = document.getElementById("comments");
+  if (error) { box.innerHTML = '<p class="meta">Couldn\'t load comments.</p>'; return; }
+  const list = data || [];
+  const top = list.filter(c => !c.parent_id);
+  box.innerHTML = top.length ? top.map(c => {
+    const replies = list.filter(r => r.parent_id === c.id);
+    return commentHtml(c, c.id, staff) +
+      `<div class="replies">${replies.map(r => commentHtml(r, c.id, staff)).join("")}</div><div class="replybox" id="rb-${c.id}"></div>`;
+  }).join("") : emptyState("No comments yet. Say hello or ask about stock.");
+
+  const form = document.getElementById("cform");
+  if (!me) form.innerHTML = `<p class="meta"><a href="${loginHref()}">Log in</a> to comment or report.</p>`;
+  else if (!isVerified(me)) form.innerHTML = `<p class="note">${verifyHelp()}</p>`;
+  else if (!form.querySelector("textarea")) form.innerHTML = composerHtml("", "Say something about this shop (500 characters max). You can add a picture too.");
+}
+
+document.querySelector("main").addEventListener("click", async e => {
+  const tip = e.target.closest("button[data-tip]");
+  if (tip) {
+    await castTip(tip.dataset.listing, tip.dataset.tip);
+    return;
+  }
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const act = btn.dataset.act;
+  const on = btn.dataset.to === "1";
+  let err = null;
+
+  if (act === "report") {
+    const r = await sendReport(btn.dataset.type, btn.dataset.id);
+    if (r) setMsg(msg, r.text, r.kind);
+    return;
+  }
+  if (act === "compare") {
+    const l = allListings.find(x => String(x.id) === String(btn.dataset.id));
+    if (!l || !shop) return;
+    const r = toggleComparePin(comparePins, l, shop, false);
+    if (!r.ok) { setMsg(msg, r.error, "err"); return; }
+    renderShopCompare();
+    return;
+  }
+  if (act === "share") {
+    const ok = await copyText(location.href.split("#")[0]);
+    const label = btn.textContent;
+    btn.textContent = ok ? "Copied!" : "Copy failed";
+    setTimeout(() => { btn.textContent = label; }, 1500);
+    setMsg(msg, ok ? "Shop link copied." : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");
+    return;
+  }
+  if (act === "copy-coords") {
+    const ok = await copyText(btn.dataset.x + ", " + btn.dataset.z);
+    setMsg(msg, ok ? "Coords copied." : "Couldn't copy.", ok ? "ok" : "err");
+    return;
+  }
+  if (act === "fav") {
+    if (!me) { location.href = loginHref(); return; }
+    const res = isFav
+      ? await sb.from("favorites").delete().eq("user_id", me.id).eq("shop_id", shopId)
+      : await sb.from("favorites").insert({ user_id: me.id, shop_id: Number(shopId) });
+    err = res.error ? res.error.message : null;
+  } else if (act === "reply") {
+    const rb = document.getElementById("rb-" + btn.dataset.root);
+    if (rb.innerHTML) { rb.innerHTML = ""; return; }
+    document.querySelectorAll(".replybox").forEach(x => x.innerHTML = "");
+    rb.innerHTML = composerHtml(btn.dataset.root, "Write a reply...");
+    const ta = rb.querySelector("textarea");
+    if (btn.dataset.name) ta.value = "@" + btn.dataset.name + " ";
+    ta.focus();
+    return;
+  } else if (act === "post") {
+    const box = btn.closest(".composer");
+    const ta = box.querySelector("textarea");
+    const file = box.querySelector("input[type=file]").files[0];
+    const body = ta.value.trim();
+    if (!body && !file) { setMsg(msg, "Write something or pick a picture first.", "err"); return; }
+    btn.disabled = true;
+    let image_path = null;
+    if (file) {
+      setMsg(msg, "Uploading picture...");
+      const up = await uploadImage(file, "comments", me.id);
+      if (!up.ok) { setMsg(msg, up.message, "err"); btn.disabled = false; return; }
+      image_path = up.path;
+    }
+    const row = { shop_id: Number(shopId), author_id: me.id, body, image_path };
+    if (box.dataset.parent) row.parent_id = Number(box.dataset.parent);
+    const res = await sb.from("comments").insert(row);
+    btn.disabled = false;
+    if (res.error) { setMsg(msg, res.error.message, "err"); return; }
+    ta.value = ""; box.querySelector("input[type=file]").value = "";
+    setMsg(msg, "");
+    if (box.dataset.parent) box.parentElement.innerHTML = "";
+  } else if (act === "post-review") {
+    const res = await sb.from("reviews").insert({
+      shop_id: Number(shopId), author_id: me.id,
+      rating: Number(document.getElementById("rrating").value),
+      body: document.getElementById("rbody").value.trim(),
+      traded: !!(document.getElementById("rtraded") && document.getElementById("rtraded").checked)
+    });
+    if (res.error) { setMsg(msg, /duplicate|unique/i.test(res.error.message) ? "You've already reviewed this shop." : res.error.message, "err"); return; }
+    document.getElementById("rform").innerHTML = "";
+    setMsg(msg, "");
+  } else if (act === "shop-timeout") {
+    err = await applyContentTimeout("shops", shopId, on);
+    if (err === "") return;
+  } else if (act === "listing-timeout") {
+    err = await applyContentTimeout("listings", btn.dataset.id, on);
+    if (err === "") return;
+  } else if (act === "comment-timeout") {
+    err = await applyContentTimeout("comments", btn.dataset.id, on);
+    if (err === "") return;
+  } else if (act === "review-timeout") {
+    err = await applyContentTimeout("reviews", btn.dataset.id, on);
+    if (err === "") return;
+  } else if (act === "comment-delete") {
+    if (!await confirmModal({ title: "Delete comment", body: "Delete this comment (and its replies)?", confirmLabel: "Delete", danger: true })) return;
+    const res = await sb.from("comments").delete().eq("id", btn.dataset.id);
+    err = res.error ? res.error.message : null;
+    if (!err && btn.dataset.path) sb.storage.from("uploads").remove([btn.dataset.path]);
+  } else if (act === "review-delete") {
+    if (!await confirmModal({ title: "Delete review", body: "Delete this review?", confirmLabel: "Delete", danger: true })) return;
+    const res = await sb.from("reviews").delete().eq("id", btn.dataset.id);
+    err = res.error ? res.error.message : null;
+    if (!err) document.getElementById("rform").innerHTML = "";
+  } else if (act === "review-reply") {
+    const rid = btn.dataset.id;
+    const r = reviewCache.find(x => String(x.id) === String(rid));
+    const rb = document.getElementById("rrb-" + rid);
+    if (!rb) return;
+    if (rb.innerHTML) { rb.innerHTML = ""; return; }
+    document.querySelectorAll(".review .replybox").forEach(x => { x.innerHTML = ""; });
+    rb.innerHTML = `<div class="composer">
+      <textarea maxlength="500" placeholder="Reply as the shop owner (500 characters max)"></textarea>
+      <div class="row"><button class="primary small" data-act="review-reply-save" data-id="${rid}">Save reply</button>
+      <button class="small" data-act="review-reply-cancel" data-id="${rid}">Cancel</button></div>
+    </div>`;
+    const ta = rb.querySelector("textarea");
+    if (r && r.owner_reply) ta.value = r.owner_reply;
+    ta.focus();
+    return;
+  } else if (act === "review-reply-cancel") {
+    const rb = document.getElementById("rrb-" + btn.dataset.id);
+    if (rb) rb.innerHTML = "";
+    return;
+  } else if (act === "review-reply-save") {
+    const rb = document.getElementById("rrb-" + btn.dataset.id);
+    const body = (rb && rb.querySelector("textarea") ? rb.querySelector("textarea").value : "").trim().slice(0, 500);
+    if (!body) { setMsg(msg, "Write a reply first, or use Clear reply.", "err"); return; }
+    const res = await sb.from("reviews").update({
+      owner_reply: body,
+      owner_reply_at: new Date().toISOString()
+    }).eq("id", btn.dataset.id);
+    err = res.error ? res.error.message : null;
+    if (!err) setMsg(msg, "Reply saved.", "ok");
+  } else if (act === "review-reply-clear") {
+    if (!await confirmModal({ title: "Clear reply", body: "Remove your owner reply from this review?", confirmLabel: "Clear reply" })) return;
+    const res = await sb.from("reviews").update({
+      owner_reply: null,
+      owner_reply_at: null
+    }).eq("id", btn.dataset.id);
+    err = res.error ? res.error.message : null;
+    if (!err) setMsg(msg, "Reply cleared.", "ok");
+  }
+  if (err) { setMsg(msg, err, "err"); return; }
+  firstLoad = false;
+  load();
+});
+
+load();
+</script>
+</body>
+</html>

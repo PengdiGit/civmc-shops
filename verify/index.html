@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify account - CivMC Shops</title>
+<link rel="stylesheet" href="../style.css?v=7">
+</head>
+<body class="verify-page auth-page">
+<nav id="nav"></nav>
+<main>
+  <div class="auth-wrap verify-wrap">
+    <span class="page-eyebrow">Account</span>
+    <h1>Verify your account</h1>
+    <p class="sub" id="verify-intro">Needed to comment, review, upload, or create shops. Until then you can browse, favourite, and report.</p>
+    <div class="msg" id="verify-status" hidden></div>
+    <div id="verify-countdown" class="verify-countdown" hidden></div>
+
+    <ol class="verify-steps" id="verify-steps">
+      <li class="verify-step">
+        <div class="verify-step-body">
+          <h2>Join the PFA discord</h2>
+          <p class="meta">Join so you can open a ticket.</p>
+          <a class="primary" id="join-discord" href="https://discord.com/invite/cNHvQb567c" target="_blank" rel="noopener noreferrer">Join</a>
+        </div>
+        <div class="verify-step-arrow" aria-hidden="true">&darr;</div>
+      </li>
+      <li class="verify-step">
+        <div class="verify-step-body">
+          <h2>Open a "CivShop" ticket in "contact PFA"</h2>
+          <p class="meta">Staff match your Discord and Minecraft names from the ticket.</p>
+          <a class="primary" id="open-ticket" href="https://discord.com/channels/1547194944253460501/1547194946044305426" target="_blank" rel="noopener noreferrer">Click here</a>
+        </div>
+        <div class="verify-step-arrow" aria-hidden="true">&darr;</div>
+      </li>
+      <li class="verify-step">
+        <div class="verify-step-body">
+          <h2>Fill out the information and wait</h2>
+          <p class="meta">Fill the ticket, then wait for a head admin (up to 24 hours).</p>
+        </div>
+      </li>
+    </ol>
+
+    <p class="meta" id="verify-foot" style="margin-top:18px">Already verified? <a href="../home/">Back to Find</a>. Not signed in? <a id="verify-login" href="../login/">Log in</a>.</p>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+<script src="../mock.js"></script>
+<script src="../app.js?v=13"></script>
+<script>
+(function () {
+  const join = document.getElementById("join-discord");
+  const ticket = document.getElementById("open-ticket");
+  if (join) join.href = PFA_DISCORD_INVITE;
+  if (ticket) ticket.href = PFA_CONTACT_CHANNEL;
+  const login = document.getElementById("verify-login");
+  if (login) login.href = loginHref();
+})();
+
+(async function () {
+  const status = document.getElementById("verify-status");
+  const countdown = document.getElementById("verify-countdown");
+  const steps = document.getElementById("verify-steps");
+  const intro = document.getElementById("verify-intro");
+  const foot = document.getElementById("verify-foot");
+
+  const session = await getSession();
+  if (!session) {
+    status.hidden = false;
+    status.className = "msg";
+    status.innerHTML = `You're not logged in. You can still follow the steps below, then <a href="${esc(loginHref())}">log in</a> with the account you want verified.`;
+    return;
+  }
+  const profile = await getProfile(session.user.id);
+  if (!profile) {
+    status.hidden = false;
+    setMsg(status, "Couldn't load your profile.", "err");
+    return;
+  }
+  if (profile.verified_at) {
+    intro.hidden = true;
+    steps.hidden = true;
+    countdown.hidden = true;
+    status.hidden = false;
+    status.className = "msg ok";
+    status.innerHTML = `<b>You're verified.</b> You can comment, review, upload pictures, and create shops. <a href="../home/">Go to Find</a> \u00b7 <a href="../dashboard/">My shops</a>`;
+    foot.innerHTML = `<a href="../home/">Back to Find</a>`;
+    return;
+  }
+  if (needsVerification(profile)) {
+    countdown.hidden = false;
+    countdown.innerHTML = `<b>${esc(deleteCountdownText(profile.created_at))}</b>. Verify before then so your account isn't removed.`;
+  } else {
+    status.hidden = false;
+    status.className = "msg";
+    status.textContent = "Your account isn't marked verified yet. Follow the steps below if you still need staff to accept you.";
+  }
+})();
+</script>
+</body>
+</html>

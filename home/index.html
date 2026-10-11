@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CivMC Shops</title>
+<link rel="stylesheet" href="../style.css?v=8">
+</head>
+<body class="find-page">
+<nav id="nav"></nav>
+<main>
+  <header class="find-board">
+    <div class="find-board-top">
+      <div class="find-hero-copy">
+        <span class="find-eyebrow">Directory</span>
+        <h1>Find a shop</h1>
+        <p class="sub">Search by item, enchant, or shop name. Press <kbd>/</kbd> to focus search.</p>
+      </div>
+      <div class="find-board-side">
+        <a class="btn-favourites" href="../favourites/">Favourites</a>
+        <div class="find-loc" title="Used for Closest sort and distance on results">
+          <span class="find-loc-label meta">Your coords</span>
+          <div class="find-loc-inputs row">
+            <input type="number" id="hx" placeholder="X" aria-label="Your X coordinate">
+            <input type="number" id="hz" placeholder="Z" aria-label="Your Z coordinate">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="stickybar find-board-search">
+      <div class="row find-command-row">
+        <select id="mode">
+          <option value="sell" selected>Who is selling</option>
+          <option value="want">Who is buying</option>
+          <option value="shop">Shop name</option>
+          <option value="enchant">Enchants</option>
+        </select>
+        <input type="search" id="q" list="items" placeholder="diamond" autocomplete="off">
+        <input type="search" id="enchant-pick" class="find-enchant-pick" placeholder="Search enchants…" autocomplete="off" hidden aria-label="Search enchantments">
+        <button class="primary" id="go">Search</button>
+        <span class="find-sort">
+          <span class="meta">Sort</span>
+          <select id="sort"></select>
+        </span>
+        <button type="button" class="find-filter-btn" id="filter-open" aria-haspopup="dialog" aria-controls="filter-overlay" title="Filters">
+          <svg class="find-filter-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          <span>Filters</span>
+          <span class="find-filter-badge" id="filter-badge" hidden>0</span>
+        </button>
+      </div>
+      <div class="citychips find-enchant-chips" id="enchant-chips" hidden></div>
+      <p class="find-active-filters meta" id="active-filters" hidden></p>
+      <div class="find-quick-chips" id="quick-chips">
+        <button type="button" class="chip-btn" id="near-me" title="Sort by Closest using your saved coords">Near me</button>
+        <span class="meta find-recent-label" id="recent-label" hidden>Recent</span>
+        <span class="find-recent" id="recent-searches"></span>
+      </div>
+    </div>
+  </header>
+  <datalist id="items"></datalist>
+
+  <section class="find-results">
+    <div class="find-results-head">
+      <h2 id="heading">All shops</h2>
+    </div>
+    <p class="find-result-count" id="result-count" hidden></p>
+    <div class="msg" id="msg"></div>
+    <div id="results"></div>
+  </section>
+  <div class="compare-tray" id="compare" hidden>
+    <div class="compare-head">
+      <b>Compare</b>
+      <span class="meta" id="compare-count">0 / 4</span>
+      <button type="button" id="compare-md" data-ico="copy" title="Copy markdown for Discord" aria-label="Copy markdown"></button>
+      <button type="button" id="compare-share" data-ico="link" title="Copy compare link" aria-label="Share tray"></button>
+      <button type="button" id="compare-clear" data-ico="x" title="Clear compare" aria-label="Clear compare tray"></button>
+    </div>
+    <div class="compare-body" id="compare-body"></div>
+  </div>
+</main>
+
+<div class="find-overlay" id="filter-overlay" hidden>
+  <div class="find-overlay-backdrop" data-close-filters tabindex="-1"></div>
+  <div class="find-overlay-panel" role="dialog" aria-modal="true" aria-labelledby="filter-title">
+    <div class="find-overlay-head">
+      <h2 id="filter-title">Filters</h2>
+      <button type="button" data-ico="x" data-close-filters title="Close filters" aria-label="Close filters"></button>
+    </div>
+    <div class="filterbar" id="filters">
+      <div class="filter-group">
+        <span class="meta">Nation</span>
+        <div class="citychips" id="nations"></div>
+      </div>
+      <div class="filter-group">
+        <span class="meta">City</span>
+        <div class="citychips" id="cities"></div>
+      </div>
+      <div class="filter-group">
+        <span class="meta">Quality</span>
+        <div class="find-filter-toggles">
+          <label class="find-filter-check"><input type="checkbox" id="f-trusted"> Trusted traders only</label>
+          <label class="find-filter-check"><span class="find-filter-check-label">Min rating</span>
+            <select id="f-min-rating" aria-label="Minimum rating">
+              <option value="">Any</option>
+              <option value="3">3+</option>
+              <option value="4">4+</option>
+              <option value="4.5">4.5+</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="filter-group">
+        <span class="meta">Listing &amp; place</span>
+        <div class="find-filter-toggles">
+          <label class="find-filter-check"><input type="checkbox" id="f-in-stock"> In stock only</label>
+          <label class="find-filter-check"><input type="checkbox" id="f-updated-week"> Updated this week</label>
+          <label class="find-filter-check"><input type="checkbox" id="f-has-loc"> Has location (X/Z)</label>
+          <label class="find-filter-check"><input type="checkbox" id="f-directions"> Has directions</label>
+        </div>
+      </div>
+      <div class="filter-group" id="fg-deal">
+        <span class="meta">Deal rate (item search)</span>
+        <div class="find-filter-toggles row" style="gap:8px;flex-wrap:wrap">
+          <label class="find-filter-check"><span class="find-filter-check-label">Min d/item</span>
+            <input type="number" id="f-min-rate" min="0" step="any" placeholder="any" style="width:88px"></label>
+          <label class="find-filter-check"><span class="find-filter-check-label">Max d/item</span>
+            <input type="number" id="f-max-rate" min="0" step="any" placeholder="any" style="width:88px"></label>
+        </div>
+      </div>
+      <div class="filter-group" id="fg-unit">
+        <span class="meta">Unit type (item search)</span>
+        <div class="find-filter-toggles">
+          <label class="find-filter-check"><span class="find-filter-check-label">Unit</span>
+            <select id="f-unit" aria-label="Listing unit type">
+              <option value="">Any</option>
+              <option value="each">Each (no CI/CS)</option>
+              <option value="ci">CI</option>
+              <option value="cs">CS</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="filter-group" id="fg-enchant">
+        <span class="meta">Enchants (item search)</span>
+        <p class="meta" id="fg-enchant-hint" style="margin:0 0 6px">Prefer the Enchants mode in the search bar for named enchant lookup.</p>
+        <div class="find-filter-toggles" style="flex-direction:column;align-items:stretch;gap:8px">
+          <label class="find-filter-check" id="fg-enchant-contains"><span class="find-filter-check-label">Contains</span>
+            <input type="search" id="f-enchant" placeholder="protection, silk touch…" maxlength="60" style="width:min(100%,220px)"></label>
+          <label class="find-filter-check"><input type="checkbox" id="f-has-enchants"> Enchanted only</label>
+        </div>
+      </div>
+    </div>
+    <div class="find-overlay-actions">
+      <button type="button" class="primary" id="save-filter-defaults">Save filters as default</button>
+      <button type="button" class="small" id="clear-filters">Clear filters</button>
+      <button type="button" class="small" data-close-filters>Done</button>
+    </div>
+    <p class="meta find-overlay-hint">Saved defaults apply when Find opens with a clean URL. Coords save automatically.</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+<script src="../mock.js"></script>
+<script src="../items.js"></script>
+<script src="../app.js?v=13"></script>
+<script src="../place-picker.js"></script>
+<script>
+const q = document.getElementById("q");
+const enchantPick = document.getElementById("enchant-pick");
+const enchantChipsEl = document.getElementById("enchant-chips");
+const mode = document.getElementById("mode");
+const sortSel = document.getElementById("sort");
+const hx = document.getElementById("hx");
+const hz = document.getElementById("hz");
+const msg = document.getElementById("msg");
+const results = document.getElementById("results");
+const heading = document.getElementById("heading");
+const citiesEl = document.getElementById("cities");
+const nationsEl = document.getElementById("nations");
+const filterOverlay = document.getElementById("filter-overlay");
+const filterBadge = document.getElementById("filter-badge");
+const activeFiltersEl = document.getElementById("active-filters");
+const FIND_DEFAULTS_KEY = "civmc_find_defaults";
+const FIND_MODES = ["sell", "want", "shop", "enchant"];
+const fTrusted = document.getElementById("f-trusted");
+const fMinRating = document.getElementById("f-min-rating");
+const fInStock = document.getElementById("f-in-stock");
+const fUpdatedWeek = document.getElementById("f-updated-week");
+const fHasLoc = document.getElementById("f-has-loc");
+const fDirections = document.getElementById("f-directions");
+const fMinRate = document.getElementById("f-min-rate");
+const fMaxRate = document.getElementById("f-max-rate");
+const fUnit = document.getElementById("f-unit");
+const fEnchant = document.getElementById("f-enchant");
+const fHasEnchants = document.getElementById("f-has-enchants");
+const resultCountEl = document.getElementById("result-count");
+const findBoard = document.querySelector(".find-board");
+let cityFilter = "";
+let nationFilter = "";
+let trustedOnly = false;
+let minRating = 0; // 0 = any, else 3 / 4 / 4.5
+let inStockOnly = true; // matches prior item-search default
+let updatedThisWeek = false;
+let hasLocationOnly = false;
+let hasDirectionsOnly = false;
+let minDealRate = null; // null = any
+let maxDealRate = null;
+let unitFilter = ""; // "" | each | ci | cs
+let enchantFilter = ""; // substring match on listings.enchants (sell/want filters)
+let hasEnchantsOnly = false;
+let lastItemRows = [];
+let lastShopRows = [];
+let lastResultFocus = -1;
+let searchRan = false;
+let shopNameCache = []; // for autocomplete
+let comparePins = []; // { listing, shop, buying }
+let marketMedians = null; // item -> { sell, buy } median d/item
+let tipCountByShop = {}; // shop_id -> tip vote count (traction)
+
+async function ensureMarketMedians() {
+  if (marketMedians) return marketMedians;
+  marketMedians = {};
+  try {
+    const { data } = await sb.rpc("market_now");
+    (data || []).forEach(m => {
+      marketMedians[m.item] = marketMedians[m.item] || {};
+      marketMedians[m.item][m.side] = m.median;
+    });
+  } catch (e) {}
+  return marketMedians;
+}
+function medianTip(l, buying) {
+  const r = dealRate(l, buying);
+  if (r == null || !marketMedians) return "";
+  const item = buying ? l.want_item : l.sell_item;
+  const side = buying ? "buy" : "sell";
+  const med = marketMedians[item] && marketMedians[item][side];
+  if (med == null || med <= 0) return "";
+  const pct = ((r - med) / med) * 100;
+  if (Math.abs(pct) < 25) return "";
+  if (!buying && pct > 25) return ` <span class="tag warn" title="About ${pct.toFixed(0)}% above market median">above market</span>`;
+  if (!buying && pct < -25) return ` <span class="tag ok" title="About ${(-pct).toFixed(0)}% below market median">below market</span>`;
+  if (buying && pct < -25) return ` <span class="tag warn" title="Pays less than typical">low buy offer</span>`;
+  if (buying && pct > 25) return ` <span class="tag ok" title="Pays more than typical">strong buy offer</span>`;
+  return "";
+}
+
+const SORTS = {
+  item: [["deal", "Best deal"], ["new", "Newest"], ["close", "Closest"], ["enchant", "Enchants A-Z"]],
+  shop: [["featured", "Featured"], ["name", "A-Z"], ["close", "Closest"]]
+};
+
+function cleanTerm(s) {
+  let t = norm(s);
+  if (t.length > 3 && t.endsWith("s") && !t.endsWith("ss")) t = t.slice(0, -1);
+  return t;
+}
+
+function loadHere() {
+  const h = loadHereCoords();
+  if (h) { hx.value = h.x; hz.value = h.z; }
+}
+function saveHere() {
+  const x = parseFloat(hx.value), z = parseFloat(hz.value);
+  if (!isNaN(x) && !isNaN(z)) saveHereCoords(x, z);
+}
+function getHere() {
+  const x = parseFloat(hx.value), z = parseFloat(hz.value);
+  return isNaN(x) || isNaN(z) ? null : { x, z };
+}
+function distTo(s, h) {
+  if (!h || !s || s.x == null || s.z == null) return Infinity;
+  return Math.hypot(s.x - h.x, s.z - h.z);
+}
+function distText(s, h) {
+  const d = distTo(s, h);
+  return d === Infinity ? "" : " \u00b7 ~" + Math.round(d) + " blocks away";
+}
+
+function isEnchantMode() { return mode.value === "enchant"; }
+function isItemMode() { return mode.value === "sell" || mode.value === "want" || mode.value === "enchant"; }
+function activeQueryInput() { return isEnchantMode() ? enchantPick : q; }
+function currentSearchTerm() {
+  return isEnchantMode() ? norm(enchantPick.value) : cleanTerm(q.value);
+}
+function setSearchTerm(term) {
+  const t = String(term || "");
+  q.value = t;
+  enchantPick.value = t;
+}
+function fillSorts(preferClose, kind) {
+  const k = kind || (mode.value === "shop" ? "shop" : "item");
+  const prev = sortSel.value;
+  sortSel.innerHTML = SORTS[k].map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
+  if (preferClose && getHere() && SORTS[k].some(([v]) => v === "close")) sortSel.value = "close";
+  else if (isEnchantMode() && SORTS[k].some(([v]) => v === "enchant")) sortSel.value = "enchant";
+  else if (prev && [...sortSel.options].some(o => o.value === prev)) sortSel.value = prev;
+}
+function renderEnchantChips() {
+  if (!enchantChipsEl) return;
+  if (!isEnchantMode()) {
+    enchantChipsEl.hidden = true;
+    enchantChipsEl.innerHTML = "";
+    return;
+  }
+  enchantChipsEl.hidden = false;
+  const selected = norm(enchantPick.value);
+  const needle = selected;
+  const catalog = (typeof filterEnchantSuggestions === "function")
+    ? filterEnchantSuggestions(needle, 28)
+    : (typeof COMMON_MC_ENCHANTS !== "undefined" ? COMMON_MC_ENCHANTS.slice(0, 28) : []);
+  if (!catalog.length) {
+    enchantChipsEl.innerHTML = `<span class="meta">No enchant matches</span>`;
+    return;
+  }
+  enchantChipsEl.innerHTML = catalog.map(name =>
+    `<button type="button" data-enchant-pick="${esc(name)}" class="${selected && norm(name) === selected ? "on" : ""}">${esc(name)}</button>`
+  ).join("");
+}
+function syncModeUi() {
+  const enchantMode = isEnchantMode();
+  q.hidden = enchantMode;
+  const enchantWrap = enchantPick.closest(".place-combo");
+  if (enchantWrap) enchantWrap.hidden = !enchantMode;
+  enchantPick.hidden = !enchantMode;
+  if (enchantMode) {
+    enchantPick.placeholder = "Search enchants…";
+    enchantPick.title = "Type to filter enchant names, then pick one";
+    if (q.value && !enchantPick.value) enchantPick.value = q.value;
+  } else {
+    q.placeholder = mode.value === "shop" ? "shop name" : "diamond";
+    if (enchantPick.value && !q.value && mode.value !== "shop") q.value = enchantPick.value;
+  }
+  renderEnchantChips();
+  updateFilterChrome();
+}
+
+function defaultFindFilters() {
+  return {
+    nation: "", city: "",
+    trusted: false, minRating: 0,
+    inStock: true, updatedWeek: false, hasLocation: false, directions: false,
+    minRate: null, maxRate: null, unit: "",
+    enchant: "", hasEnchants: false
+  };
+}
+function loadFilterDefaults() {
+  const base = defaultFindFilters();
+  try {
+    const o = JSON.parse(localStorage.getItem(FIND_DEFAULTS_KEY) || "null");
+    if (!o || typeof o !== "object") return base;
+    const numOrNull = v => (v == null || v === "" || isNaN(Number(v)) ? null : Number(v));
+    return {
+      nation: typeof o.nation === "string" ? o.nation : "",
+      city: typeof o.city === "string" ? o.city : "",
+      trusted: !!o.trusted,
+      minRating: [3, 4, 4.5].includes(Number(o.minRating)) ? Number(o.minRating) : 0,
+      inStock: o.inStock == null ? true : !!o.inStock,
+      updatedWeek: !!o.updatedWeek,
+      hasLocation: !!o.hasLocation,
+      directions: !!o.directions,
+      minRate: numOrNull(o.minRate),
+      maxRate: numOrNull(o.maxRate),
+      unit: ["each", "ci", "cs"].includes(o.unit) ? o.unit : "",
+      enchant: typeof o.enchant === "string" ? o.enchant : "",
+      hasEnchants: !!o.hasEnchants
+    };
+  } catch (e) {
+    return base;
+  }
+}
+function saveFilterDefaults() {
+  try {
+    localStorage.setItem(FIND_DEFAULTS_KEY, JSON.stringify({
+      nation: nationFilter || "",
+      city: cityFilter || "",
+      trusted: !!trustedOnly,
+      minRating: minRating || 0,
+      inStock: !!inStockOnly,
+      updatedWeek: !!updatedThisWeek,
+      hasLocation: !!hasLocationOnly,
+      directions: !!hasDirectionsOnly,
+      minRate: minDealRate,
+      maxRate: maxDealRate,
+      unit: unitFilter || "",
+      enchant: enchantFilter || "",
+      hasEnchants: !!hasEnchantsOnly
+    }));
+  } catch (e) {}
+}
+function syncFilterControls() {
+  fTrusted.checked = !!trustedOnly;
+  fMinRating.value = minRating ? String(minRating) : "";
+  fInStock.checked = !!inStockOnly;
+  fUpdatedWeek.checked = !!updatedThisWeek;
+  fHasLoc.checked = !!hasLocationOnly;
+  fDirections.checked = !!hasDirectionsOnly;
+  fMinRate.value = minDealRate != null ? String(minDealRate) : "";
+  fMaxRate.value = maxDealRate != null ? String(maxDealRate) : "";
+  fUnit.value = unitFilter || "";
+  fEnchant.value = enchantFilter || "";
+  fHasEnchants.checked = !!hasEnchantsOnly;
+  const itemMode = isItemMode();
+  const sellWant = mode.value === "sell" || mode.value === "want";
+  document.getElementById("fg-deal").hidden = !itemMode;
+  document.getElementById("fg-unit").hidden = !itemMode;
+  // Enchants mode owns named enchant search — keep only "Enchanted only" for sell/want
+  document.getElementById("fg-enchant").hidden = !sellWant;
+  const containsRow = document.getElementById("fg-enchant-contains");
+  const enchantHint = document.getElementById("fg-enchant-hint");
+  if (containsRow) containsRow.hidden = true; // prefer Enchants mode picker
+  if (enchantHint) enchantHint.hidden = !sellWant;
+}
+function activeFilterCount() {
+  const listingMode = isItemMode();
+  const sellWant = mode.value === "sell" || mode.value === "want";
+  return (nationFilter ? 1 : 0) + (cityFilter ? 1 : 0)
+    + (trustedOnly ? 1 : 0) + (minRating ? 1 : 0)
+    + (inStockOnly ? 1 : 0) + (updatedThisWeek ? 1 : 0)
+    + (hasLocationOnly ? 1 : 0) + (hasDirectionsOnly ? 1 : 0)
+    + (listingMode && minDealRate != null ? 1 : 0)
+    + (listingMode && maxDealRate != null ? 1 : 0)
+    + (listingMode && unitFilter ? 1 : 0)
+    + (sellWant && enchantFilter ? 1 : 0)
+    + (sellWant && hasEnchantsOnly ? 1 : 0);
+}
+function updateFilterChrome() {
+  syncFilterControls();
+  const n = activeFilterCount();
+  if (n) {
+    filterBadge.hidden = false;
+    filterBadge.textContent = String(n);
+    document.getElementById("filter-open").classList.add("has-filters");
+  } else {
+    filterBadge.hidden = true;
+    document.getElementById("filter-open").classList.remove("has-filters");
+  }
+  const bits = [];
+  if (nationFilter) bits.push("Nation: " + nationFilter);
+  if (cityFilter) bits.push("City: " + cityFilter);
+  if (trustedOnly) bits.push("Trusted");
+  if (minRating) bits.push(minRating + "+ \u2605");
+  if (inStockOnly) bits.push("In stock");
+  if (updatedThisWeek) bits.push("Updated this week");
+  if (hasLocationOnly) bits.push("Has location");
+  if (hasDirectionsOnly) bits.push("Has directions");
+  if (isItemMode() && minDealRate != null) bits.push("Min " + minDealRate + " d/item");
+  if (isItemMode() && maxDealRate != null) bits.push("Max " + maxDealRate + " d/item");
+  if (isItemMode() && unitFilter) bits.push("Unit: " + (unitFilter === "each" ? "each" : unitFilter.toUpperCase()));
+  if ((mode.value === "sell" || mode.value === "want") && enchantFilter) bits.push("Enchant: " + enchantFilter);
+  if ((mode.value === "sell" || mode.value === "want") && hasEnchantsOnly) bits.push("Enchanted only");
+  if (bits.length) {
+    activeFiltersEl.hidden = false;
+    activeFiltersEl.textContent = bits.join(" \u00b7 ") + " \u00b7 edit in Filters";
+  } else {
+    activeFiltersEl.hidden = true;
+    activeFiltersEl.textContent = "";
+  }
+}
+function setResultCount(shown, total, label) {
+  if (shown == null) { resultCountEl.hidden = true; resultCountEl.textContent = ""; return; }
+  resultCountEl.hidden = false;
+  const unit = label || "result";
+  if (total != null && total !== shown)
+    resultCountEl.textContent = "Showing " + shown + " of " + total + " " + unit + (total === 1 ? "" : "s") + " after filters";
+  else
+    resultCountEl.textContent = shown + " " + unit + (shown === 1 ? "" : "s");
+}
+function setFindCompact(on) {
+  searchRan = !!on;
+  if (findBoard) findBoard.classList.toggle("is-compact", !!on);
+}
+function renderRecentChips() {
+  const wrap = document.getElementById("recent-searches");
+  const label = document.getElementById("recent-label");
+  const list = loadRecentSearches();
+  if (!list.length) {
+    wrap.innerHTML = "";
+    label.hidden = true;
+    return;
+  }
+  label.hidden = false;
+  wrap.innerHTML = list.map((r, i) =>
+    `<button type="button" data-recent="${i}" title="${esc(r.mode)}">${esc(r.q)}</button>`).join("");
+}
+function listingUnitOf(l, buying) {
+  return buying ? (l.want_unit || "") : (l.sell_unit || "");
+}
+function listingMatchesUnit(l, buying, unit) {
+  if (!unit) return true;
+  const u = listingUnitOf(l, buying);
+  if (unit === "each") return !u;
+  return u === unit;
+}
+function openFilters() {
+  filterOverlay.hidden = false;
+  document.body.classList.add("find-filters-open");
+}
+function closeFilters() {
+  filterOverlay.hidden = true;
+  document.body.classList.remove("find-filters-open");
+}
+
+function syncUrl() {
+  const u = new URL(location.href);
+  const sp = u.searchParams;
+  [...sp.keys()].forEach(k => sp.delete(k));
+  const term = isEnchantMode() ? norm(enchantPick.value) : q.value.trim();
+  if (term) {
+    sp.set("q", term);
+    sp.set("mode", mode.value);
+    if (sortSel.value !== "deal" && sortSel.value !== "name" && sortSel.value !== "featured") sp.set("sort", sortSel.value);
+  } else if (mode.value === "shop") {
+    if (sortSel.value && sortSel.value !== "featured") sp.set("sort", sortSel.value);
+  } else if (isEnchantMode()) {
+    sp.set("mode", "enchant");
+    if (sortSel.value && sortSel.value !== "enchant") sp.set("sort", sortSel.value);
+  }
+  if (nationFilter) sp.set("nation", nationFilter);
+  if (cityFilter) sp.set("city", cityFilter);
+  if (trustedOnly) sp.set("trusted", "1");
+  if (minRating) sp.set("min_rating", String(minRating));
+  // in_stock default is on - write 0 when off so shared links stay accurate
+  if (inStockOnly) sp.set("in_stock", "1");
+  else sp.set("in_stock", "0");
+  if (updatedThisWeek) sp.set("updated_week", "1");
+  if (hasLocationOnly) sp.set("has_loc", "1");
+  if (hasDirectionsOnly) sp.set("directions", "1");
+  if (isItemMode()) {
+    if (minDealRate != null) sp.set("min_rate", String(minDealRate));
+    if (maxDealRate != null) sp.set("max_rate", String(maxDealRate));
+    if (unitFilter) sp.set("unit", unitFilter);
+    if ((mode.value === "sell" || mode.value === "want") && enchantFilter) sp.set("enchant", enchantFilter);
+    if ((mode.value === "sell" || mode.value === "want") && hasEnchantsOnly) sp.set("has_enchants", "1");
+  }
+  const qs = sp.toString();
+  history.replaceState(null, "", u.pathname + (qs ? "?" + qs : "") + u.hash);
+}
+
+function chipCounts(rows, keyOf) {
+  const counts = {};
+  rows.forEach(r => {
+    const c = canonicalPlace(keyOf(r));
+    if (c) counts[c] = (counts[c] || 0) + 1;
+  });
+  return Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b))
+    .map(name => ({ name, n: counts[name] }));
+}
+
+function renderFilterChips(el, items, selected, dataAttr, allLabel) {
+  if (!items.length) {
+    el.innerHTML = `<button type="button" data-${dataAttr}="" class="on">${allLabel}</button>`;
+    return;
+  }
+  el.innerHTML = `<button type="button" data-${dataAttr}="" class="${selected ? "" : "on"}">${allLabel}</button>` +
+    items.map(it => `<button type="button" data-${dataAttr}="${esc(it.name)}" class="${selected === it.name ? "on" : ""}">${esc(it.name)} (${it.n})</button>`).join("");
+}
+
+function renderPlaceFilters(rows, shopOf) {
+  const shopRows = rows.map(r => shopOf(r)).filter(Boolean);
+  // When a nation is selected, city chips only count shops in that nation
+  const forCities = nationFilter
+    ? shopRows.filter(s => placeEquals(s.nation, nationFilter))
+    : shopRows;
+  const nations = chipCounts(shopRows, s => s.nation);
+  const cities = chipCounts(forCities, s => s.city);
+  renderFilterChips(nationsEl, nations, nationFilter, "nation", "All nations");
+  renderFilterChips(citiesEl, cities, cityFilter, "city", "All cities");
+  updateFilterChrome();
+}
+
+function shopHasInStockListing(s) {
+  const ls = (s && s.listings) || [];
+  return ls.some(l => !l.timed_out && l.in_stock !== false && l.stock !== 0);
+}
+function listingIsInStock(l) {
+  return !!(l && l.in_stock !== false && l.stock !== 0);
+}
+function shopHasDirections(s) {
+  if (!s) return false;
+  return !!(String(s.find_note || "").trim() || String(s.transit_note || "").trim());
+}
+/** @param {"shop"|"listing"} kind */
+function applyFindFilters(rows, shopOf, kind) {
+  const buying = mode.value === "want";
+  const sellWant = mode.value === "sell" || mode.value === "want";
+  return rows.filter(r => {
+    const s = shopOf(r);
+    if (!s || !placeFilterMatch(s, cityFilter, nationFilter)) return false;
+    if (trustedOnly && !isTrustedTrader(s.reviews)) return false;
+    if (minRating) {
+      const sum = ratingSummary(s.reviews);
+      if (!sum || sum.avg < minRating) return false;
+    }
+    if (hasLocationOnly && (s.x == null || s.z == null)) return false;
+    if (hasDirectionsOnly && !shopHasDirections(s)) return false;
+    if (inStockOnly) {
+      if (kind === "listing") {
+        if (!listingIsInStock(r)) return false;
+      } else if (!shopHasInStockListing(s)) {
+        return false;
+      }
+    }
+    if (updatedThisWeek) {
+      if (kind === "listing") {
+        if (daysAgo(r.updated_at) > 7) return false;
+      } else {
+        const ls = (s.listings || []).filter(l => !l.timed_out);
+        if (!ls.some(l => daysAgo(l.updated_at) <= 7)) return false;
+      }
+    }
+    if (kind === "listing") {
+      if (!listingMatchesUnit(r, buying, unitFilter)) return false;
+      if (minDealRate != null || maxDealRate != null) {
+        const rate = dealRate(r, buying);
+        if (rate == null) return false;
+        if (minDealRate != null && rate < minDealRate) return false;
+        if (maxDealRate != null && rate > maxDealRate) return false;
+      }
+      if (sellWant) {
+        const ench = String(r.enchants || "").toLowerCase();
+        if (hasEnchantsOnly && !ench.trim()) return false;
+        if (enchantFilter) {
+          const needles = enchantFilter.toLowerCase().split(/\s+/).filter(Boolean);
+          if (!needles.every(w => ench.includes(w))) return false;
+        }
+      }
+    }
+    return true;
+  });
+}
+
+function reapplyFindFilters(opts) {
+  const needItemRefetch = opts && opts.refetchItems && isItemMode() && currentSearchTerm();
+  syncUrl();
+  updateFilterChrome();
+  if (needItemRefetch) return search(true);
+  if (mode.value === "shop") paintShopResults(lastShopRows);
+  else if (lastItemRows.length) paintItemResults(lastItemRows);
+  else renderPlaceFilters([], () => null);
+}
+
+function onFilterClick(e) {
+  const nb = e.target.closest("button[data-nation]");
+  const cb = e.target.closest("button[data-city]");
+  if (!nb && !cb) return;
+  if (nb) {
+    nationFilter = nb.dataset.nation || "";
+    // city may no longer belong to this nation - clear if mismatch after re-render
+  }
+  if (cb) cityFilter = cb.dataset.city || "";
+  reapplyFindFilters();
+}
+
+nationsEl.addEventListener("click", onFilterClick);
+citiesEl.addEventListener("click", onFilterClick);
+
+fTrusted.addEventListener("change", () => {
+  trustedOnly = fTrusted.checked;
+  reapplyFindFilters();
+});
+fMinRating.addEventListener("change", () => {
+  const v = parseFloat(fMinRating.value);
+  minRating = [3, 4, 4.5].includes(v) ? v : 0;
+  reapplyFindFilters();
+});
+fInStock.addEventListener("change", () => {
+  inStockOnly = fInStock.checked;
+  // Item search may have fetched only in-stock rows - refetch when toggled
+  reapplyFindFilters({ refetchItems: true });
+});
+fHasLoc.addEventListener("change", () => {
+  hasLocationOnly = fHasLoc.checked;
+  reapplyFindFilters();
+});
+fDirections.addEventListener("change", () => {
+  hasDirectionsOnly = fDirections.checked;
+  reapplyFindFilters();
+});
+fUpdatedWeek.addEventListener("change", () => {
+  updatedThisWeek = fUpdatedWeek.checked;
+  reapplyFindFilters();
+});
+function parseRateInput(el) {
+  const v = parseFloat(el.value);
+  return el.value.trim() === "" || isNaN(v) || v < 0 ? null : v;
+}
+fMinRate.addEventListener("change", () => { minDealRate = parseRateInput(fMinRate); reapplyFindFilters(); });
+fMaxRate.addEventListener("change", () => { maxDealRate = parseRateInput(fMaxRate); reapplyFindFilters(); });
+fUnit.addEventListener("change", () => { unitFilter = fUnit.value || ""; reapplyFindFilters(); });
+fEnchant.addEventListener("change", () => { enchantFilter = norm(fEnchant.value); reapplyFindFilters(); });
+fEnchant.addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); enchantFilter = norm(fEnchant.value); reapplyFindFilters(); }
+});
+fHasEnchants.addEventListener("change", () => { hasEnchantsOnly = fHasEnchants.checked; reapplyFindFilters(); });
+
+document.getElementById("filter-open").addEventListener("click", openFilters);
+filterOverlay.addEventListener("click", e => {
+  if (e.target.closest("[data-close-filters]")) closeFilters();
+});
+document.getElementById("clear-filters").addEventListener("click", () => {
+  nationFilter = "";
+  cityFilter = "";
+  trustedOnly = false;
+  minRating = 0;
+  inStockOnly = false;
+  updatedThisWeek = false;
+  hasLocationOnly = false;
+  hasDirectionsOnly = false;
+  minDealRate = null;
+  maxDealRate = null;
+  unitFilter = "";
+  enchantFilter = "";
+  hasEnchantsOnly = false;
+  reapplyFindFilters({ refetchItems: true });
+});
+document.getElementById("save-filter-defaults").addEventListener("click", () => {
+  saveFilterDefaults();
+  setMsg(msg, "Saved filters as your default.", "ok");
+});
+
+document.getElementById("near-me").addEventListener("click", () => {
+  const h = getHere();
+  if (!h) {
+    hx.focus();
+    setMsg(msg, "Enter your X and Z coords first (saved automatically).", "err");
+    return;
+  }
+  fillSorts(true);
+  sortSel.value = "close";
+  search(true);
+});
+document.getElementById("recent-searches").addEventListener("click", e => {
+  const b = e.target.closest("[data-recent]");
+  if (!b) return;
+  const r = loadRecentSearches()[Number(b.dataset.recent)];
+  if (!r) return;
+  mode.value = FIND_MODES.includes(r.mode) ? r.mode : "sell";
+  setSearchTerm(r.q);
+  q.setAttribute("list", "");
+  syncModeUi();
+  fillSorts(!!getHere());
+  search(false);
+});
+
+enchantChipsEl.addEventListener("click", e => {
+  const b = e.target.closest("[data-enchant-pick]");
+  if (!b) return;
+  setSearchTerm(b.dataset.enchantPick || "");
+  renderEnchantChips();
+  search(false);
+});
+
+mode.addEventListener("change", () => {
+  q.setAttribute("list", ""); // custom autocomplete for all modes
+  syncModeUi();
+  fillSorts(!!getHere());
+  if (isEnchantMode()) loadEnchantCatalog().then(() => renderEnchantChips());
+  const term = currentSearchTerm();
+  if (term) search(true);
+  else if (mode.value === "shop") showShops("");
+});
+sortSel.addEventListener("change", () => { search(true); });
+[hx, hz].forEach(el => el.addEventListener("change", () => { saveHere(); search(true); }));
+
+function resultCards() {
+  return [...results.querySelectorAll(".shop-card, .listing-row")];
+}
+function focusResultCard(i) {
+  const cards = resultCards();
+  if (!cards.length) return;
+  lastResultFocus = ((i % cards.length) + cards.length) % cards.length;
+  cards.forEach((c, n) => c.classList.toggle("is-focused", n === lastResultFocus));
+  const el = cards[lastResultFocus];
+  el.scrollIntoView({ block: "nearest" });
+  el.focus({ preventScroll: true });
+  if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+}
+document.addEventListener("keydown", e => {
+  if (document.body.classList.contains("ui-modal-open")) return;
+  if (e.key === "Escape") {
+    if (!filterOverlay.hidden) { closeFilters(); return; }
+    if (document.activeElement === q || document.activeElement === enchantPick || currentSearchTerm()) {
+      e.preventDefault();
+      const hadTerm = !!currentSearchTerm();
+      setSearchTerm("");
+      renderEnchantChips();
+      setResultCount(null);
+      setFindCompact(false);
+      if (mode.value === "shop" || !hadTerm) showShops("");
+      else { setMsg(msg, ""); results.innerHTML = ""; heading.textContent = "Find a shop"; }
+      return;
+    }
+  }
+  const t = e.target;
+  const inField = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+  if (inField && t !== q && t !== enchantPick) return;
+  if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !filterOverlay.hidden) return;
+  const acBox = document.getElementById("ac-box");
+  const placeList = enchantPick.closest(".place-combo") && enchantPick.closest(".place-combo").querySelector(".place-combo-list");
+  const acOpen = (acBox && !acBox.hidden) || (placeList && !placeList.hidden);
+  if ((e.key === "ArrowDown" || e.key === "ArrowUp") && acOpen && (t === q || t === enchantPick)) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    const cards = resultCards();
+    if (!cards.length) return;
+    e.preventDefault();
+    if (lastResultFocus < 0) focusResultCard(e.key === "ArrowDown" ? 0 : cards.length - 1);
+    else focusResultCard(lastResultFocus + (e.key === "ArrowDown" ? 1 : -1));
+  } else if (e.key === "Enter" && lastResultFocus >= 0 && document.activeElement && document.activeElement.classList.contains("is-focused")) {
+    const card = resultCards()[lastResultFocus];
+    if (card && card.dataset.href) { e.preventDefault(); location.href = card.dataset.href; }
+  }
+});
+
+function sortListings(rows, how, h) {
+  const buying = mode.value === "want";
+  if (how === "deal") {
+    const rate = new Map(rows.map(l => [l.id, dealRate(l, buying)]));
+    rows.sort((a, b) => {
+      const ra = rate.get(a.id), rb = rate.get(b.id);
+      if (ra == null && rb == null) return 0;
+      if (ra == null) return 1;
+      if (rb == null) return -1;
+      return buying ? rb - ra : ra - rb;
+    });
+  } else if (how === "close") {
+    rows.sort((a, b) => distTo(a.shops, h) - distTo(b.shops, h));
+  } else if (how === "enchant") {
+    rows.sort((a, b) => {
+      const ea = String(a.enchants || "").trim().toLowerCase();
+      const eb = String(b.enchants || "").trim().toLowerCase();
+      if (ea && !eb) return -1;
+      if (!ea && eb) return 1;
+      const c = ea.localeCompare(eb);
+      if (c) return c;
+      return String(a.sell_item || a.want_item || "").localeCompare(String(b.sell_item || b.want_item || ""));
+    });
+  }
+}
+
+// ---- compare tray
+function renderCompare() {
+  paintCompareTray(comparePins, { here: getHere() });
+  if (results.className === "offers" && lastItemRows.length) paintItemResults(lastItemRows);
+}
+wireCompareTray(() => comparePins, pins => { comparePins = pins; }, {
+  msgEl: msg,
+  onChange: renderCompare
+});
+function toggleCompare(l, s, buying) {
+  const r = toggleComparePin(comparePins, l, s, buying);
+  if (!r.ok) { setMsg(msg, r.error, "err"); return; }
+  renderCompare();
+}
+
+async function restoreCompareFromHash() {
+  const fromHash = parseCompareHash(location.hash);
+  const specs = mergeCompareSpecs(fromHash, loadCompareSpecs());
+  if (!specs.length) return;
+  comparePins = await fetchComparePins(specs);
+  if (!comparePins.length) return;
+  // Shared #cmp= links open the pinned deals as results; session-only restores just the tray
+  if (fromHash.length) {
+    lastItemRows = comparePins.map(p => p.listing);
+    mode.value = comparePins[0].buying ? "want" : "sell";
+    results.className = "offers";
+    paintItemResults(lastItemRows);
+    setMsg(msg, "Restored " + comparePins.length + " pinned listing" + (comparePins.length === 1 ? "" : "s") + " from the shared link.", "ok");
+  }
+  renderCompare();
+}
+
+async function paintShopResults(all) {
+  lastShopRows = all;
+  lastResultFocus = -1;
+  // Default: hide empty shops (0 listings) on shop browse - not a user toggle
+  const withListings = all.filter(s => ((s.listings || []).length > 0));
+  renderPlaceFilters(withListings, s => s);
+  let data = applyFindFilters(withListings, s => s, "shop");
+  // Drop city filter if it no longer matches any remaining shops under the nation
+  if (cityFilter && !data.some(s => placeEquals(s.city, cityFilter))) {
+    cityFilter = "";
+    syncUrl();
+    data = applyFindFilters(withListings, s => s, "shop");
+    renderPlaceFilters(withListings, s => s);
+  }
+  const filtered = activeFilterCount() > 0;
+  const totalBeforeFilters = withListings.length;
+  if (!data.length) {
+    setMsg(msg, "");
+    setResultCount(0, totalBeforeFilters, "shop");
+    results.className = "";
+    results.innerHTML = emptyState(
+      filtered
+        ? "No shops match those filters. Clear filters or try another search."
+        : "No shops with listings yet. Be the first trader on the board.",
+      filtered ? null : "../dashboard/",
+      filtered ? null : "Create a shop"
+    );
+    return;
+  }
+  const h = getHere();
+  let note = "";
+  if (sortSel.value === "close") {
+    if (h) data = data.slice().sort((a, b) => distTo(a, h) - distTo(b, h));
+    else note = " Enter your X and Z to sort by distance.";
+  } else if (sortSel.value === "featured") {
+    data = data.slice().sort((a, b) => {
+      const tb = shopTractionScore(b, tipCountByShop) - shopTractionScore(a, tipCountByShop);
+      if (tb !== 0) return tb > 0 ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
+  } else if (sortSel.value === "name") {
+    data = data.slice().sort((a, b) => a.name.localeCompare(b.name));
+  }
+  setMsg(msg, (note ? note.trim() : ""));
+  setResultCount(data.length, totalBeforeFilters, "shop");
+  results.className = "shop-grid";
+  const hist = await loadHonestyHistory(data.map(s => s.id));
+  results.innerHTML = data.map(s => shopCardHtml(s, {
+    listingCount: (s.listings || []).length,
+    honestyHtml: honestyBadge(s.listings, hist[String(s.id)]),
+    distText: sortSel.value === "close" ? distText(s, h) : ""
+  })).join("");
+}
+
+async function ensureTipCounts(shops) {
+  if (Object.keys(tipCountByShop).length) return;
+  try {
+    const { data } = await sb.from("tip_votes").select("listing_id");
+    const lidToShop = {};
+    (shops || lastShopRows || []).forEach(s => (s.listings || []).forEach(l => { lidToShop[String(l.id)] = s.id; }));
+    if (!Object.keys(lidToShop).length) {
+      const { data: ls } = await sb.from("listings").select("id, shop_id").limit(2000);
+      (ls || []).forEach(l => { lidToShop[String(l.id)] = l.shop_id; });
+    }
+    tipCountByShop = {};
+    (data || []).forEach(v => {
+      const sid = lidToShop[String(v.listing_id)];
+      if (sid == null) return;
+      tipCountByShop[String(sid)] = (tipCountByShop[String(sid)] || 0) + 1;
+    });
+  } catch (e) { tipCountByShop = tipCountByShop || {}; }
+}
+
+async function showShops(term) {
+  heading.textContent = term ? 'Shops matching "' + term + '"' : "All shops";
+  document.title = (term ? term + " shops" : "Find a shop") + " - CivMC Shops";
+  setMsg(msg, "Loading...");
+  results.innerHTML = "";
+  syncUrl();
+  if (term) { pushRecentSearch("shop", term); renderRecentChips(); setFindCompact(true); }
+  else setFindCompact(searchRan && !!norm(q.value));
+
+  let query = sb.from("shops")
+    .select("id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out), listings(id, updated_at, stock, in_stock, timed_out), reviews(rating, traded, timed_out, created_at)")
+    .order("name", { ascending: true });
+  if (term) query = query.ilike("name", "%"+term+"%");
+  const { data: all, error } = await query;
+
+  if (error) { setMsg(msg, "Couldn't load shops: " + error.message, "err"); return; }
+  const data = (all || []).filter(s => shopListedPublicly(s, s.profiles));
+  shopNameCache = data.map(s => s.name).filter(Boolean);
+  await ensureTipCounts(data);
+  if (!data.length && !activeFilterCount()) {
+    setMsg(msg, "");
+    setResultCount(null);
+    updateFilterChrome();
+    results.className = "";
+    results.innerHTML = emptyState(
+      term ? "No shop matches that name. Try another search or browse the market." : "No shops yet. Be the first trader on the board.",
+      term ? "../market/" : "../dashboard/",
+      term ? "Browse market" : "Create a shop"
+    );
+    return;
+  }
+  await paintShopResults(data);
+}
+
+function paintItemResults(data) {
+  lastItemRows = data;
+  lastResultFocus = -1;
+  const h = getHere();
+  renderPlaceFilters(data, l => l.shops);
+  let rows = applyFindFilters(data, l => l.shops, "listing");
+  if (cityFilter && !rows.some(l => l.shops && placeEquals(l.shops.city, cityFilter))) {
+    cityFilter = "";
+    syncUrl();
+    rows = applyFindFilters(data, l => l.shops, "listing");
+    renderPlaceFilters(data, l => l.shops);
+  }
+  const totalBefore = data.length;
+  if (!rows.length) {
+    setMsg(msg, "");
+    setResultCount(0, totalBefore, "listing");
+    results.className = "";
+    results.innerHTML = emptyState("Nobody matching those filters has it listed. Clear filters or try another item.", null, null);
+    return;
+  }
+  let note = "Click a row to open the shop. The columns icon pins a deal to compare.";
+  if (sortSel.value === "close" && !h) note = "Enter your X and Z to sort by distance.";
+  sortListings(rows, sortSel.value, h);
+  setMsg(msg, note);
+  setResultCount(rows.length, totalBefore, "listing");
+
+  const buying = mode.value === "want";
+  const qTerm = currentSearchTerm();
+  results.className = "offers";
+  results.innerHTML = rows.map(l => {
+    const s = l.shops;
+    const stale = daysAgo(l.updated_at) >= STALE_DAYS;
+    let tags = stockHtml(l);
+    if (stale) tags += ' <span class="tag warn">might be out of date</span>';
+    tags += medianTip(l, buying);
+    if (shopSaleActive(s)) tags += " " + saleBadgeHtml(s);
+    const pinned = comparePins.some(p => p.listing.id === l.id);
+    const place = placeHtml(s);
+    return tradeRow(l, {
+      buying,
+      stale,
+      href: "../shops/?id=" + l.shop_id + "&listing=" + l.id + (qTerm ? "&q=" + encodeURIComponent(qTerm) : ""),
+      tags,
+      meta: `${shopName(s)}${place ? " \u00b7 " + place : ""} \u00b7 ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} \u00b7 ${updatedHtml(l.updated_at)}`,
+      btns: iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` })
+    });
+  }).join("");
+}
+
+results.addEventListener("click", e => {
+  const b = e.target.closest("[data-compare]");
+  if (!b) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const id = Number(b.dataset.compare);
+  const l = lastItemRows.find(x => x.id === id);
+  if (!l || !l.shops) return;
+  toggleCompare(l, l.shops, mode.value === "want");
+  paintItemResults(lastItemRows);
+});
+
+async function showItems(term) {
+  const enchantMode = isEnchantMode();
+  if (enchantMode) {
+    heading.textContent = 'Listings with enchant "' + term + '"';
+    document.title = term + " enchants - CivMC Shops";
+  } else {
+    heading.textContent = (mode.value === "sell" ? "Shops selling " : "Shops buying ") + term;
+    document.title = (mode.value === "sell" ? "Selling " : "Buying ") + term + " - CivMC Shops";
+  }
+  setMsg(msg, "Searching...");
+  results.innerHTML = "";
+  results.className = "offers";
+  syncUrl();
+  pushRecentSearch(mode.value, term);
+  renderRecentChips();
+  setFindCompact(true);
+
+  const safeTerm = String(term).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
+  let query = sb
+    .from("listings")
+    .select("*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out), reviews(rating, traded, timed_out, created_at))")
+    .order("updated_at", { ascending: false })
+    .limit(200);
+  if (enchantMode) {
+    query = query.ilike("enchants", "%" + safeTerm + "%");
+  } else {
+    const col = mode.value === "sell" ? "sell_item" : "want_item";
+    // Match item name OR enchants (so "silk touch" / "protection" finds gear)
+    query = query.or(`${col}.ilike.%${safeTerm}%,enchants.ilike.%${safeTerm}%`);
+  }
+  if (inStockOnly) query = query.eq("in_stock", true);
+  if (!enchantMode && enchantFilter) {
+    const safeEnch = String(enchantFilter).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
+    if (safeEnch) query = query.ilike("enchants", "%" + safeEnch + "%");
+  }
+  const { data: all, error } = await query;
+
+  if (error) { setMsg(msg, "Search failed: " + error.message, "err"); return; }
+  const data = (all || []).filter(l => {
+    const sh = l.shops;
+    return sh && !l.timed_out && shopListedPublicly(sh, sh.profiles);
+  });
+  lastItemRows = data;
+  await ensureMarketMedians();
+  if (!data.length) {
+    setMsg(msg, "");
+    setResultCount(0, 0, "listing");
+    updateFilterChrome();
+    results.className = "";
+    results.innerHTML = emptyState(
+      enchantMode
+        ? "Nobody has that enchant listed yet. Try another name or browse the market."
+        : "Nobody has that listed yet. Try another item or check the market.",
+      "../market/",
+      "Browse market"
+    );
+    return;
+  }
+  paintItemResults(data);
+}
+
+function search(quiet) {
+  if (mode.value === "shop") return showShops(norm(q.value));
+  const term = currentSearchTerm();
+  if (!term) {
+    if (quiet && !norm(activeQueryInput().value) && results.classList.contains("shop-grid")) return showShops("");
+    if (!quiet) setMsg(msg, isEnchantMode() ? "Pick or type an enchant first." : "Type an item first.", "err");
+    return;
+  }
+  if (isEnchantMode()) {
+    if (![...sortSel.options].some(o => o.value === "enchant")) fillSorts(!!getHere());
+  } else if (![...sortSel.options].some(o => o.value === "deal")) {
+    fillSorts(sortSel.value === "close");
+  }
+  return showItems(term);
+}
+
+document.getElementById("go").onclick = () => search(false);
+q.addEventListener("keydown", e => { if (e.key === "Enter") search(false); });
+enchantPick.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    // place-combo may consume Enter when a suggestion is highlighted
+    setTimeout(() => search(false), 0);
+  }
+});
+enchantPick.addEventListener("input", () => {
+  if (isEnchantMode()) {
+    q.value = enchantPick.value;
+    renderEnchantChips();
+  }
+});
+q.setAttribute("list", ""); // custom autocomplete replaces datalist for Tab-accept
+wireSearchAutocomplete(q, term => {
+  const t = norm(term);
+  if (isEnchantMode()) return [];
+  if (mode.value === "shop") {
+    const names = shopNameCache.length ? shopNameCache : [];
+    return names.filter(n => !t || norm(n).includes(t)).slice(0, 8);
+  }
+  if (typeof ITEMS === "undefined") return [];
+  return ITEMS.filter(i => !t || norm(i).includes(t) || norm(i).startsWith(t)).slice(0, 8);
+}, { onAccept: () => { /* leave search to Enter / button */ } });
+
+if (typeof bindSearchCombo === "function") {
+  bindSearchCombo(enchantPick, () => {
+    if (typeof getEnchantCatalog === "function") return getEnchantCatalog();
+    return typeof COMMON_MC_ENCHANTS !== "undefined" ? COMMON_MC_ENCHANTS.slice() : [];
+  }, label => {
+    setSearchTerm(label);
+    renderEnchantChips();
+    search(false);
+  });
+}
+renderRecentChips();
+syncModeUi();
+
+(async () => {
+  fillSorts(false);
+  loadHere();
+  const preferClose = !!getHere();
+  fillSorts(preferClose);
+  // Prefetch shop names + enchant catalog for autocomplete
+  try {
+    const { data } = await sb.from("shops").select("name").order("name").limit(500);
+    shopNameCache = (data || []).map(s => s.name).filter(Boolean);
+  } catch (e) {}
+  try { await loadEnchantCatalog(); } catch (e) {}
+  const ps = new URLSearchParams(location.search);
+  const defaults = loadFilterDefaults();
+  // URL wins; otherwise restore saved defaults
+  nationFilter = ps.has("nation") ? (ps.get("nation") || "") : defaults.nation;
+  cityFilter = ps.has("city") ? (ps.get("city") || "") : defaults.city;
+  trustedOnly = ps.has("trusted") ? ps.get("trusted") === "1" : !!defaults.trusted;
+  {
+    const mr = ps.has("min_rating") ? parseFloat(ps.get("min_rating")) : defaults.minRating;
+    minRating = [3, 4, 4.5].includes(mr) ? mr : 0;
+  }
+  inStockOnly = ps.has("in_stock") ? ps.get("in_stock") === "1" : !!defaults.inStock;
+  updatedThisWeek = ps.has("updated_week") ? ps.get("updated_week") === "1" : !!defaults.updatedWeek;
+  hasLocationOnly = ps.has("has_loc") ? ps.get("has_loc") === "1" : !!defaults.hasLocation;
+  hasDirectionsOnly = ps.has("directions") ? ps.get("directions") === "1" : !!defaults.directions;
+  {
+    const mn = ps.has("min_rate") ? parseFloat(ps.get("min_rate")) : defaults.minRate;
+    minDealRate = mn != null && !isNaN(mn) ? mn : null;
+    const mx = ps.has("max_rate") ? parseFloat(ps.get("max_rate")) : defaults.maxRate;
+    maxDealRate = mx != null && !isNaN(mx) ? mx : null;
+  }
+  unitFilter = ps.has("unit")
+    ? (["each", "ci", "cs"].includes(ps.get("unit")) ? ps.get("unit") : "")
+    : (defaults.unit || "");
+  enchantFilter = ps.has("enchant") ? norm(ps.get("enchant") || "") : norm(defaults.enchant || "");
+  hasEnchantsOnly = ps.has("has_enchants") ? ps.get("has_enchants") === "1" : !!defaults.hasEnchants;
+  updateFilterChrome();
+  const hasCmp = /#cmp=/.test(location.hash);
+  const hasStoredCmp = loadCompareSpecs().length > 0;
+  if (ps.get("q") || ps.get("mode") === "enchant") {
+    mode.value = FIND_MODES.includes(ps.get("mode")) ? ps.get("mode") : "sell";
+    setSearchTerm(ps.get("q") || "");
+    q.setAttribute("list", "");
+    syncModeUi();
+    fillSorts(preferClose);
+    if (ps.get("sort") && [...sortSel.options].some(o => o.value === ps.get("sort"))) sortSel.value = ps.get("sort");
+    if (ps.get("q")) await search(false);
+    else if (mode.value === "shop") await showShops("");
+    else renderEnchantChips();
+  } else if (!hasCmp) {
+    mode.value = "sell";
+    syncModeUi();
+    fillSorts(preferClose, "shop");
+    await showShops("");
+  } else {
+    mode.value = "sell";
+    syncModeUi();
+    fillSorts(preferClose);
+  }
+  if (hasCmp || hasStoredCmp) await restoreCompareFromHash();
+})();
+</script>
+</body>
+</html>

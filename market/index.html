@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market - CivMC Shops</title>
+<link rel="stylesheet" href="../style.css?v=8">
+</head>
+<body class="market-page">
+<nav id="nav"></nav>
+<main>
+  <header class="page-hero">
+    <span class="page-eyebrow">Prices</span>
+    <h1>Market</h1>
+    <p class="sub meta market-scope-note" id="market-scope-note"></p>
+  </header>
+
+  <div class="stickybar market-sticky">
+    <div class="row market-scope-row">
+      <span class="meta market-scope-label">Market for</span>
+      <select id="m-nation" title="Which nation's shops set these rates">
+        <option value="">All nations</option>
+      </select>
+      <select id="m-city" title="Which city's shops set these rates">
+        <option value="">All cities</option>
+      </select>
+    </div>
+    <div class="row">
+      <input type="search" id="filter" placeholder="Filter items (bread, blaze rod...)">
+      <span class="meta">Show</span>
+      <select id="unit"><option value="1">diamonds per item</option><option value="64">diamonds per stack (64)</option></select>
+    </div>
+  </div>
+  <div class="msg" id="msg"></div>
+  <div class="intel-grid" id="intel" hidden></div>
+
+  <div class="card" id="detail" hidden>
+    <div class="top">
+      <div class="cardrow"><span id="d-icon"></span><h2 id="d-name" style="margin:0"></h2></div>
+      <div class="inline-actions">
+        <a class="small tag" id="d-sell" href="#">Shops selling &rarr;</a>
+        <a class="small tag" id="d-buy" href="#">Shops buying &rarr;</a>
+        <button type="button" id="d-close" data-ico="x" title="Close" aria-label="Close"></button>
+      </div>
+    </div>
+    <div class="citychips market-enchant-modes" id="d-enchant-modes" hidden></div>
+    <div class="stats" id="d-stats"></div>
+    <div id="d-listings" class="market-item-listings" hidden></div>
+    <div class="row rangebtns" id="ranges">
+      <span class="meta">History</span>
+      <button class="small" data-range="14">2 weeks</button>
+      <button class="small" data-range="30">30 days</button>
+      <button class="small" data-range="90">90 days</button>
+      <button class="small" data-range="0">All</button>
+    </div>
+    <div class="chartwrap" id="chart"></div>
+    <div class="legend" id="legend"></div>
+    <p class="meta" id="d-note" style="margin-bottom:0"></p>
+  </div>
+
+  <h2>All items</h2>
+  <div class="mrow head mrow-market">
+    <span>Item</span>
+    <span>Trend</span>
+    <span id="h-sell">Sell (unenchanted)</span>
+    <span id="h-buy">Buy (unenchanted)</span>
+    <span id="h-spread">Spread</span>
+    <span>Shops</span>
+  </div>
+  <div id="list"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+<script src="../mock.js"></script>
+<script src="../app.js?v=13"></script>
+<script>
+const msg = document.getElementById("msg");
+const unitSel = document.getElementById("unit");
+const filterEl = document.getElementById("filter");
+const nationEl = document.getElementById("m-nation");
+const cityEl = document.getElementById("m-city");
+const SELL = "#7fb35a", BUY = "#d9a441";
+const DAYMS = 86400000;
+let byItem = {};          // item -> { sell: row|null, buy: row|null }
+let sparkByItem = {};     // item -> [median...] oldest\u2192newest (sell side)
+let selected = null;
+let itemHistory = { sell: [], buy: [] };
+let rangeDays = 30;
+let allShops = [];
+let allListings = [];
+let allProfiles = [];
+let enchantModeId = "plain"; // URL ?enchant=… for enchantable items
+let enchantModes = [];       // modes for selected item
+
+const k = () => Number(unitSel.value);
+const unitWord = () => k() === 64 ? "stack" : "item";
+function fmtD(v) {
+  if (v == null || isNaN(v)) return "-";
+  if (v >= 100) return v.toFixed(0);
+  if (v >= 10) return v.toFixed(1);
+  if (v >= 1) return v.toFixed(2);
+  if (v === 0) return "0";
+  // Keep tiny diamond rates readable (avoid 8.5e-3 style on chart axes)
+  const s = Number(v).toPrecision(2);
+  if (!/[eE]/.test(s)) return String(+s);
+  const digits = Math.min(8, Math.max(2, Math.ceil(-Math.log10(Math.abs(v))) + 1));
+  return Number(v).toFixed(digits).replace(/\.?0+$/, "") || "0";
+}
+const priceCell = (m) => m
+  ? `<b>${fmtD(m.median * k())}</b> d<small>${fmtD(m.low * k())} - ${fmtD(m.high * k())} \u00b7 ${m.n} shop${m.n === 1 ? "" : "s"}</small>`
+  : '<span class="meta">-</span>';
+function spreadCell(e) {
+  const sp = marketSpread(e.sell, e.buy);
+  if (sp == null) return '<span class="meta">-</span>';
+  const v = sp * k();
+  const cls = v > 0 ? "spread-pos" : v < 0 ? "spread-neg" : "";
+  return `<span class="${cls}" title="Sell median - buy median">${v >= 0 ? "+" : ""}${fmtD(v)} d</span>`;
+}
+
+function applyMarketRows(rows) {
+  byItem = {};
+  (rows || []).forEach(m => { (byItem[m.item] = byItem[m.item] || { sell: null, buy: null })[m.side] = m; });
+}
+
+function fillPlaceOptions() {
+  const nations = [...new Set(allShops.map(s => (s.nation || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  const curNation = nationEl.value;
+  nationEl.innerHTML = '<option value="">All nations</option>' +
+    nations.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  if (curNation && nations.some(n => n === curNation)) nationEl.value = curNation;
+
+  const scoped = nationEl.value.trim()
+    ? allShops.filter(s => placeEquals(s.nation, nationEl.value))
+    : allShops;
+  const cities = [...new Set(scoped.map(s => (s.city || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  const curCity = cityEl.value;
+  cityEl.innerHTML = '<option value="">All cities</option>' +
+    cities.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  if (curCity && cities.some(c => c === curCity)) cityEl.value = curCity;
+  else if (curCity && nationEl.value) cityEl.value = "";
+}
+
+function marketPlaceFilter() {
+  return { nation: nationEl.value.trim(), city: cityEl.value.trim() };
+}
+
+function paintMarketScopeNote() {
+  const note = document.getElementById("market-scope-note");
+  if (!note) return;
+  const { nation, city } = marketPlaceFilter();
+  const bits = [];
+  if (city) bits.push(city);
+  if (nation && (!city || !placeEquals(nation, city))) bits.push(nation);
+  if (!bits.length) {
+    note.textContent = "Unenchanted rates from all public shops server-wide. Pick a nation or city to see local market prices.";
+    return;
+  }
+  note.textContent = "Unenchanted rates from shops in " + bits.join(" \u00b7 ") + ". Item filter below only hides rows in this table.";
+}
+
+function marketScopeQuery() {
+  const p = new URLSearchParams();
+  const { nation, city } = marketPlaceFilter();
+  if (nation) p.set("nation", nation);
+  if (city) p.set("city", city);
+  const s = p.toString();
+  return s ? ("&" + s) : "";
+}
+
+function syncMarketScopeUrl() {
+  const u = new URL(location.href);
+  const { nation, city } = marketPlaceFilter();
+  if (nation) u.searchParams.set("nation", nation);
+  else u.searchParams.delete("nation");
+  if (city) u.searchParams.set("city", city);
+  else u.searchParams.delete("city");
+  if (selected && enchantModes.length && enchantModeId) u.searchParams.set("enchant", enchantModeId);
+  else if (!selected) u.searchParams.delete("enchant");
+  if (selected) u.searchParams.set("item", selected);
+  window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+}
+
+function currentEnchantMode() {
+  return enchantModes.find(m => m.id === enchantModeId) || enchantModes[0] || null;
+}
+
+/** Listings for the selected item that match the active enchant mode (and are live). */
+function itemListingsForMode(item) {
+  const mode = currentEnchantMode();
+  const { nation, city } = marketPlaceFilter();
+  const shopOk = {};
+  (allShops || []).forEach(s => {
+    const p = (allProfiles || []).find(x => String(x.id) === String(s.owner_id));
+    if (!s || !shopListedPublicly(s, p)) return;
+    if (!placeFilterMatch(s, city, nation)) return;
+    shopOk[String(s.id)] = true;
+  });
+  return (allListings || []).filter(l => {
+    if (!(l.in_stock && !l.timed_out && shopOk[String(l.shop_id)])) return false;
+    if (isBundleItem(l.sell_item) || isBundleItem(l.want_item)) return false;
+    if (l.sell_item !== item && l.want_item !== item) return false;
+    if (enchantModes.length && mode && !listingMatchesEnchantMode(l, mode)) return false;
+    return true;
+  });
+}
+
+/** Recompute sell/buy rates for one item under the active enchant mode. */
+function itemRatesForMode(item) {
+  const filtered = itemListingsForMode(item);
+  // Caller already applied enchant mode (plain/max/silk/…); do not re-drop enchanted
+  const rows = computeMarketNow(filtered, allShops, allProfiles, marketPlaceFilter(), { unenchantedOnly: false });
+  const out = { sell: null, buy: null };
+  (rows || []).forEach(m => { if (m.item === item) out[m.side] = m; });
+  return out;
+}
+
+function paintEnchantModes() {
+  const box = document.getElementById("d-enchant-modes");
+  if (!box) return;
+  if (!selected || !enchantModes.length) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = '<span class="meta">Enchants</span>' + enchantModes.map(m =>
+    `<button type="button" data-enchant-mode="${esc(m.id)}" class="${m.id === enchantModeId ? "on" : ""}">${esc(m.label)}</button>`
+  ).join("");
+}
+
+function enchantFindQuery() {
+  // Find page uses substring enchant filter; map modes to useful needles
+  const id = enchantModeId;
+  if (!id || id === "plain") return { enchant: "", hasEnchants: false };
+  if (id === "silk" || id === "debris_silk") return { enchant: "silk touch", hasEnchants: true };
+  if (id === "fortune" || id === "debris_fortune") return { enchant: "fortune", hasEnchants: true };
+  if (id === "kb") return { enchant: "knockback", hasEnchants: true };
+  if (id === "debris") return { enchant: "efficiency", hasEnchants: true };
+  if (id === "density") return { enchant: "density", hasEnchants: true };
+  if (id === "breach") return { enchant: "breach", hasEnchants: true };
+  if (id === "multishot") return { enchant: "multishot", hasEnchants: true };
+  if (id === "piercing") return { enchant: "piercing", hasEnchants: true };
+  if (id === "loyalty") return { enchant: "loyalty", hasEnchants: true };
+  if (id === "riptide") return { enchant: "riptide", hasEnchants: true };
+  return { enchant: "", hasEnchants: true };
+}
+
+function findHref(mode, item) {
+  const q = new URLSearchParams();
+  q.set("mode", mode);
+  q.set("q", item);
+  const { nation, city } = marketPlaceFilter();
+  if (nation) q.set("nation", nation);
+  if (city) q.set("city", city);
+  if (enchantModes.length) {
+    const ef = enchantFindQuery();
+    if (ef.enchant) q.set("enchant", ef.enchant);
+    if (ef.hasEnchants) q.set("has_enchants", "1");
+    else if (enchantModeId === "plain") { /* unenchanted: Find has no "no enchants" flag */ }
+  }
+  return "../home/?" + q.toString();
+}
+
+async function loadSparks() {
+  sparkByItem = {};
+  const since = new Date(Date.now() - 30 * DAYMS).toISOString().slice(0, 10);
+  const { data } = await sb.from("market_history").select("day, item, side, median")
+    .eq("side", "sell").gte("day", since).order("day", { ascending: true });
+  (data || []).forEach(h => {
+    (sparkByItem[h.item] = sparkByItem[h.item] || []).push(Number(h.median));
+  });
+}
+
+async function recompute() {
+  applyMarketRows(computeMarketNow(allListings, allShops, allProfiles, marketPlaceFilter()));
+  paintMarketScopeNote();
+  renderList();
+  await renderIntel();
+}
+
+async function load() {
+  try { await sb.rpc("take_market_snapshot"); } catch (e) {}
+  const [{ data: shops }, { data: listings }, { data: profiles }] = await Promise.all([
+    sb.from("shops").select("id, nation, city, timed_out, archived, is_open, owner_id"),
+    sb.from("listings").select("*"),
+    sb.from("profiles").select("id, timed_out")
+  ]);
+  allShops = shops || [];
+  allListings = listings || [];
+  allProfiles = profiles || [];
+  const ps = new URLSearchParams(location.search);
+  const urlNation = ps.get("nation") || "";
+  const urlCity = ps.get("city") || "";
+  if (urlNation && allShops.some(s => placeEquals(s.nation, urlNation))) nationEl.value = urlNation;
+  fillPlaceOptions();
+  if (urlCity && allShops.some(s => placeFilterMatch(s, urlCity, nationEl.value))) cityEl.value = urlCity;
+  await loadSparks();
+  await recompute();
+  const psItem = new URLSearchParams(location.search);
+  const want = psItem.get("item");
+  if (want && byItem[want]) openItem(want, { enchant: psItem.get("enchant") || undefined });
+  if (!Object.keys(byItem).length) setMsg(msg, "No prices yet. Prices appear once shops list items for diamonds.");
+}
+
+async function renderIntel() {
+  const box = document.getElementById("intel");
+  const items = Object.keys(byItem);
+  if (!items.length) { box.hidden = true; return; }
+
+  const thin = items.map(i => ({ i, m: byItem[i].sell })).filter(x => x.m && x.m.n > 0 && x.m.n < 3)
+    .sort((a, b) => a.m.n - b.m.n || a.i.localeCompare(b.i)).slice(0, 6);
+
+  const spreads = items.map(i => {
+    const m = byItem[i].sell;
+    if (!m || !m.low || m.n < 2) return null;
+    return { i, m, ratio: m.high / m.low };
+  }).filter(Boolean).sort((a, b) => b.ratio - a.ratio).slice(0, 6);
+
+  const { data: hist } = await sb.from("market_history").select("day, item, side, median")
+    .eq("side", "sell").order("day", { ascending: false }).limit(400);
+  const weekAgo = Date.now() - 7 * DAYMS;
+  const older = {};
+  (hist || []).forEach(h => {
+    if (h.side !== "sell") return;
+    const t = Date.parse(h.day);
+    if (t > weekAgo) return;
+    if (!older[h.item] || t > older[h.item].t) older[h.item] = { t, median: Number(h.median) };
+  });
+  const movers = items.map(i => {
+    const now = byItem[i].sell;
+    const old = older[i];
+    if (!now || !old || !old.median) return null;
+    const pct = ((now.median - old.median) / old.median) * 100;
+    return { i, now, old, pct };
+  }).filter(x => x && Math.abs(x.pct) >= 5).sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, 6);
+
+  const line = (label, rows, render) => `<div class="intel-card"><h3>${label}</h3>${
+    rows.length ? rows.map(render).join("") : '<p class="meta" style="margin:0">Nothing notable yet.</p>'
+  }</div>`;
+
+  box.hidden = false;
+  box.innerHTML =
+    line("Movers (~7 days)", movers, m =>
+      `<div class="rowline"><a href="#" data-open="${esc(m.i)}">${esc(m.i)}</a>
+        <span class="delta ${m.pct >= 0 ? "up" : "down"}">${m.pct >= 0 ? "+" : ""}${m.pct.toFixed(0)}%</span></div>`) +
+    line("Wide spreads", spreads, s =>
+      `<div class="rowline"><a href="#" data-open="${esc(s.i)}">${esc(s.i)}</a>
+        <span class="meta">\u00d7 range \u00b7 ${s.m.n} shops</span></div>`) +
+    line("Thin markets", thin, t =>
+      `<div class="rowline"><a href="#" data-open="${esc(t.i)}">${esc(t.i)}</a>
+        <span class="tag warn">${t.m.n} shop${t.m.n === 1 ? "" : "s"}</span></div>`);
+}
+document.getElementById("intel").addEventListener("click", e => {
+  const a = e.target.closest("[data-open]");
+  if (!a) return;
+  e.preventDefault();
+  openItem(a.dataset.open);
+});
+
+function filteredItems() {
+  const f = norm(filterEl.value);
+  return Object.keys(byItem).filter(i => !f || i.includes(f))
+    .sort((a, b) => total(b) - total(a) || a.localeCompare(b));
+}
+
+function renderList() {
+  const items = filteredItems();
+  document.getElementById("h-sell").textContent = "Sell (unenchanted, d / " + unitWord() + ")";
+  document.getElementById("h-buy").textContent = "Buy (unenchanted, d / " + unitWord() + ")";
+  document.getElementById("h-spread").textContent = "Spread (d / " + unitWord() + ")";
+  document.getElementById("list").innerHTML = items.map(i => {
+    const e = byItem[i];
+    return `<div class="mrow mrow-market${i === selected ? " sel" : ""}" data-item="${esc(i)}">
+      <span class="itemname">${itemIcon(i, true)}<b>${esc(i)}</b></span>
+      <span class="m-spark-cell">${marketSparkline(sparkByItem[i], SELL)}</span>
+      <span>${priceCell(e.sell)}</span><span>${priceCell(e.buy)}</span>
+      <span>${spreadCell(e)}</span>
+      <span class="meta">${total(i)}</span></div>`;
+  }).join("") || '<p class="meta" style="padding:10px 12px">Nothing matches.</p>';
+}
+const total = i => ((byItem[i].sell || {}).n || 0) + ((byItem[i].buy || {}).n || 0);
+
+async function openItem(item, opts) {
+  selected = item;
+  enchantModes = typeof marketEnchantModesForItem === "function" ? marketEnchantModesForItem(item) : [];
+  const prefer = (opts && opts.enchant) || new URLSearchParams(location.search).get("enchant") || "plain";
+  enchantModeId = enchantModes.some(m => m.id === prefer) ? prefer : (enchantModes[0] ? enchantModes[0].id : "plain");
+  renderList();
+  const d = document.getElementById("detail");
+  d.hidden = false;
+  document.getElementById("d-icon").innerHTML = itemIcon(item, true);
+  document.getElementById("d-name").textContent = item;
+  document.title = item + " - Market - CivMC Shops";
+  document.getElementById("d-sell").href = findHref("sell", item);
+  document.getElementById("d-buy").href = findHref("want", item);
+  paintEnchantModes();
+  syncMarketScopeUrl();
+  d.scrollIntoView({ block: "nearest", behavior: "smooth" });
+
+  const { data, error } = await sb.from("market_history").select("*").eq("item", item).order("day", { ascending: true });
+  if (error) { document.getElementById("chart").innerHTML = '<p class="meta">Couldn\'t load history.</p>'; return; }
+  itemHistory = { sell: (data || []).filter(h => h.side === "sell"), buy: (data || []).filter(h => h.side === "buy") };
+  renderDetail();
+}
+
+function stat(label, m, color) {
+  if (!m) return `<div class="stat"><div class="lbl"><i style="background:${color}"></i> ${label}</div><div class="big">-</div><div class="meta">nobody lists this right now</div></div>`;
+  return `<div class="stat">
+    <div class="lbl"><i style="background:${color}"></i> ${label}</div>
+    <div class="big">${fmtD(m.median * k())} <span class="meta">d / ${unitWord()}</span></div>
+    <div class="meta">usual range ${fmtD(m.low * k())} - ${fmtD(m.high * k())} \u00b7 ${m.n} shop${m.n === 1 ? "" : "s"}
+      ${m.outliers ? ` \u00b7 ${m.outliers} odd price${m.outliers === 1 ? "" : "s"} ignored` : ""}
+      ${m.n < 3 ? ' <span class="tag warn">few shops</span>' : ""}</div></div>`;
+}
+
+function renderItemListings(item) {
+  const box = document.getElementById("d-listings");
+  if (!box) return;
+  const rows = itemListingsForMode(item);
+  if (!enchantModes.length) { box.hidden = true; box.innerHTML = ""; return; }
+  const mode = currentEnchantMode();
+  const label = mode ? mode.label : "";
+  // Compact rate chips: up to 12 live offers matching this enchant mode
+  const chips = rows.slice(0, 12).map(l => {
+    const selling = l.sell_item === item;
+    const rate = dealRate(l, !selling);
+    const shop = (allShops || []).find(s => String(s.id) === String(l.shop_id));
+    const shopName = shop ? shop.name : "Shop";
+    const side = selling ? "sells" : "buys";
+    const ench = normalizeListingEnchants(l.enchants);
+    const tip = [shopName, side, ench || "no enchants"].filter(Boolean).join(" · ");
+    return `<a class="chip" href="../shops/?id=${esc(String(l.shop_id))}" title="${esc(tip)}">${esc(shopName)} · ${rate != null ? fmtD(rate * k()) + " d" : "—"}</a>`;
+  }).join("");
+  box.hidden = false;
+  box.innerHTML = `<div class="meta" style="margin:0 0 6px">${rows.length} listing${rows.length === 1 ? "" : "s"} · ${esc(label)}</div>
+    <div class="market-listing-chips">${chips || '<span class="meta">No matching listings right now.</span>'}</div>`;
+}
+
+function renderDetail() {
+  if (!selected) return;
+  paintEnchantModes();
+  document.getElementById("d-sell").href = findHref("sell", selected);
+  document.getElementById("d-buy").href = findHref("want", selected);
+  // Enchantable items: rates from filtered listings; others use aggregate byItem
+  const e = enchantModes.length ? itemRatesForMode(selected) : (byItem[selected] || {});
+  document.getElementById("d-stats").innerHTML = stat("Shops are selling for", e.sell, SELL) + stat("Shops are buying at", e.buy, BUY);
+  renderItemListings(selected);
+  document.querySelectorAll("#ranges button[data-range]").forEach(b => b.classList.toggle("on", Number(b.dataset.range) === rangeDays));
+  const cut = rangeDays ? Date.now() - rangeDays * DAYMS : 0;
+  const pick = rows => rows.filter(h => Date.parse(h.day) >= cut)
+    .map(h => ({ d: h.day, m: Number(h.median), lo: Number(h.low), hi: Number(h.high), n: h.n }));
+  const series = [{ name: "Selling for", color: SELL, pts: pick(itemHistory.sell) }, { name: "Buying at", color: BUY, pts: pick(itemHistory.buy) }]
+    .filter(s => s.pts.length);
+  drawChart(document.getElementById("chart"), series);
+  document.getElementById("legend").innerHTML = series.map(s => `<span><i style="background:${s.color}"></i>${s.name} (line = typical, shading = usual range)</span>`).join("");
+  const days = new Set([...itemHistory.sell, ...itemHistory.buy].map(h => h.day)).size;
+  const { nation, city } = marketPlaceFilter();
+  const scopeBits = [city, nation].filter(Boolean);
+  const scopeNote = scopeBits.length
+    ? ` Live rates above are for ${scopeBits.join(" \u00b7 ")} only; history chart is still server-wide.`
+    : "";
+  const enchNote = enchantModes.length
+    ? ` Live rates and listing chips use the “${(currentEnchantMode() || {}).label || enchantModeId}” enchant filter; history is all enchants.`
+    : "";
+  document.getElementById("d-note").textContent = (days < 7
+    ? `Only ${days} day${days === 1 ? "" : "s"} of history so far. The graph fills in as days pass.`
+    : "Prices are saved once a day. Shops with odd prices are left out of both the line and the shading.") + scopeNote + enchNote;
+}
+
+function drawChart(el, series) {
+  const kk = k();
+  const all = series.flatMap(s => s.pts);
+  if (!all.length) { el.innerHTML = '<p class="meta">No history in this range yet.</p>'; return; }
+  const W = 720, H = 290, R = 14, T = 12, B = 28;
+  const days = [...new Set(all.map(p => p.d))].sort();
+  let lo = Math.min(...all.map(p => p.lo * kk)), hi = Math.max(...all.map(p => p.hi * kk));
+  const pad = (hi - lo) * 0.12 || hi * 0.1 || 1;
+  lo = Math.max(0, lo - pad); hi += pad;
+
+  const raw = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw || 1e-9)));
+  const step = ([1, 2, 2.5, 5, 10].find(m => m * mag >= raw) || 10) * mag;
+  const yTicks = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) yTicks.push({ v, label: fmtD(v) });
+  // Extra left pad so end-anchored axis labels (e.g. 0.0085) are not clipped by the viewBox
+  const L = Math.max(56, Math.min(88, 16 + Math.max(4, ...yTicks.map(t => t.label.length)) * 7.2));
+  const t0 = Date.parse(days[0]), span = Math.max(Date.parse(days[days.length - 1]) - t0, DAYMS);
+  const xOf = d => L + (days.length === 1 ? (W - L - R) / 2 : (Date.parse(d) - t0) / span * (W - L - R));
+  const yOf = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+
+  let grid = "";
+  yTicks.forEach(({ v, label }) => {
+    grid += `<line x1="${L}" x2="${W - R}" y1="${yOf(v)}" y2="${yOf(v)}" stroke="#3a3e37" stroke-width="1"/><text x="${L - 8}" y="${yOf(v) + 4}" text-anchor="end">${label}</text>`;
+  });
+  const nTicks = Math.min(6, days.length);
+  for (let i = 0; i < nTicks; i++) {
+    const d = days[Math.round(i * (days.length - 1) / Math.max(1, nTicks - 1))];
+    const anchor = i === 0 && nTicks > 1 ? "start" : i === nTicks - 1 && nTicks > 1 ? "end" : "middle";
+    grid += `<text x="${xOf(d)}" y="${H - 8}" text-anchor="${anchor}">${new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}</text>`;
+  }
+
+  let shapes = "";
+  series.forEach(s => {
+    const top = s.pts.map(p => `${xOf(p.d)},${yOf(p.hi * kk)}`), bot = s.pts.slice().reverse().map(p => `${xOf(p.d)},${yOf(p.lo * kk)}`);
+    if (s.pts.length > 1) shapes += `<polygon points="${top.concat(bot).join(" ")}" fill="${s.color}" opacity=".16"/>`;
+    shapes += `<polyline fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linejoin="round" points="${s.pts.map(p => xOf(p.d) + "," + yOf(p.m * kk)).join(" ")}"/>`;
+    if (s.pts.length <= 45) shapes += s.pts.map(p => `<circle cx="${xOf(p.d)}" cy="${yOf(p.m * kk)}" r="2.6" fill="${s.color}"/>`).join("");
+  });
+  el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="price history">${grid}${shapes}
+    <line id="guide" y1="${T}" y2="${H - B}" stroke="#98998c" stroke-dasharray="3 3" visibility="hidden"/>
+    <rect id="hit" x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent"/></svg><div class="tip" id="tip" hidden></div>`;
+
+  const svg = el.querySelector("svg"), tip = el.querySelector("#tip"), guide = el.querySelector("#guide");
+  const show = ev => {
+    const r = svg.getBoundingClientRect();
+    const px = (ev.clientX - r.left) / r.width * W;
+    const d = days.reduce((best, x) => Math.abs(xOf(x) - px) < Math.abs(xOf(best) - px) ? x : best, days[0]);
+    guide.setAttribute("x1", xOf(d)); guide.setAttribute("x2", xOf(d)); guide.setAttribute("visibility", "visible");
+    const rows = series.map(s => { const p = s.pts.find(q => q.d === d); return p ? `<div><span style="color:${s.color}">\u25cf</span> ${s.name}: <b>${fmtD(p.m * kk)}</b> (${fmtD(p.lo * kk)} - ${fmtD(p.hi * kk)}, ${p.n} shop${p.n === 1 ? "" : "s"})</div>` : ""; }).join("");
+    tip.innerHTML = `<b>${new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}</b>${rows}`;
+    tip.hidden = false;
+    const pct = xOf(d) / W * 100;
+    tip.style.left = pct > 60 ? "auto" : (pct + 2) + "%";
+    tip.style.right = pct > 60 ? (100 - pct + 2) + "%" : "auto";
+  };
+  svg.addEventListener("mousemove", show);
+  svg.addEventListener("mouseleave", () => { tip.hidden = true; guide.setAttribute("visibility", "hidden"); });
+}
+
+document.getElementById("list").addEventListener("click", e => { const r = e.target.closest("[data-item]"); if (r) openItem(r.dataset.item); });
+document.getElementById("ranges").addEventListener("click", e => { const b = e.target.closest("button[data-range]"); if (b) { rangeDays = Number(b.dataset.range); renderDetail(); } });
+document.getElementById("d-enchant-modes").addEventListener("click", e => {
+  const b = e.target.closest("[data-enchant-mode]");
+  if (!b) return;
+  enchantModeId = b.dataset.enchantMode;
+  syncMarketScopeUrl();
+  renderDetail();
+});
+document.getElementById("d-close").onclick = () => {
+  document.getElementById("detail").hidden = true;
+  selected = null;
+  enchantModes = [];
+  enchantModeId = "plain";
+  const box = document.getElementById("d-listings");
+  if (box) { box.hidden = true; box.innerHTML = ""; }
+  document.getElementById("d-enchant-modes").hidden = true;
+  const u = new URL(location.href);
+  u.searchParams.delete("item");
+  u.searchParams.delete("enchant");
+  window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+  renderList();
+};
+unitSel.addEventListener("change", () => { renderList(); if (selected) renderDetail(); });
+filterEl.addEventListener("input", renderList);
+function onMarketScopeChange() {
+  fillPlaceOptions();
+  syncMarketScopeUrl();
+  recompute();
+  if (selected) renderDetail();
+}
+nationEl.addEventListener("change", onMarketScopeChange);
+cityEl.addEventListener("change", onMarketScopeChange);
+
+load();
+</script>
+</body>
+</html>
