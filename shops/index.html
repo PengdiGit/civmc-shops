@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shop - CivMC Shops</title>
+<meta name="description" content="CivMC shop page — listings, reviews, and location.">
+<meta name="theme-color" content="#7fb35a">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CivMC Shops">
+<meta property="og:title" content="Shop - CivMC Shops">
+<meta property="og:description" content="CivMC shop page — listings, reviews, and location.">
+<meta property="og:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/chest.png">
+<meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="../style.css?v=19">
 </head>
 <body class="shop-page">
@@ -299,6 +307,16 @@ async function load() {
   }
   shop = s;
   document.title = s.name + " - CivMC Shops";
+  const placePlain = [canonicalPlace(s.city), canonicalPlace(s.nation)].filter(Boolean)
+    .filter((v, i, a) => a.findIndex(x => String(x).toLowerCase() === String(v).toLowerCase()) === i)
+    .join(" · ");
+  const placeBits = [placePlain, s.x != null && s.z != null ? s.x + ", " + s.z : ""].filter(Boolean).join(" · ");
+  setPageMeta({
+    title: s.name + " - CivMC Shops",
+    description: (stripCodes(s.description || "") || placeBits || "CivMC shop").replace(/\s+/g, " ").slice(0, 180),
+    url: absPageHref("shops", { id: s.id, ...(hlListingId ? { listing: hlListingId } : {}) }),
+    image: s.icon_path ? publicUrl(s.icon_path) : itemImg(s.icon_item || "chest")
+  });
   document.getElementById("name").innerHTML = shopName(s) + (saleBadgeHtml(s) ? " " + saleBadgeHtml(s) : "");
   document.getElementById("shopicon").innerHTML = shopIcon(s, "hero");
   const dEl = document.getElementById("desc");
@@ -547,11 +565,11 @@ document.querySelector("main").addEventListener("click", async e => {
     return;
   }
   if (act === "share") {
-    const ok = await copyText(location.href.split("#")[0]);
-    const label = btn.textContent;
-    btn.textContent = ok ? "Copied!" : "Copy failed";
-    setTimeout(() => { btn.textContent = label; }, 1500);
-    setMsg(msg, ok ? "Shop link copied." : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");
+    const shareUrl = shopId
+      ? embedHref({ shop: shopId, listing: hlListingId || undefined })
+      : location.href.split("#")[0];
+    const ok = await copyText(shareUrl);
+    setMsg(msg, ok ? "Shop link copied (Discord-friendly embed)." : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");
     return;
   }
   if (act === "copy-coords") {

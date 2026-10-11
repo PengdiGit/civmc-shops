@@ -181,6 +181,105 @@ function pageHref(slug, search, hash) {
   if (hash != null && hash !== "") h = String(hash).startsWith("#") ? String(hash) : "#" + hash;
   return siteBase() + "/" + s + "/" + q + h;
 }
+/** Absolute GitHub Pages origin (even when developing on localhost). */
+function sitePublicOrigin() {
+  if (typeof location !== "undefined" && location.hostname === "pengdigit.github.io") return location.origin;
+  return "https://pengdigit.github.io";
+}
+/** Absolute page URL on the live site (or current origin when already on GitHub Pages). */
+function absPageHref(slug, search, hash) {
+  const rel = pageHref(slug, search, hash);
+  if (/^https?:/i.test(rel)) return rel;
+  const origin = (typeof location !== "undefined" && location.hostname === "pengdigit.github.io")
+    ? location.origin
+    : sitePublicOrigin();
+  // When developing at site root (no /civmc-shops prefix), still share production paths.
+  if (!siteBase() && origin === sitePublicOrigin()) return origin + "/civmc-shops" + rel;
+  return origin + rel;
+}
+/**
+ * Shareable URL that Discord/Slack/iMessage can unfurl (Supabase embed edge function).
+ * Falls back to the real page URL under USE_MOCK / missing config.
+ * params: { shop, listing, profile, name, item, enchant, q, mode }
+ */
+function embedHref(params) {
+  const p = params || {};
+  const pageFallback = () => {
+    if (p.shop != null) {
+      const q = { id: p.shop };
+      if (p.listing != null && p.listing !== "") q.listing = p.listing;
+      return absPageHref("shops", q);
+    }
+    if (p.profile) return absPageHref("profile", { id: p.profile });
+    if (p.name) return absPageHref("profile", { name: p.name });
+    if (p.item) {
+      const q = { item: p.item };
+      if (p.enchant) q.enchant = p.enchant;
+      return absPageHref("market", q);
+    }
+    if (p.q != null || p.mode) {
+      const q = {};
+      if (p.q) q.q = p.q;
+      if (p.mode) q.mode = p.mode;
+      return absPageHref("home", q);
+    }
+    return absPageHref("home");
+  };
+  if (typeof USE_MOCK !== "undefined" && USE_MOCK) return pageFallback();
+  if (typeof SUPABASE_URL !== "string" || !SUPABASE_URL) return pageFallback();
+  try {
+    const u = new URL(String(SUPABASE_URL).replace(/\/$/, "") + "/functions/v1/embed");
+    [["shop", p.shop], ["listing", p.listing], ["profile", p.profile], ["name", p.name],
+      ["item", p.item], ["enchant", p.enchant], ["q", p.q], ["mode", p.mode]].forEach(([k, v]) => {
+      if (v != null && v !== "") u.searchParams.set(k, String(v));
+    });
+    return u.href;
+  } catch (e) {
+    return pageFallback();
+  }
+}
+/** Update <title> + Open Graph / Twitter tags for in-browser / some previews. */
+function setPageMeta(opts) {
+  const o = opts || {};
+  if (o.title) document.title = o.title;
+  const ensure = (attr, key, content) => {
+    if (content == null || content === "") return;
+    let el = document.head.querySelector("meta[" + attr + "=\"" + key + "\"]");
+    if (!el) {
+      el = document.createElement("meta");
+      el.setAttribute(attr, key);
+      document.head.appendChild(el);
+    }
+    el.setAttribute("content", content);
+  };
+  if (o.title) {
+    ensure("property", "og:title", o.title);
+    ensure("name", "twitter:title", o.title);
+  }
+  if (o.description != null) {
+    ensure("name", "description", o.description);
+    ensure("property", "og:description", o.description);
+    ensure("name", "twitter:description", o.description);
+  }
+  if (o.url) {
+    ensure("property", "og:url", o.url);
+    let link = document.head.querySelector("link[rel=\"canonical\"]");
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "canonical";
+      document.head.appendChild(link);
+    }
+    link.href = o.url;
+  }
+  if (o.image) {
+    ensure("property", "og:image", o.image);
+    ensure("name", "twitter:image", o.image);
+  }
+  ensure("property", "og:type", "website");
+  ensure("property", "og:site_name", "CivMC Shops");
+  ensure("name", "twitter:card", "summary");
+  ensure("name", "theme-color", "#7fb35a");
+}
 function navPageKey() {
   const slug = currentPageSlug();
   if (slug === "home") return "find";

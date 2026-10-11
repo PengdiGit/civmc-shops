@@ -4,7 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CivMC Shops</title>
-<link rel="stylesheet" href="../style.css?v=9">
+<meta name="description" content="Find CivMC shops, compare diamond prices, and browse the live market.">
+<meta name="theme-color" content="#7fb35a">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CivMC Shops">
+<meta property="og:title" content="CivMC Shops">
+<meta property="og:description" content="Find CivMC shops, compare diamond prices, and browse the live market.">
+<meta property="og:url" content="https://pengdigit.github.io/civmc-shops/home/">
+<meta property="og:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/chest.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="CivMC Shops">
+<meta name="twitter:description" content="Find CivMC shops, compare diamond prices, and browse the live market.">
+<meta name="twitter:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/chest.png">
+<link rel="stylesheet" href="../style.css?v=10">
 </head>
 <body class="find-page">
 <nav id="nav"></nav>
@@ -17,6 +29,7 @@
         <p class="sub">Search by item, enchant, or shop name. Press <kbd>/</kbd> to focus search.</p>
       </div>
       <div class="find-board-side">
+        <button type="button" id="find-share" class="small" data-ico="share" title="Copy search link" aria-label="Share search">Share</button>
         <a class="btn-favourites" href="../favourites/">Favourites</a>
         <div class="find-loc" title="Used for Closest sort and distance on results">
           <span class="find-loc-label meta">Your coords</span>
@@ -945,7 +958,13 @@ async function ensureTipCounts(shops) {
 
 async function showShops(term) {
   heading.textContent = term ? 'Shops matching "' + term + '"' : "All shops";
-  document.title = (term ? term + " shops" : "Find a shop") + " - CivMC Shops";
+  const title = (term ? term + " shops" : "Find a shop") + " - CivMC Shops";
+  setPageMeta({
+    title,
+    description: term ? "Shops matching \"" + term + "\" on CivMC Shops." : "Search CivMC shops by item, enchant, or name.",
+    url: absPageHref("home", term ? { q: term, mode: "shop" } : {}),
+    image: itemImg("chest")
+  });
   setMsg(msg, "Loading...");
   results.innerHTML = "";
   syncUrl();
@@ -1040,13 +1059,22 @@ results.addEventListener("click", e => {
 
 async function showItems(term) {
   const enchantMode = isEnchantMode();
+  let title;
   if (enchantMode) {
     heading.textContent = 'Listings with enchant "' + term + '"';
-    document.title = term + " enchants - CivMC Shops";
+    title = term + " enchants - CivMC Shops";
   } else {
     heading.textContent = (mode.value === "sell" ? "Shops selling " : "Shops buying ") + term;
-    document.title = (mode.value === "sell" ? "Selling " : "Buying ") + term + " - CivMC Shops";
+    title = (mode.value === "sell" ? "Selling " : "Buying ") + term + " - CivMC Shops";
   }
+  setPageMeta({
+    title,
+    description: enchantMode
+      ? "Listings with enchant \"" + term + "\" on CivMC Shops."
+      : ((mode.value === "sell" ? "Shops selling " : "Shops buying ") + term + " on CivMC Shops."),
+    url: absPageHref("home", { q: term, mode: mode.value }),
+    image: enchantMode ? itemImg("enchanted book") : itemImg(term)
+  });
   setMsg(msg, "Searching...");
   results.innerHTML = "";
   results.className = "offers";
@@ -1215,6 +1243,15 @@ syncModeUi();
   }
   if (hasCmp || hasStoredCmp) await restoreCompareFromHash();
 })();
+
+document.getElementById("find-share").onclick = async () => {
+  const term = norm(q.value);
+  const params = {};
+  if (term) params.q = term;
+  if (mode.value && mode.value !== "sell") params.mode = mode.value;
+  const ok = await copyText(embedHref(params));
+  setMsg(msg, ok ? "Search link copied (Discord-friendly embed)." : "Couldn't copy.", ok ? "ok" : "err");
+};
 </script>
 </body>
 </html>

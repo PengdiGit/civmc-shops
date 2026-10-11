@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
+<meta name="description" content="CivMC trader profile on CivMC Shops.">
+<meta name="theme-color" content="#7fb35a">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CivMC Shops">
+<meta property="og:title" content="Profile - CivMC Shops">
+<meta property="og:description" content="CivMC trader profile on CivMC Shops.">
+<meta property="og:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/player_head.png">
+<meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="../style.css?v=20">
 </head>
 <body class="profile-page">
@@ -291,6 +299,12 @@ async function load() {
 
   const primary = profileDisplayName(p);
   document.title = primary + " - CivMC Shops";
+  setPageMeta({
+    title: primary + " - CivMC Shops",
+    description: (stripCodes(p.bio || "") || [p.mc_username && ("MC: " + p.mc_username), p.discord_username && ("Discord: " + p.discord_username)].filter(Boolean).join(" · ") || "CivMC trader").replace(/\s+/g, " ").slice(0, 180),
+    url: absPageHref("profile", { id: p.id }),
+    image: avatarUrl(p, 128)
+  });
   document.getElementById("name").textContent = primary;
   document.getElementById("avatar").innerHTML = avatarImg(p, 128);
   applyHighlight(p.highlight_color || null);
@@ -484,8 +498,9 @@ document.getElementById("follower-count").onclick = async () => {
 };
 
 document.getElementById("shareprof").onclick = async () => {
-  const ok = await copyText(location.href.split("#")[0]);
-  setMsg(msg, ok ? "Profile link copied." : "Couldn't copy.", ok ? "ok" : "err");
+  const shareUrl = (shown && shown.id) ? embedHref({ profile: shown.id }) : location.href.split("#")[0];
+  const ok = await copyText(shareUrl);
+  setMsg(msg, ok ? "Profile link copied (Discord-friendly embed)." : "Couldn't copy.", ok ? "ok" : "err");
 };
 
 document.getElementById("toggledit").onclick = () => {

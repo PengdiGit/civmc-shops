@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Market - CivMC Shops</title>
+<meta name="description" content="Live diamond market rates across CivMC shops.">
+<meta name="theme-color" content="#7fb35a">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CivMC Shops">
+<meta property="og:title" content="Market - CivMC Shops">
+<meta property="og:description" content="Live diamond market rates across CivMC shops.">
+<meta property="og:url" content="https://pengdigit.github.io/civmc-shops/market/">
+<meta property="og:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/diamond.png">
+<meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="../style.css?v=8">
 </head>
 <body class="market-page">
@@ -40,6 +49,7 @@
       <div class="inline-actions">
         <a class="small tag" id="d-sell" href="#">Shops selling &rarr;</a>
         <a class="small tag" id="d-buy" href="#">Shops buying &rarr;</a>
+        <button type="button" id="d-share" class="small" data-ico="share" title="Copy market link" aria-label="Share item"></button>
         <button type="button" id="d-close" data-ico="x" title="Close" aria-label="Close"></button>
       </div>
     </div>
@@ -392,7 +402,14 @@ async function openItem(item, opts) {
   d.hidden = false;
   document.getElementById("d-icon").innerHTML = itemIcon(item, true);
   document.getElementById("d-name").textContent = item;
-  document.title = item + " - Market - CivMC Shops";
+  const enchantLabel = enchantModeId && enchantModeId !== "plain" ? enchantModeId : "";
+  const title = (enchantLabel ? item + " (" + enchantLabel + ")" : item) + " - Market - CivMC Shops";
+  setPageMeta({
+    title,
+    description: "Live diamond market rates for " + item + " on CivMC Shops.",
+    url: absPageHref("market", { item, ...(enchantLabel ? { enchant: enchantLabel } : {}) }),
+    image: itemImg(item)
+  });
   document.getElementById("d-sell").href = findHref("sell", item);
   document.getElementById("d-buy").href = findHref("want", item);
   paintEnchantModes();
@@ -537,6 +554,12 @@ document.getElementById("d-enchant-modes").addEventListener("click", e => {
   syncMarketScopeUrl();
   renderDetail();
 });
+document.getElementById("d-share").onclick = async () => {
+  if (!selected) return;
+  const enchant = enchantModeId && enchantModeId !== "plain" ? enchantModeId : undefined;
+  const ok = await copyText(embedHref({ item: selected, enchant }));
+  setMsg(msg, ok ? "Market link copied (Discord-friendly embed)." : "Couldn't copy.", ok ? "ok" : "err");
+};
 document.getElementById("d-close").onclick = () => {
   document.getElementById("detail").hidden = true;
   selected = null;
@@ -549,6 +572,12 @@ document.getElementById("d-close").onclick = () => {
   u.searchParams.delete("item");
   u.searchParams.delete("enchant");
   window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+  setPageMeta({
+    title: "Market - CivMC Shops",
+    description: "Live diamond market rates across CivMC shops.",
+    url: absPageHref("market"),
+    image: itemImg("diamond")
+  });
   renderList();
 };
 unitSel.addEventListener("change", () => { renderList(); if (selected) renderDetail(); });
