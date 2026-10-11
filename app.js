@@ -354,12 +354,17 @@ function fillItemList() {
 
 // ------------------------------------------------------------ items, units, deals
 // item textures: the item "oak boat" is Minecraft_Items/oak_boat.png (folder name must match EXACTLY, GitHub Pages is case-sensitive)
-// Root-absolute so nested pages (/home/, /shops/, …) don't look under their own folder.
+// Resolve from the page URL so nested clean-URL folders (/home/, /shops/, …) hit the root Minecraft_Items/ folder.
 const ITEM_IMG_ALIAS = { essence: "ender eye" }; // Civ slang → eyes of ender
 const itemImg = name => {
   const key = norm(name || "");
   const file = ITEM_IMG_ALIAS[key] || key;
-  return siteBase() + "/Minecraft_Items/" + encodeURIComponent(file.replace(/ /g, "_")) + ".png";
+  const filePart = encodeURIComponent(file.replace(/ /g, "_")) + ".png";
+  try {
+    return new URL("../Minecraft_Items/" + filePart, location.href).href;
+  } catch (e) {
+    return siteBase() + "/Minecraft_Items/" + filePart;
+  }
 };
 function itemIcon(name, big) {
   // inventory-slot tile around the texture; missing textures just disappear
