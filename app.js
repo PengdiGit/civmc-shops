@@ -1076,6 +1076,41 @@ function ownerChip(p, ownerId) {
   if (!p || !ownerId) return '<span class="meta">owner: ?</span>';
   return `<a class="owner-chip" href="${pageHref("profile", { id: ownerId })}">${avatarImg(p, 22)} ${esc(userName(p))}</a>${businessTag(p)}`;
 }
+function shopMembersOf(shop) {
+  const rows = Array.isArray(shop && shop.shop_members) ? shop.shop_members : [];
+  const seen = new Set();
+  const out = [];
+  rows.forEach(m => {
+    if (!m || m.user_id == null) return;
+    const id = String(m.user_id);
+    if (seen.has(id)) return;
+    seen.add(id);
+    out.push(m);
+  });
+  out.sort((a, b) => {
+    const ar = a.role === "owner" ? 0 : 1;
+    const br = b.role === "owner" ? 0 : 1;
+    if (ar !== br) return ar - br;
+    return String(a.created_at || "").localeCompare(String(b.created_at || ""));
+  });
+  return out;
+}
+function userOwnsShop(shop, userId) {
+  if (!shop || userId == null) return false;
+  if (String(shop.owner_id) === String(userId)) return true;
+  return shopMembersOf(shop).some(m => String(m.user_id) === String(userId));
+}
+function ownerChipsHtml(shop) {
+  const members = shopMembersOf(shop);
+  if (!members.length) return ownerChip(shop && shop.profiles, shop && shop.owner_id);
+  return `<span class="owner-chips">${members.map(m => {
+    const p = m.profiles || (shop && String(m.user_id) === String(shop.owner_id) ? shop.profiles : null);
+    return ownerChip(p, m.user_id);
+  }).join("")}</span>`;
+}
+function shopInviteUrl(token) {
+  return new URL(pageHref("shops", { invite: token }), location.origin).href;
+}
 // "Mount Augusta \u00b7 Commonwealth" style place line for cards / meta
 // Soft city/nation aliases (display + filter matching without rewriting DB rows)
 const PLACE_ALIASES = {
@@ -1162,7 +1197,7 @@ function writeCompareHash(pins) {
 
 // Cross-page compare tray (sessionStorage + optional #cmp=)
 const COMPARE_STORE_KEY = "civmc_compare_pins";
-const COMPARE_LISTING_SELECT = "*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out, is_business))";
+const COMPARE_LISTING_SELECT = "*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business))";
 function loadCompareSpecs() {
   try {
     const arr = JSON.parse(sessionStorage.getItem(COMPARE_STORE_KEY) || "[]");

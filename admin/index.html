@@ -335,7 +335,7 @@ async function paintAdminSales() {
 async function findAliasHits(from, field) {
   const needle = from.trim();
   if (!needle) return [];
-  const { data } = await sb.from("shops").select("id, name, city, nation, profiles(username, mc_username)").order("name");
+  const { data } = await sb.from("shops").select("id, name, city, nation, profiles!shops_owner_id_fkey(username, mc_username)").order("name");
   return (data || []).filter(s => {
     const cityExact = norm(s.city || "") === norm(needle);
     const nationExact = norm(s.nation || "") === norm(needle);
@@ -478,7 +478,7 @@ async function render() {
   }
 
   const [{ data: shops }, { data: listings }] = await Promise.all([
-    sb.from("shops").select("id, owner_id, name, city, nation, profiles(username, mc_username), listings(id, updated_at, in_stock, timed_out)").order("created_at", { ascending: false }),
+    sb.from("shops").select("id, owner_id, name, city, nation, profiles!shops_owner_id_fkey(username, mc_username), listings(id, updated_at, in_stock, timed_out)").order("created_at", { ascending: false }),
     sb.from("listings").select("*, shops(name)").order("id")
   ]);
   shopRows = shops || [];

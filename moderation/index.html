@@ -119,7 +119,7 @@ async function load() {
   me = ctx.profile;
   const [u, s, l, c, r, rv, tv] = await Promise.all([
     sb.from("profiles").select("*").order("username"),
-    sb.from("shops").select("id, name, city, nation, timed_out, owner_id, profiles(username, mc_username)").order("name"),
+    sb.from("shops").select("id, name, city, nation, timed_out, owner_id, profiles!shops_owner_id_fkey(username, mc_username)").order("name"),
     sb.from("listings").select("*, shops(name)").order("id"),
     sb.from("comments").select("id, shop_id, author_id, body, timed_out, profiles(username, mc_username)").order("id"),
     sb.from("reports").select("*").order("id", { ascending: false }),
