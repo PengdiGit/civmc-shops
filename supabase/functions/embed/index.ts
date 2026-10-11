@@ -161,13 +161,13 @@ function parseFromPageUrl(page: string) {
         listing: u.searchParams.get("listing"),
       };
     }
-    const profPath = path.match(/\/profile\/([0-9a-f-]{36})$/i);
+    const profPath = path.match(/\/profile\/([^/]+)$/i);
     if (profPath) {
-      return {
-        kind: "profile" as const,
-        id: profPath[1],
-        name: u.searchParams.get("name"),
-      };
+      const slug = decodeURIComponent(profPath[1]);
+      if (/^[0-9a-f-]{36}$/i.test(slug)) {
+        return { kind: "profile" as const, id: slug, name: u.searchParams.get("name") };
+      }
+      return { kind: "profile" as const, id: null as string | null, name: slug };
     }
     if (path.endsWith("/profile") || /\/profile\/?$/.test(path)) {
       return {
@@ -376,10 +376,10 @@ Deno.serve(async (req) => {
     return respond({
       title: primary,
       description: desc.slice(0, 300),
-      url: SITE + "/profile/?id=" + p.id,
+      url: SITE + "/profile/" + encodeURIComponent(login || String(p.id)) + "/",
       image,
       authorName: primary,
-      authorUrl: SITE + "/profile/?id=" + p.id,
+      authorUrl: SITE + "/profile/" + encodeURIComponent(login || String(p.id)) + "/",
     });
   }
 

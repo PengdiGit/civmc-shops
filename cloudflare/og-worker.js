@@ -35,6 +35,9 @@ function embedUrlFor(requestUrl) {
     const listing = url.searchParams.get("listing");
     if (listing) embed.searchParams.set("listing", listing);
   } else if (path.endsWith("/profile") || path.includes("/profile/")) {
+    const slug = (path.match(/\/profile\/([^/]+)$/) || [])[1];
+    if (slug && /^[0-9a-f-]{36}$/i.test(slug)) embed.searchParams.set("profile", slug);
+    else if (slug) embed.searchParams.set("name", decodeURIComponent(slug));
     const id = url.searchParams.get("id");
     if (id) embed.searchParams.set("profile", id);
     const name = url.searchParams.get("name");

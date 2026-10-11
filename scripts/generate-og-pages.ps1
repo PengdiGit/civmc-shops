@@ -36,10 +36,11 @@ function PlaceLine($city, $nation) {
   return $n
 }
 
-function PageHtml($title, $description, $url, $image, $authorName) {
+function PageHtml($title, $description, $url, $image, $authorName, $redirectUrl) {
+  if (-not $redirectUrl) { $redirectUrl = $url }
   $oembed = "$SupabaseUrl/functions/v1/embed?format=oembed&url=$([uri]::EscapeDataString($url))"
   $authorBit = if ($authorName) { " · $(Esc $authorName)" } else { "" }
-  $urlJson = ($url | ConvertTo-Json -Compress)
+  $redirJson = ($redirectUrl | ConvertTo-Json -Compress)
   return @"
 <!DOCTYPE html>
 <html lang="en">
@@ -62,10 +63,10 @@ function PageHtml($title, $description, $url, $image, $authorName) {
 <meta name="twitter:image" content="$(Esc $image)">
 <link rel="canonical" href="$(Esc $url)">
 <link type="application/json+oembed" href="$(Esc $oembed)">
-<meta http-equiv="refresh" content="0;url=$(Esc $url)">
+<meta http-equiv="refresh" content="0;url=$(Esc $redirectUrl)">
 <script>
 (function () {
-  var base = $urlJson;
+  var base = $redirJson;
   var extra = location.search ? location.search.slice(1) : "";
   if (extra) base += (base.indexOf("?") >= 0 ? "&" : "?") + extra;
   location.replace(base);
@@ -73,7 +74,7 @@ function PageHtml($title, $description, $url, $image, $authorName) {
 </script>
 </head>
 <body style="font-family:system-ui,sans-serif;background:#1a1c18;color:#e8eadf;padding:24px">
-<p><a href="$(Esc $url)" style="color:$Theme">Open $(Esc $title)$authorBit</a></p>
+<p><a href="$(Esc $redirectUrl)" style="color:$Theme">Open $(Esc $title)$authorBit</a></p>
 </body>
 </html>
 "@
@@ -84,17 +85,20 @@ function SbGet([string]$path) {
   return Invoke-RestMethod -Uri "$SupabaseUrl/rest/v1/$path" -Headers $headers
 }
 
-function Clean-Landers([string]$dir) {
+function Clean-Landers([string]$dir, [string]$mode) {
   if (-not (Test-Path $dir)) { return }
   Get-ChildItem $dir -Directory | ForEach-Object {
-    if ($_.Name -match '^\d+$' -or $_.Name -match '^[0-9a-f-]{36}$') {
-      Remove-Item $_.FullName -Recurse -Force
-    }
+    $n = $_.Name
+    $drop = $false
+    if ($mode -eq "shops" -and $n -match '^\d+$') { $drop = $true }
+    # profiles: drop uuid landers and username landers (regenerated below)
+    if ($mode -eq "profile" -and ($n -match '^[0-9a-f-]{36}$' -or $n -match '^[a-z0-9_]{3,20}$')) { $drop = $true }
+    if ($drop) { Remove-Item $_.FullName -Recurse -Force }
   }
 }
 
-Clean-Landers (Join-Path $Root "shops")
-Clean-Landers (Join-Path $Root "profile")
+Clean-Landers (Join-Path $Root "shops") "shops"
+Clean-Landers (Join-Path $Root "profile") "profile"
 
 $shops = SbGet "shops?select=id,name,styled_name,description,city,nation,icon_item,icon_path,x,z,owner_id,archived,is_open,timed_out,profiles!shops_owner_id_fkey(username,mc_username,timed_out)&archived=eq.false&is_open=eq.true&timed_out=eq.false&order=id"
 $shopN = 0
@@ -116,10 +120,11 @@ foreach ($s in $shops) {
   if (-not $desc) { $desc = if ($bits.Count) { $bits -join " | " } else { "CivMC shop on CivMC Shops." } }
   elseif ($bits.Count) { $desc = "$desc | $($bits -join ' | ')" }
   $image = if ($s.icon_path) { StorageUrl $s.icon_path } else { ItemImg $(if ($s.icon_item) { $s.icon_item } else { "chest" }) }
+  $landerUrl = "$Site/shops/$($s.id)/"
   $spaUrl = "$Site/shops/?id=$($s.id)"
   $dir = Join-Path $Root "shops\$($s.id)"
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
-  $html = PageHtml $name $desc.Substring(0, [Math]::Min(300, $desc.Length)) $spaUrl $image $ownerName
+  $html = PageHtml $name $desc.Substring(0, [Math]::Min(300, $desc.Length)) $landerUrl $image $ownerName $spaUrl
   $utf8 = New-Object System.Text.UTF8Encoding $false
   [System.IO.File]::WriteAllText((Join-Path $dir "index.html"), $html, $utf8)
   $shopN++
@@ -148,10 +153,14 @@ foreach ($p in $profiles) {
   if (-not $desc) { $desc = if ($bits.Count) { $bits -join " | " } else { "CivMC trader on CivMC Shops." } }
   elseif ($bits.Count) { $desc = "$desc | $(($bits | Select-Object -First 3) -join ' | ')" }
   $image = if ($p.avatar_path) { StorageUrl $p.avatar_path } else { "https://minotar.net/avatar/$([uri]::EscapeDataString($(if ($mc) { $mc } else { 'steve' })))/128" }
-  $spaUrl = "$Site/profile/?id=$($p.id)"
-  $dir = Join-Path $Root "profile\$($p.id)"
+  $loginKey = $login.Trim().ToLower()
+  if ($loginKey -notmatch '^[a-z0-9_]{3,20}$') { continue }
+  # Lander at /profile/{username}/ ; humans redirect into the SPA via ?name=
+  $landerUrl = "$Site/profile/$loginKey/"
+  $spaUrl = "$Site/profile/?name=$([uri]::EscapeDataString($loginKey))"
+  $dir = Join-Path $Root "profile\$loginKey"
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
-  $html = PageHtml $primary $desc.Substring(0, [Math]::Min(300, $desc.Length)) $spaUrl $image $primary
+  $html = PageHtml $primary $desc.Substring(0, [Math]::Min(300, $desc.Length)) $landerUrl $image $primary $spaUrl
   $utf8 = New-Object System.Text.UTF8Encoding $false
   [System.IO.File]::WriteAllText((Join-Path $dir "index.html"), $html, $utf8)
   $profN++

@@ -86,7 +86,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=19"></script>
+<script src="../app.js?v=20"></script>
 <script>
 const params = new URLSearchParams(location.search);
 // Support both /shops/?id=1 (SPA) and /shops/1/ (share / Discord lander → redirect here)
@@ -452,7 +452,7 @@ function paintReviewList(staff, isOwner) {
     return `
       <div class="review" id="review-${r.id}">
         <div class="top">
-          <span class="cname">${avatarImg(pr, 24)}<a href="../profile/?id=${r.author_id}">${esc(userName(pr))}</a>
+          <span class="cname">${avatarImg(pr, 24)}<a href="${profilePath(pr, r.author_id)}">${esc(userName(pr))}</a>
             <span class="stars">${starsText(r.rating)}</span>
             ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
             <span class="meta">\u00b7 ${agoText(r.created_at)}</span> ${r.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
@@ -525,7 +525,7 @@ function commentHtml(c, rootId, staff) {
   return `
     <div class="comment" id="comment-${c.id}">
       <div class="head">
-        <span class="cname">${avatarImg(pr, 24)}<a href="../profile/?id=${c.author_id}">${esc(userName(pr))}</a>
+        <span class="cname">${avatarImg(pr, 24)}<a href="${profilePath(pr, c.author_id)}">${esc(userName(pr))}</a>
           ${isOwnerAuthor ? '<span class="tag owner">owner</span>' : ""}
           ${pr && pr.is_nation ? '<span class="tag role-nation">nation</span>' : ""}
           ${pr && pr.is_business ? '<span class="tag role-business">business</span>' : ""}

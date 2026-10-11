@@ -51,7 +51,8 @@ function placeLine(city, nation) {
   return c || n || "";
 }
 
-function pageHtml({ title, description, url, image, authorName }) {
+function pageHtml({ title, description, url, image, authorName, redirectUrl }) {
+  const dest = redirectUrl || url;
   const oembed = SUPABASE_URL.replace(/\/$/, "") +
     "/functions/v1/embed?format=oembed&url=" + encodeURIComponent(url);
   return `<!DOCTYPE html>
@@ -75,10 +76,10 @@ function pageHtml({ title, description, url, image, authorName }) {
 <meta name="twitter:image" content="${esc(image)}">
 <link rel="canonical" href="${esc(url)}">
 <link type="application/json+oembed" href="${esc(oembed)}">
-<meta http-equiv="refresh" content="0;url=${esc(url)}">
+<meta http-equiv="refresh" content="0;url=${esc(dest)}">
 <script>
 (function () {
-  var base = ${JSON.stringify(url)};
+  var base = ${JSON.stringify(dest)};
   var extra = location.search ? location.search.slice(1) : "";
   if (extra) base += (base.indexOf("?") >= 0 ? "&" : "?") + extra;
   location.replace(base);
@@ -86,7 +87,7 @@ function pageHtml({ title, description, url, image, authorName }) {
 </script>
 </head>
 <body style="font-family:system-ui,sans-serif;background:#1a1c18;color:#e8eadf;padding:24px">
-<p><a href="${esc(url)}" style="color:${THEME}">Open ${esc(title)}${authorName ? " · " + esc(authorName) : ""}</a></p>
+<p><a href="${esc(dest)}" style="color:${THEME}">Open ${esc(title)}${authorName ? " · " + esc(authorName) : ""}</a></p>
 </body>
 </html>
 `;
@@ -103,25 +104,24 @@ async function sb(path) {
   return res.json();
 }
 
-/** Remove previously generated numeric/uuid lander folders; keep SPA index.html. */
-async function cleanLanders(dir, keepName) {
+/** Remove previously generated lander folders; keep SPA index.html. */
+async function cleanLanders(dir, mode) {
   let entries = [];
   try { entries = await readdir(dir); } catch { return; }
   for (const name of entries) {
-    if (name === keepName) continue;
     const full = join(dir, name);
     const st = await stat(full);
     if (!st.isDirectory()) continue;
-    // shop ids are digits; profile ids are uuids
-    if (/^\d+$/.test(name) || /^[0-9a-f-]{36}$/i.test(name)) {
-      await rm(full, { recursive: true, force: true });
-    }
+    const drop = mode === "shops"
+      ? /^\d+$/.test(name)
+      : (/^[0-9a-f-]{36}$/i.test(name) || /^[a-z0-9_]{3,20}$/.test(name));
+    if (drop) await rm(full, { recursive: true, force: true });
   }
 }
 
 async function main() {
-  await cleanLanders(join(ROOT, "shops"), "index.html");
-  await cleanLanders(join(ROOT, "profile"), "index.html");
+  await cleanLanders(join(ROOT, "shops"), "shops");
+  await cleanLanders(join(ROOT, "profile"), "profile");
 
   const shops = await sb(
     "shops?select=id,name,styled_name,description,city,nation,icon_item,icon_path,x,z,owner_id,archived,is_open,timed_out,profiles!shops_owner_id_fkey(username,mc_username,timed_out)&archived=eq.false&is_open=eq.true&timed_out=eq.false&order=id",
@@ -142,13 +142,15 @@ async function main() {
     if (!desc) desc = bits.join(" | ") || "CivMC shop on CivMC Shops.";
     else if (bits.length) desc = desc + " | " + bits.join(" | ");
     const image = s.icon_path ? storageUrl(s.icon_path) : itemImg(s.icon_item || "chest");
+    const landerUrl = SITE + "/shops/" + s.id + "/";
     const spaUrl = SITE + "/shops/?id=" + s.id;
     const dir = join(ROOT, "shops", String(s.id));
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, "index.html"), pageHtml({
       title: name,
       description: desc.slice(0, 300),
-      url: spaUrl,
+      url: landerUrl,
+      redirectUrl: spaUrl,
       image,
       authorName: ownerName,
     }));
@@ -181,13 +183,17 @@ async function main() {
     const image = p.avatar_path
       ? storageUrl(p.avatar_path)
       : "https://minotar.net/avatar/" + encodeURIComponent(mc || "steve") + "/128";
-    const spaUrl = SITE + "/profile/?id=" + p.id;
-    const dir = join(ROOT, "profile", String(p.id));
+    const loginKey = String(p.username || "").trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,20}$/.test(loginKey)) continue;
+    const landerUrl = SITE + "/profile/" + loginKey + "/";
+    const spaUrl = SITE + "/profile/?name=" + encodeURIComponent(loginKey);
+    const dir = join(ROOT, "profile", loginKey);
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, "index.html"), pageHtml({
       title: primary,
       description: desc.slice(0, 300),
-      url: spaUrl,
+      url: landerUrl,
+      redirectUrl: spaUrl,
       image,
       authorName: primary,
     }));
