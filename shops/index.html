@@ -86,10 +86,15 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=18"></script>
+<script src="../app.js?v=19"></script>
 <script>
 const params = new URLSearchParams(location.search);
-const shopId = params.get("id");
+// Support both /shops/?id=1 (SPA) and /shops/1/ (share / Discord lander → redirect here)
+let shopId = params.get("id");
+if (!shopId) {
+  const pathId = (location.pathname.match(/\/shops\/(\d+)\/?$/) || [])[1];
+  if (pathId) shopId = pathId;
+}
 const inviteToken = params.get("invite");
 const focusId = params.get("listing");
 const findQ = norm(params.get("q") || "");
@@ -308,14 +313,23 @@ async function load() {
   }
   shop = s;
   document.title = s.name + " - CivMC Shops";
+  // Pretty share URL in the address bar: /shops/1/ (same link Discord unfurls)
+  try {
+    const pretty = "/shops/" + encodeURIComponent(String(s.id)) + "/" +
+      (hlListingId ? "?listing=" + encodeURIComponent(String(hlListingId)) : "");
+    if (location.pathname + location.search !== pretty) {
+      history.replaceState(null, "", (typeof siteBase === "function" ? siteBase() : "") + pretty);
+    }
+  } catch (e) {}
   const placePlain = [canonicalPlace(s.city), canonicalPlace(s.nation)].filter(Boolean)
     .filter((v, i, a) => a.findIndex(x => String(x).toLowerCase() === String(v).toLowerCase()) === i)
     .join(" · ");
   const placeBits = [placePlain, s.x != null && s.z != null ? s.x + ", " + s.z : ""].filter(Boolean).join(" · ");
+  const shareUrl = "https://civshops.pengworld.net/shops/" + encodeURIComponent(String(s.id)) + "/";
   setPageMeta({
     title: s.name + " - CivMC Shops",
     description: (stripCodes(s.description || "") || placeBits || "CivMC shop").replace(/\s+/g, " ").slice(0, 180),
-    url: absPageHref("shops", { id: s.id, ...(hlListingId ? { listing: hlListingId } : {}) }),
+    url: shareUrl,
     image: s.icon_path ? publicUrl(s.icon_path) : itemImg(s.icon_item || "chest")
   });
   document.getElementById("name").innerHTML = shopName(s) + (saleBadgeHtml(s) ? " " + saleBadgeHtml(s) : "");
@@ -567,9 +581,11 @@ document.querySelector("main").addEventListener("click", async e => {
     return;
   }
   if (act === "share") {
+    // Always the civshops lander URL (not Supabase). Hard-coded so a stale app.js cache can't break it.
     const shareUrl = shopId
-      ? embedHref({ shop: shopId, listing: hlListingId || undefined })
-      : location.href.split("#")[0];
+      ? ("https://civshops.pengworld.net/shops/" + encodeURIComponent(String(shopId)) + "/" +
+        (hlListingId ? "?listing=" + encodeURIComponent(String(hlListingId)) : ""))
+      : "https://civshops.pengworld.net/shops/";
     const ok = await copyText(shareUrl);
     setMsg(msg, ok ? "Shop link copied." : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");
     return;

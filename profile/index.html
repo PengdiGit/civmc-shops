@@ -107,10 +107,14 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=18"></script>
+<script src="../app.js?v=19"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let id = params.get("id");
+if (!id) {
+  const pathId = (location.pathname.match(/\/profile\/([0-9a-f-]{36})\/?$/i) || [])[1];
+  if (pathId) id = pathId;
+}
 const nameParam = params.get("name");
 const msg = document.getElementById("msg");
 const factsEl = document.getElementById("facts");
@@ -300,10 +304,17 @@ async function load() {
 
   const primary = profileDisplayName(p);
   document.title = primary + " - CivMC Shops";
+  try {
+    const pretty = "/profile/" + encodeURIComponent(String(p.id)) + "/";
+    if (location.pathname + location.search !== pretty) {
+      history.replaceState(null, "", (typeof siteBase === "function" ? siteBase() : "") + pretty);
+    }
+  } catch (e) {}
+  const shareUrl = "https://civshops.pengworld.net/profile/" + encodeURIComponent(String(p.id)) + "/";
   setPageMeta({
     title: primary + " - CivMC Shops",
     description: (stripCodes(p.bio || "") || [p.mc_username && ("MC: " + p.mc_username), p.discord_username && ("Discord: " + p.discord_username)].filter(Boolean).join(" · ") || "CivMC trader").replace(/\s+/g, " ").slice(0, 180),
-    url: absPageHref("profile", { id: p.id }),
+    url: shareUrl,
     image: avatarUrl(p, 128)
   });
   document.getElementById("name").textContent = primary;
@@ -500,7 +511,9 @@ document.getElementById("follower-count").onclick = async () => {
 };
 
 document.getElementById("shareprof").onclick = async () => {
-  const shareUrl = (shown && shown.id) ? embedHref({ profile: shown.id }) : location.href.split("#")[0];
+  const shareUrl = (shown && shown.id)
+    ? ("https://civshops.pengworld.net/profile/" + encodeURIComponent(String(shown.id)) + "/")
+    : "https://civshops.pengworld.net/profile/";
   const ok = await copyText(shareUrl);
   setMsg(msg, ok ? "Profile link copied." : "Couldn't copy.", ok ? "ok" : "err");
 };
