@@ -639,7 +639,7 @@ function filterEnchantSuggestions(term, limit) {
   return starts.concat(contains).slice(0, max);
 }
 
-/** Normalize barrel-style bundle slots: [{slot,item,amount,notes?}] length ≤ 27. */
+/** Normalize bundle slots: [{slot,item,amount,notes?}] length ≤ 27. */
 function normalizeBundleContents(raw) {
   if (raw == null || raw === "") return null;
   let arr = raw;
@@ -679,12 +679,12 @@ function bundleContentsPreviewHtml(contents, opts) {
     const s = bySlot[i];
     if (s) {
       const tip = [s.item, s.amount > 1 ? "x" + s.amount : "", s.enchants || "", s.notes || ""].filter(Boolean).join(" · ");
-      cells += `<span class="barrel-slot filled" title="${esc(tip)}">${itemIcon(s.item, false)}${s.amount > 1 ? `<span class="barrel-qty">${s.amount}</span>` : ""}</span>`;
+      cells += `<span class="bundle-slot filled" title="${esc(tip)}">${itemIcon(s.item, false)}${s.amount > 1 ? `<span class="bundle-qty">${s.amount}</span>` : ""}</span>`;
     } else {
-      cells += `<span class="barrel-slot empty" aria-hidden="true"></span>`;
+      cells += `<span class="bundle-slot empty" aria-hidden="true"></span>`;
     }
   }
-  return `<div class="barrel-gui${o.compact ? " compact" : ""}" title="Bundle contents">${cells}</div>`;
+  return `<div class="bundle-gui${o.compact ? " compact" : ""}" title="Bundle contents">${cells}</div>`;
 }
 
 /** Extra payment options beyond primary want_* — max 2 → 3 prices total. */
@@ -749,18 +749,17 @@ function listingExtrasHtml(l) {
   return html;
 }
 
-/** Read-only barrel overlay (opened by clicking the bundle icon on a listing). */
+/** Read-only bundle overlay (opened by clicking the bundle icon on a listing). */
 function openBundlePeekOverlay(contents, title) {
   const slots = normalizeBundleContents(contents);
   if (!slots || !slots.length) return;
   const root = document.createElement("div");
-  root.className = "modal-overlay barrel-peek-overlay";
-  root.innerHTML = `<div class="modal barrel-peek" role="dialog" aria-modal="true" aria-labelledby="barrel-peek-title">
-    <h2 id="barrel-peek-title">${esc(title || "Bundle contents")}</h2>
-    <p class="meta" style="margin:0 0 10px">What's inside this bundle.</p>
+  root.className = "modal-overlay bundle-peek-overlay";
+  root.innerHTML = `<div class="modal bundle-peek" role="dialog" aria-modal="true" aria-labelledby="bundle-peek-title">
+    <h2 id="bundle-peek-title" class="bundle-modal-title">${esc(title || "Bundle contents")}</h2>
     ${bundleContentsPreviewHtml(slots)}
     <div class="ui-modal-actions row" style="margin-top:12px">
-      <button type="button" class="primary small" data-barrel-peek-close>Close</button>
+      <button type="button" class="primary small" data-bundle-peek-close>Close</button>
     </div>
   </div>`;
   document.body.appendChild(root);
@@ -769,12 +768,12 @@ function openBundlePeekOverlay(contents, title) {
     root.remove();
     document.body.classList.remove("ui-modal-open");
   };
-  root.querySelector("[data-barrel-peek-close]").onclick = close;
+  root.querySelector("[data-bundle-peek-close]").onclick = close;
   root.addEventListener("click", e => { if (e.target === root) close(); });
   root.addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); close(); } });
 }
 
-/** Open Minecraft barrel-style 27-slot editor. Resolves cleaned contents array or null if cancelled. */
+/** Open Minecraft inventory-style 27-slot bundle editor. Resolves cleaned contents array or null if cancelled. */
 function openBundleContentsEditor(initial) {
   return new Promise(resolve => {
     const slots = Array.from({ length: 27 }, () => null);
@@ -782,27 +781,27 @@ function openBundleContentsEditor(initial) {
       slots[s.slot] = { item: s.item, amount: s.amount, notes: s.notes || "", enchants: s.enchants || "" };
     });
     const root = document.createElement("div");
-    root.className = "modal-overlay barrel-editor-overlay";
-    root.innerHTML = `<div class="modal barrel-editor" role="dialog" aria-modal="true" aria-labelledby="barrel-editor-title">
-      <h2 id="barrel-editor-title">Bundle contents</h2>
-      <p class="meta" style="margin:0 0 10px">Click a slot to set an item (barrel layout — 27 slots). Empty slots are fine.</p>
-      <div class="barrel-gui barrel-gui-edit" id="barrel-grid"></div>
+    root.className = "modal-overlay bundle-editor-overlay";
+    root.innerHTML = `<div class="modal bundle-editor" role="dialog" aria-modal="true" aria-labelledby="bundle-editor-title">
+      <h2 id="bundle-editor-title" class="bundle-modal-title">Bundle contents</h2>
+      <p class="meta bundle-modal-hint">Click a slot to set an item. Shift-click a filled slot to clear it.</p>
+      <div class="bundle-gui bundle-gui-edit" id="bundle-grid"></div>
       <div class="ui-modal-actions row" style="margin-top:12px">
-        <button type="button" class="small" data-barrel-clear>Clear all</button>
+        <button type="button" class="small" data-bundle-clear>Clear all</button>
         <span style="flex:1"></span>
-        <button type="button" class="small" data-barrel-cancel>Cancel</button>
-        <button type="button" class="primary small" data-barrel-save>Save contents</button>
+        <button type="button" class="small" data-bundle-cancel>Cancel</button>
+        <button type="button" class="primary small" data-bundle-save>Save contents</button>
       </div>
     </div>`;
     document.body.appendChild(root);
     document.body.classList.add("ui-modal-open");
-    const grid = root.querySelector("#barrel-grid");
+    const grid = root.querySelector("#bundle-grid");
 
     function paint() {
       grid.innerHTML = slots.map((s, i) => {
-        if (!s) return `<button type="button" class="barrel-slot empty" data-slot="${i}" title="Empty slot ${i + 1}" aria-label="Empty slot ${i + 1}"></button>`;
+        if (!s) return `<button type="button" class="bundle-slot empty" data-slot="${i}" title="Empty slot ${i + 1}" aria-label="Empty slot ${i + 1}"></button>`;
         const tip = [s.item, "x" + s.amount, s.enchants, s.notes].filter(Boolean).join(" · ");
-        return `<button type="button" class="barrel-slot filled" data-slot="${i}" title="${esc(tip)}" aria-label="${esc(tip)}">${itemIcon(s.item, false)}${s.amount > 1 ? `<span class="barrel-qty">${s.amount}</span>` : ""}</button>`;
+        return `<button type="button" class="bundle-slot filled" data-slot="${i}" title="${esc(tip)}" aria-label="${esc(tip)}">${itemIcon(s.item, false)}${s.amount > 1 ? `<span class="bundle-qty">${s.amount}</span>` : ""}</button>`;
       }).join("");
     }
 
@@ -865,12 +864,12 @@ function openBundleContentsEditor(initial) {
       }
       editSlot(i);
     });
-    root.querySelector("[data-barrel-clear]").onclick = () => {
+    root.querySelector("[data-bundle-clear]").onclick = () => {
       for (let i = 0; i < 27; i++) slots[i] = null;
       paint();
     };
-    root.querySelector("[data-barrel-cancel]").onclick = () => done(null);
-    root.querySelector("[data-barrel-save]").onclick = () => {
+    root.querySelector("[data-bundle-cancel]").onclick = () => done(null);
+    root.querySelector("[data-bundle-save]").onclick = () => {
       const packed = slots.map((s, slot) => s ? {
         slot, item: s.item, amount: s.amount,
         notes: s.notes || undefined,
@@ -2394,7 +2393,9 @@ function marketQuantile(sorted, q) {
   const pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
 }
-function computeMarketNow(listings, shops, profiles, placeFilter) {
+/** Client-side market_now(). Default skips enchanted listings; pass { unenchantedOnly: false } when the caller already filtered by enchant mode. */
+function computeMarketNow(listings, shops, profiles, placeFilter, opts) {
+  const unenchantedOnly = !(opts && opts.unenchantedOnly === false);
   let city = "";
   let nation = "";
   if (placeFilter && typeof placeFilter === "object") {
@@ -2419,6 +2420,8 @@ function computeMarketNow(listings, shops, profiles, placeFilter) {
     if (!(l.in_stock && !l.timed_out && shopOk[String(l.shop_id)])) continue;
     // Match market_now(): skip bundle sell/want (incl. colored "red bundle")
     if (isBundleItem(l.sell_item) || isBundleItem(l.want_item)) continue;
+    // Match market_now(): unenchanted only (null / blank enchants), unless caller opted out
+    if (unenchantedOnly && String(l.enchants || "").trim()) continue;
     if (CURRENCY[l.want_item] != null && CURRENCY[l.sell_item] == null)
       push(l.sell_item, "sell", l.shop_id, rawCount(l.want_amount, l.want_unit) * CURRENCY[l.want_item] / rawCount(l.sell_amount, l.sell_unit));
     if (CURRENCY[l.sell_item] != null && CURRENCY[l.want_item] == null)
