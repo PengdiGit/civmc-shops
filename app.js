@@ -1611,6 +1611,62 @@ function normalizeGroupIcons(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   return raw;
 }
+/** group_order jsonb: array of named group strings; [] / null = alpha fallback for leftovers. */
+function normalizeGroupOrder(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const x of raw) {
+    const t = String(x || "").trim();
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
+}
+function collectNamedGroupKeys(listings, shop) {
+  const named = new Set();
+  Object.keys(normalizeGroupIcons(shop && shop.group_icons)).forEach(k => {
+    const t = String(k || "").trim();
+    if (t) named.add(t);
+  });
+  (listings || []).forEach(l => {
+    const t = String(l.group_name || "").trim();
+    if (t) named.add(t);
+  });
+  return named;
+}
+/** Named groups: group_order first (existing keys only), then leftover alpha. Ungrouped not included. */
+function orderedNamedGroups(listings, shop) {
+  const named = collectNamedGroupKeys(listings, shop);
+  const order = normalizeGroupOrder(shop && shop.group_order);
+  const remaining = new Set(named);
+  const result = [];
+  for (const k of order) {
+    if (!remaining.has(k)) continue;
+    result.push(k);
+    remaining.delete(k);
+  }
+  [...remaining].sort((a, b) => a.localeCompare(b)).forEach(k => result.push(k));
+  return result;
+}
+function appendGroupOrder(shop, name) {
+  const t = String(name || "").trim();
+  const order = normalizeGroupOrder(shop && shop.group_order);
+  if (t && !order.includes(t)) order.push(t);
+  return order;
+}
+function renameGroupOrderKey(shop, oldName, newName) {
+  const from = String(oldName || "").trim();
+  const to = String(newName || "").trim();
+  const order = normalizeGroupOrder(shop && shop.group_order).map(k => (k === from ? to : k));
+  if (to && !order.includes(to)) order.push(to);
+  return normalizeGroupOrder(order);
+}
+function pruneGroupOrder(shop, listings) {
+  const named = collectNamedGroupKeys(listings, shop);
+  return normalizeGroupOrder(shop && shop.group_order).filter(k => named.has(k));
+}
 function groupIconEntry(shop, groupName) {
   const key = String(groupName || "").trim();
   const entry = normalizeGroupIcons(shop && shop.group_icons)[key];
@@ -1628,10 +1684,10 @@ function groupSectionId(groupName) {
   const k = String(groupName || "").trim();
   return "shop-group-" + (k ? encodeURIComponent(k) : "other");
 }
-function orderedListingGroupKeys(listings) {
+function orderedListingGroupKeys(listings, shop) {
   const keys = [];
   const seen = new Set();
-  sortListingsOwnerOrder(listings || []).forEach(l => {
+  sortListingsOwnerOrder(listings || [], shop).forEach(l => {
     const key = String(l.group_name || "").trim();
     if (seen.has(key)) return;
     seen.add(key);
@@ -2304,13 +2360,21 @@ function pushRecentSearch(mode, q) {
 function listingIsOut(l) {
   return !!(l && (l.in_stock === false || l.stock === 0));
 }
-function sortListingsOwnerOrder(list) {
+function sortListingsOwnerOrder(list, shop) {
+  const named = shop ? orderedNamedGroups(list, shop) : null;
+  const rank = new Map();
+  if (named) named.forEach((k, i) => rank.set(k, i));
   return (list || []).slice().sort((a, b) => {
-    const ga = String(a.group_name || "").toLowerCase();
-    const gb = String(b.group_name || "").toLowerCase();
+    const ga = String(a.group_name || "").trim();
+    const gb = String(b.group_name || "").trim();
     if (ga !== gb) {
-      if (!ga) return 1;
+      if (!ga) return 1;   // ungrouped last (public + listing sort)
       if (!gb) return -1;
+      if (named) {
+        const ia = rank.has(ga) ? rank.get(ga) : 1e9;
+        const ib = rank.has(gb) ? rank.get(gb) : 1e9;
+        if (ia !== ib) return ia - ib;
+      }
       return ga.localeCompare(gb);
     }
     const sa = a.sort_order != null ? a.sort_order : a.id;

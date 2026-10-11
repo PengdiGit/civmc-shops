@@ -135,7 +135,7 @@ function buildGroupNavEntries(list) {
   });
   const inFilter = new Set(Object.keys(counts));
   const entries = [];
-  orderedListingGroupKeys(allListings).forEach(key => {
+  orderedListingGroupKeys(allListings, shop).forEach(key => {
     if (!inFilter.has(key) || !counts[key]) return;
     entries.push({
       key,
@@ -183,7 +183,7 @@ function groupLabelHtml(g) {
 function paintListings(staff, isOwner) {
   const q = norm(document.getElementById("lq").value);
   const stock = document.getElementById("lstock").value;
-  let list = sortListingsOwnerOrder(allListings);
+  let list = sortListingsOwnerOrder(allListings, shop);
   if (q) list = list.filter(l => (l.sell_item + " " + l.want_item).includes(q));
   if (stock === "hide" || stock === "in") list = list.filter(l => !listingIsOut(l) && !l.timed_out);
   if (stock === "out") list = list.filter(l => listingIsOut(l) || l.timed_out);
@@ -303,7 +303,7 @@ async function load() {
   dEl.hidden = !s.description;
   dEl.innerHTML = s.description ? mcText(s.description) : "";
 
-  allListings = sortListingsOwnerOrder(s.listings || []);
+  allListings = sortListingsOwnerOrder(s.listings || [], s);
   // If Find landed without listing=, prefer the best matching listing for highlight
   if (!hlListingId && findQ) {
     const hit = allListings.find(listingMatchesFind);

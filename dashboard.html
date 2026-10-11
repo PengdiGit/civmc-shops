@@ -559,19 +559,15 @@ function dashListingCard(l) {
 }
 
 function shopGroupSections(listings, shop) {
-  const named = new Set();
-  Object.keys(normalizeGroupIcons(shop.group_icons || {})).forEach(k => {
-    const t = String(k || "").trim();
-    if (t) named.add(t);
-  });
-  (listings || []).forEach(l => {
-    const t = String(l.group_name || "").trim();
-    if (t) named.add(t);
-  });
-  const names = [...named].sort((a, b) => a.localeCompare(b));
+  const names = orderedNamedGroups(listings, shop);
   const sections = [{ key: "", label: "Ungrouped", showHead: names.length > 0 }];
   names.forEach(k => sections.push({ key: k, label: k, showHead: true }));
   return sections;
+}
+
+function dashGroupCollapseId(shopId, groupKey) {
+  const k = String(groupKey || "").trim();
+  return "dash-group-" + shopId + "-" + (k ? encodeURIComponent(k) : "__ungrouped__");
 }
 
 function dashGroupHeadHtml(shop, groupKey, label) {
@@ -579,7 +575,18 @@ function dashGroupHeadHtml(shop, groupKey, label) {
   const renameBtn = groupKey
     ? iconBtn("pen", { title: "Rename group", attrs: `data-act="rename-group" data-group="${esc(groupKey)}"` })
     : "";
+  const dragHandle = groupKey
+    ? `<div class="dash-group-drag-handle" draggable="true" role="button" tabindex="0" aria-label="Drag to reorder group" title="Drag to reorder group">
+      <span class="dash-drag-burger" aria-hidden="true"><span></span><span></span><span></span></span>
+    </div>`
+    : "";
+  const collapseId = dashGroupCollapseId(shop.id, groupKey);
+  const bodyId = collapseId + "-body";
   return `<div class="dash-group-head">
+    <button type="button" class="collapse-toggle dash-group-collapse-toggle" aria-expanded="true" aria-controls="${esc(bodyId)}" title="Show or hide listings in this group">
+      <span class="collapse-chevron" aria-hidden="true"></span>
+    </button>
+    ${dragHandle}
     ${groupIconHtml(shop, groupKey, "sm")}
     <span class="meta dash-group-title">${esc(label)}</span>
     <div class="action-cluster dash-group-icon-actions">
@@ -611,7 +618,7 @@ function addListingFormHtml(groupKey) {
 function listingsByGroupHtml(shop) {
   const listings = shop.listings || [];
   const sections = shopGroupSections(listings, shop);
-  const sorted = sortListingsOwnerOrder(listings);
+  const sorted = sortListingsOwnerOrder(listings, shop);
   let html = `<div class="dash-listings-toolbar">
     <button type="button" class="small ico-label" data-act="add-group">${uiIcon("plus")} Add group</button>
   </div><div class="dash-listings-root">`;
@@ -620,15 +627,21 @@ function listingsByGroupHtml(shop) {
     const slotOpen = addingListingSlot
       && String(addingListingSlot.shopId) === String(shop.id)
       && addingListingSlot.groupKey === sec.key;
-    html += `<div class="dash-group-block">`;
+    const collapseId = dashGroupCollapseId(shop.id, sec.key);
+    const bodyId = collapseId + "-body";
+    const blockAttrs = sec.showHead
+      ? ` class="dash-group-block collapse-section" data-collapse="${esc(collapseId)}" data-group-key="${esc(sec.key)}"`
+      : ` class="dash-group-block" data-group-key="${esc(sec.key)}"`;
+    html += `<div${blockAttrs}>`;
     if (sec.showHead) html += dashGroupHeadHtml(shop, sec.key, sec.label);
+    html += `<div class="collapse-body dash-group-body" id="${esc(bodyId)}">`;
     html += `<div class="dash-group-top">
       <button type="button" class="dash-add-listing-btn" data-act="open-add-listing" data-group="${esc(sec.key)}" title="Add listing to this group" aria-label="Add listing">+</button>
     </div>`;
     if (slotOpen) html += addListingFormHtml(sec.key);
     html += `<div class="dash-listing-list" data-group-name="${esc(sec.key)}">`;
     inGroup.forEach(l => { html += dashListingCard(l); });
-    html += `</div></div>`;
+    html += `</div></div></div>`;
   });
   html += `</div>`;
   return html;
@@ -670,7 +683,11 @@ async function render(resetShop) {
   });
 
   shopsData = {};
-  shops.forEach(s => { s.listings = sortListingsOwnerOrder(s.listings || []); shopsData[s.id] = s; });
+  shops.forEach(s => {
+    if (!Array.isArray(s.group_order)) s.group_order = [];
+    s.listings = sortListingsOwnerOrder(s.listings || [], s);
+    shopsData[s.id] = s;
+  });
   paintOwnerAlerts(shops || []);
   if (!shops.length) {
     box.innerHTML = emptyState("No shops yet. Press + New Shop to create one.");
@@ -732,7 +749,7 @@ async function render(resetShop) {
           </tr>`).join("")}</tbody>
         </table></div>
       </div>
-      <p class="meta dash-listing-tools">Use <b>+</b> on a group to add a listing. Drag to reorder or move between groups. Click item icons or in-stock to edit.</p>
+      <p class="meta dash-listing-tools">Use <b>+</b> on a group to add a listing. Drag listings to reorder or move between groups; drag a group handle to reorder sections. Click item icons or in-stock to edit.</p>
       ${listingsByGroupHtml(s)}
       </div>
     </div>`;
@@ -850,8 +867,8 @@ function listingDisplaySnapshot(listings) {
   }]));
 }
 
-function listingsOrderCopy(listings) {
-  return sortListingsOwnerOrder(listings || []).map(l => ({ ...l }));
+function listingsOrderCopy(listings, shop) {
+  return sortListingsOwnerOrder(listings || [], shop).map(l => ({ ...l }));
 }
 
 async function applyListingDisplayOrder(shop, order, beforeSnap) {
@@ -878,7 +895,7 @@ async function applyListingDisplayOrder(shop, order, beforeSnap) {
 
 async function reorderListingDrag(shop, fromId, toId) {
   const before = listingDisplaySnapshot(shop.listings);
-  const order = listingsOrderCopy(shop.listings);
+  const order = listingsOrderCopy(shop.listings, shop);
   const fromIdx = order.findIndex(l => listingIdEq(l.id, fromId));
   let toIdx = order.findIndex(l => listingIdEq(l.id, toId));
   if (fromIdx < 0 || toIdx < 0) return "Listing not found.";
@@ -895,7 +912,7 @@ async function moveListingToGroupEnd(shop, fromId, groupKeyRaw) {
   const before = listingDisplaySnapshot(shop.listings);
   const newGroup = normalizeListingGroup(groupKeyRaw);
   const gKey = String(newGroup || "");
-  const order = listingsOrderCopy(shop.listings);
+  const order = listingsOrderCopy(shop.listings, shop);
   const fromIdx = order.findIndex(l => listingIdEq(l.id, fromId));
   if (fromIdx < 0) return "Listing not found.";
   const [item] = order.splice(fromIdx, 1);
@@ -910,13 +927,17 @@ async function moveListingToGroupEnd(shop, fromId, groupKeyRaw) {
   if (insertAt < 0) {
     if (!gKey) insertAt = order.length;
     else {
-      insertAt = order.findIndex(l => {
-        const ga = String(l.group_name || "").trim().toLowerCase();
-        const gb = gKey.toLowerCase();
-        if (!ga) return true;
-        return gb.localeCompare(ga) < 0;
-      });
-      if (insertAt < 0) insertAt = order.length;
+      const named = orderedNamedGroups(order, shop);
+      const gi = named.indexOf(gKey);
+      insertAt = order.length;
+      for (let j = gi + 1; j < named.length; j++) {
+        const idx = order.findIndex(l => String(l.group_name || "").trim() === named[j]);
+        if (idx >= 0) { insertAt = idx; break; }
+      }
+      if (insertAt === order.length) {
+        const u = order.findIndex(l => !String(l.group_name || "").trim());
+        if (u >= 0) insertAt = u;
+      }
     }
   }
   order.splice(insertAt, 0, item);
@@ -928,11 +949,38 @@ function clearListingDragMarkers() {
     .forEach(el => el.classList.remove("drag-over", "drag-over-group"));
 }
 
+function clearGroupDragMarkers() {
+  shopsRoot.querySelectorAll(".dash-group-block.drag-over-reorder")
+    .forEach(el => el.classList.remove("drag-over-reorder"));
+}
+
+async function reorderNamedGroupDrag(shop, fromKey, toKey) {
+  const from = String(fromKey || "").trim();
+  const to = String(toKey || "").trim();
+  if (!from || !to || from === to) return null;
+  const names = orderedNamedGroups(shop.listings, shop).slice();
+  const fromIdx = names.indexOf(from);
+  let toIdx = names.indexOf(to);
+  if (fromIdx < 0 || toIdx < 0) return "Group not found.";
+  const [item] = names.splice(fromIdx, 1);
+  toIdx = names.indexOf(to);
+  if (toIdx < 0) return "Group not found.";
+  names.splice(toIdx, 0, item);
+  const r = await sb.from("shops").update({ group_order: names }).eq("id", shop.id);
+  if (r.error) return r.error.message;
+  shop.group_order = names;
+  return null;
+}
+
 let dragListingId = null;
 let dragShopId = null;
 let dragPayload = null;
+let dragGroupKey = null;
+let dragGroupShopId = null;
+let dragGroupPayload = null;
 const shopsRoot = document.getElementById("shops");
 const DND_MIME = "application/x-civmc-listing";
+const DND_GROUP_MIME = "application/x-civmc-group";
 
 function readListingDragPayload(e) {
   try {
@@ -945,6 +993,14 @@ function readListingDragPayload(e) {
   return dragPayload || (dragListingId ? { listingId: dragListingId, shopId: dragShopId } : null);
 }
 
+function readGroupDragPayload(e) {
+  try {
+    const raw = e.dataTransfer.getData(DND_GROUP_MIME);
+    if (raw && raw.startsWith("{")) return JSON.parse(raw);
+  } catch (err) { /* fall through */ }
+  return dragGroupPayload || (dragGroupKey ? { groupKey: dragGroupKey, shopId: dragGroupShopId } : null);
+}
+
 function clearListingDragState() {
   shopsRoot.querySelectorAll(".dash-listing-card.is-dragging").forEach(c => c.classList.remove("is-dragging"));
   clearListingDragMarkers();
@@ -953,9 +1009,34 @@ function clearListingDragState() {
   dragPayload = null;
 }
 
+function clearGroupDragState() {
+  shopsRoot.querySelectorAll(".dash-group-block.is-dragging-group").forEach(c => c.classList.remove("is-dragging-group"));
+  clearGroupDragMarkers();
+  dragGroupKey = null;
+  dragGroupShopId = null;
+  dragGroupPayload = null;
+}
+
 shopsRoot.addEventListener("dragstart", e => {
+  const groupHandle = e.target.closest(".dash-group-drag-handle");
+  if (groupHandle) {
+    const block = groupHandle.closest(".dash-group-block");
+    const shopEl = groupHandle.closest("[data-shop]");
+    const groupKey = block && String(block.getAttribute("data-group-key") || "").trim();
+    if (!block || !shopEl || !groupKey) return;
+    const payload = { groupKey, shopId: shopEl.dataset.shop };
+    dragGroupKey = payload.groupKey;
+    dragGroupShopId = payload.shopId;
+    dragGroupPayload = payload;
+    clearListingDragState();
+    e.dataTransfer.setData(DND_GROUP_MIME, JSON.stringify(payload));
+    e.dataTransfer.setData("text/plain", "group:" + payload.groupKey);
+    e.dataTransfer.effectAllowed = "move";
+    block.classList.add("is-dragging-group");
+    return;
+  }
   const handle = e.target.closest(".dash-drag-handle");
-  if (!handle) return;
+  if (!handle || handle.classList.contains("dash-group-drag-handle")) return;
   const card = handle.closest(".dash-listing-card");
   const shopEl = handle.closest("[data-shop]");
   if (!card || !shopEl) return;
@@ -963,6 +1044,7 @@ shopsRoot.addEventListener("dragstart", e => {
   dragListingId = payload.listingId;
   dragShopId = payload.shopId;
   dragPayload = payload;
+  clearGroupDragState();
   e.dataTransfer.setData(DND_MIME, JSON.stringify(payload));
   e.dataTransfer.setData("text/plain", JSON.stringify(payload));
   e.dataTransfer.effectAllowed = "move";
@@ -970,12 +1052,26 @@ shopsRoot.addEventListener("dragstart", e => {
 });
 shopsRoot.addEventListener("dragend", () => {
   clearListingDragState();
+  clearGroupDragState();
 });
 shopsRoot.addEventListener("dragenter", e => {
-  if (!dragListingId) return;
+  if (!dragListingId && !dragGroupKey) return;
   e.preventDefault();
 });
 shopsRoot.addEventListener("dragover", e => {
+  if (dragGroupKey) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    clearGroupDragMarkers();
+    const block = e.target.closest(".dash-group-block");
+    if (!block) return;
+    const key = String(block.getAttribute("data-group-key") || "").trim();
+    if (!key || key === dragGroupKey) return;
+    const shopEl = block.closest("[data-shop]");
+    if (!shopEl || String(shopEl.dataset.shop) !== String(dragGroupShopId)) return;
+    block.classList.add("drag-over-reorder");
+    return;
+  }
   if (!dragListingId) return;
   e.preventDefault();
   e.dataTransfer.dropEffect = "move";
@@ -995,6 +1091,24 @@ shopsRoot.addEventListener("dragover", e => {
 shopsRoot.addEventListener("drop", async e => {
   e.preventDefault();
   e.stopPropagation();
+  if (dragGroupKey || (e.dataTransfer && e.dataTransfer.types && [...e.dataTransfer.types].includes(DND_GROUP_MIME))) {
+    const gPayload = readGroupDragPayload(e);
+    clearGroupDragMarkers();
+    if (!gPayload || !gPayload.groupKey || gPayload.shopId == null) {
+      clearGroupDragState();
+      return;
+    }
+    const shop = shopsData[gPayload.shopId] || shopsData[String(gPayload.shopId)];
+    const targetBlock = e.target.closest(".dash-group-block");
+    const toKey = targetBlock ? String(targetBlock.getAttribute("data-group-key") || "").trim() : "";
+    clearGroupDragState();
+    if (!shop || !toKey || toKey === gPayload.groupKey) return;
+    const err = await reorderNamedGroupDrag(shop, gPayload.groupKey, toKey);
+    if (err) { setMsg(msg, err, "err"); return; }
+    setMsg(msg, "Group order saved.", "ok");
+    render();
+    return;
+  }
   const payload = readListingDragPayload(e);
   clearListingDragMarkers();
   if (!payload || payload.listingId == null || payload.shopId == null) {
@@ -1122,11 +1236,13 @@ document.getElementById("shops").addEventListener("click", async e => {
     }
     const icons = { ...normalizeGroupIcons(shop.group_icons) };
     icons[trimmed] = {};
+    const group_order = appendGroupOrder(shop, trimmed);
     btn.disabled = true;
-    sb.from("shops").update({ group_icons: icons }).eq("id", shopElEarly.dataset.shop).then(r => {
+    sb.from("shops").update({ group_icons: icons, group_order }).eq("id", shopElEarly.dataset.shop).then(r => {
       btn.disabled = false;
       if (r.error) { setMsg(msg, r.error.message, "err"); return; }
       shop.group_icons = icons;
+      shop.group_order = group_order;
       addingListingSlot = { shopId: shopElEarly.dataset.shop, groupKey: trimmed };
       setMsg(msg, "Group added.", "ok");
       render();
@@ -1169,10 +1285,12 @@ document.getElementById("shops").addEventListener("click", async e => {
       icons[trimmed] = icons[oldName];
       delete icons[oldName];
     }
-    const shopRes = await sb.from("shops").update({ group_icons: icons }).eq("id", shopId);
+    const group_order = renameGroupOrderKey(shop, oldName, trimmed);
+    const shopRes = await sb.from("shops").update({ group_icons: icons, group_order }).eq("id", shopId);
     btn.disabled = false;
     if (shopRes.error) { setMsg(msg, shopRes.error.message, "err"); return; }
     shop.group_icons = icons;
+    shop.group_order = group_order;
     (shop.listings || []).forEach(l => {
       if (String(l.group_name || "").trim() === oldName) l.group_name = trimmed;
     });
@@ -1294,9 +1412,15 @@ document.getElementById("shops").addEventListener("click", async e => {
     const gName = btn.dataset.group || "";
     const icons = { ...normalizeGroupIcons(shop.group_icons) };
     delete icons[gName];
-    const r = await sb.from("shops").update({ group_icons: icons }).eq("id", shopId);
+    const group_order = pruneGroupOrder({ ...shop, group_icons: icons }, shop.listings);
+    const patch = { group_icons: icons };
+    if (JSON.stringify(group_order) !== JSON.stringify(normalizeGroupOrder(shop.group_order))) {
+      patch.group_order = group_order;
+    }
+    const r = await sb.from("shops").update(patch).eq("id", shopId);
     if (r.error) { setMsg(msg, r.error.message, "err"); return; }
     shop.group_icons = icons;
+    if (patch.group_order) shop.group_order = group_order;
     setMsg(msg, "Group icon cleared.", "ok");
     render();
     return;
