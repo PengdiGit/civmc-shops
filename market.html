@@ -62,8 +62,8 @@
   <div class="mrow head mrow-market">
     <span>Item</span>
     <span>Trend</span>
-    <span id="h-sell">Shops sell for</span>
-    <span id="h-buy">Shops buy at</span>
+    <span id="h-sell">Sell (unenchanted)</span>
+    <span id="h-buy">Buy (unenchanted)</span>
     <span id="h-spread">Spread</span>
     <span>Shops</span>
   </div>
@@ -155,10 +155,10 @@ function paintMarketScopeNote() {
   if (city) bits.push(city);
   if (nation && (!city || !placeEquals(nation, city))) bits.push(nation);
   if (!bits.length) {
-    note.textContent = "Rates from all public shops server-wide. Pick a nation or city to see local market prices.";
+    note.textContent = "Unenchanted rates from all public shops server-wide. Pick a nation or city to see local market prices.";
     return;
   }
-  note.textContent = "Rates computed only from shops in " + bits.join(" \u00b7 ") + ". Item filter below only hides rows in this table.";
+  note.textContent = "Unenchanted rates from shops in " + bits.join(" \u00b7 ") + ". Item filter below only hides rows in this table.";
 }
 
 function marketScopeQuery() {
@@ -210,7 +210,8 @@ function itemListingsForMode(item) {
 /** Recompute sell/buy rates for one item under the active enchant mode. */
 function itemRatesForMode(item) {
   const filtered = itemListingsForMode(item);
-  const rows = computeMarketNow(filtered, allShops, allProfiles, marketPlaceFilter());
+  // Caller already applied enchant mode (plain/max/silk/…); do not re-drop enchanted
+  const rows = computeMarketNow(filtered, allShops, allProfiles, marketPlaceFilter(), { unenchantedOnly: false });
   const out = { sell: null, buy: null };
   (rows || []).forEach(m => { if (m.item === item) out[m.side] = m; });
   return out;
@@ -367,8 +368,8 @@ function filteredItems() {
 
 function renderList() {
   const items = filteredItems();
-  document.getElementById("h-sell").textContent = "Shops sell for (d / " + unitWord() + ")";
-  document.getElementById("h-buy").textContent = "Shops buy at (d / " + unitWord() + ")";
+  document.getElementById("h-sell").textContent = "Sell (unenchanted, d / " + unitWord() + ")";
+  document.getElementById("h-buy").textContent = "Buy (unenchanted, d / " + unitWord() + ")";
   document.getElementById("h-spread").textContent = "Spread (d / " + unitWord() + ")";
   document.getElementById("list").innerHTML = items.map(i => {
     const e = byItem[i];
