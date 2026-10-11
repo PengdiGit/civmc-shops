@@ -77,7 +77,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=16"></script>
+<script src="../app.js?v=17"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const shopId = params.get("id");
@@ -281,7 +281,7 @@ async function load() {
 
   const { data: s, error } = await sb
     .from("shops")
-    .select("*, listings(*), profiles(username, mc_username, discord_username, avatar_path, timed_out, is_business)")
+    .select("*, listings(*), profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business)")
     .eq("id", shopId)
     .single();
 
