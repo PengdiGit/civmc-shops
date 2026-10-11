@@ -1199,13 +1199,36 @@ function userOwnsShop(shop, userId) {
   if (String(shop.owner_id) === String(userId)) return true;
   return shopMembersOf(shop).some(m => String(m.user_id) === String(userId));
 }
+function memberProfile(shop, m) {
+  return (m && m.profiles) || (shop && m && String(m.user_id) === String(shop.owner_id) ? shop.profiles : null);
+}
 function ownerChipsHtml(shop) {
   const members = shopMembersOf(shop);
   if (!members.length) return ownerChip(shop && shop.profiles, shop && shop.owner_id);
-  return `<span class="owner-chips">${members.map(m => {
-    const p = m.profiles || (shop && String(m.user_id) === String(shop.owner_id) ? shop.profiles : null);
-    return ownerChip(p, m.user_id);
-  }).join("")}</span>`;
+  return `<span class="owner-chips">${members.map(m => ownerChip(memberProfile(shop, m), m.user_id)).join("")}</span>`;
+}
+function ownerCollabHtml(shop, members) {
+  const faces = members.slice(0, 3).map(m => {
+    const p = memberProfile(shop, m);
+    const name = userName(p);
+    return `<a class="owner-face" href="${pageHref("profile", { id: m.user_id })}" title="${esc(name)}">${avatarImg(p, 22)}</a>`;
+  }).join("");
+  const extra = members.length - 3;
+  const extraFace = extra > 0 ? `<span class="owner-face owner-face-more" title="${extra} more">+${extra}</span>` : "";
+  const names = members.map(m => {
+    const p = memberProfile(shop, m);
+    return `<a href="${pageHref("profile", { id: m.user_id })}">${esc(userName(p))}</a>`;
+  }).join('<span class="owner-amp">&</span>');
+  const tags = members.map(m => businessTag(memberProfile(shop, m))).join("");
+  return `<span class="owner-collab"><span class="owner-faces">${faces}${extraFace}</span><span class="owner-names">${names}</span>${tags}</span>`;
+}
+function cardOwnersHtml(shop, ownerIdFallback) {
+  const members = shopMembersOf(shop);
+  if (members.length >= 2) return ownerCollabHtml(shop, members);
+  if (members.length === 1) return ownerChip(memberProfile(shop, members[0]), members[0].user_id);
+  const id = (shop && shop.owner_id) || ownerIdFallback;
+  if (shop && shop.profiles && id) return ownerChip(shop.profiles, id);
+  return '<span class="meta">-</span>';
 }
 function shopInviteUrl(token) {
   return new URL(pageHref("shops", { invite: token }), location.origin).href;
@@ -1580,9 +1603,7 @@ function shopCardHtml(s, opts) {
   const honesty = o.honestyHtml || "";
   const place = placeHtml(s);
   const where = (place || (s.x != null && s.z != null ? coordsHtml(s.x, s.z) : "no location")) + (o.distText || "");
-  const owner = s.profiles && (s.owner_id || o.ownerId)
-    ? ownerChip(s.profiles, s.owner_id || o.ownerId)
-    : '<span class="meta">-</span>';
+  const owner = cardOwnersHtml(s, o.ownerId);
   const sale = saleBadgeHtml(s);
   return `<div class="card shop-card" data-href="${pageHref("shops", { id: s.id })}">
     <div class="cardrow">${shopIcon(s, "card")}<div class="grow">

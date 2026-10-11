@@ -16,7 +16,7 @@
 <meta name="twitter:title" content="CivMC Shops">
 <meta name="twitter:description" content="Find CivMC shops, compare diamond prices, and browse the live market.">
 <meta name="twitter:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/chest.png">
-<link rel="stylesheet" href="../style.css?v=10">
+<link rel="stylesheet" href="../style.css?v=11">
 </head>
 <body class="find-page">
 <nav id="nav"></nav>
@@ -175,7 +175,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../items.js"></script>
-<script src="../app.js?v=17"></script>
+<script src="../app.js?v=18"></script>
 <script src="../place-picker.js"></script>
 <script>
 const q = document.getElementById("q");
@@ -972,7 +972,7 @@ async function showShops(term) {
   else setFindCompact(searchRan && !!norm(q.value));
 
   let query = sb.from("shops")
-    .select("id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business), listings(id, updated_at, stock, in_stock, timed_out), reviews(rating, traded, timed_out, created_at)")
+    .select("id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business), shop_members(user_id, role, created_at, profiles(username, mc_username, avatar_path, is_business)), listings(id, updated_at, stock, in_stock, timed_out), reviews(rating, traded, timed_out, created_at)")
     .order("name", { ascending: true });
   if (term) query = query.ilike("name", "%"+term+"%");
   const { data: all, error } = await query;
