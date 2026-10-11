@@ -10,7 +10,8 @@
 <meta property="og:site_name" content="CivMC Shops">
 <meta property="og:title" content="Profile - CivMC Shops">
 <meta property="og:description" content="CivMC trader profile on CivMC Shops.">
-<meta property="og:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/player_head.png">
+<meta property="og:url" content="https://civshops.pengworld.net/profile/">
+<meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/player_head.png">
 <meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="../style.css?v=21">
 </head>
@@ -501,7 +502,7 @@ document.getElementById("follower-count").onclick = async () => {
 document.getElementById("shareprof").onclick = async () => {
   const shareUrl = (shown && shown.id) ? embedHref({ profile: shown.id }) : location.href.split("#")[0];
   const ok = await copyText(shareUrl);
-  setMsg(msg, ok ? "Profile link copied (Discord-friendly embed)." : "Couldn't copy.", ok ? "ok" : "err");
+  setMsg(msg, ok ? "Profile link copied." : "Couldn't copy.", ok ? "ok" : "err");
 };
 
 document.getElementById("toggledit").onclick = () => {

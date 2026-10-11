@@ -10,8 +10,8 @@
 <meta property="og:site_name" content="CivMC Shops">
 <meta property="og:title" content="Market - CivMC Shops">
 <meta property="og:description" content="Live diamond market rates across CivMC shops.">
-<meta property="og:url" content="https://pengdigit.github.io/civmc-shops/market/">
-<meta property="og:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/diamond.png">
+<meta property="og:url" content="https://civshops.pengworld.net/market/">
+<meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/diamond.png">
 <meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="../style.css?v=8">
 </head>
@@ -558,7 +558,7 @@ document.getElementById("d-share").onclick = async () => {
   if (!selected) return;
   const enchant = enchantModeId && enchantModeId !== "plain" ? enchantModeId : undefined;
   const ok = await copyText(embedHref({ item: selected, enchant }));
-  setMsg(msg, ok ? "Market link copied (Discord-friendly embed)." : "Couldn't copy.", ok ? "ok" : "err");
+  setMsg(msg, ok ? "Market link copied." : "Couldn't copy.", ok ? "ok" : "err");
 };
 document.getElementById("d-close").onclick = () => {
   document.getElementById("detail").hidden = true;

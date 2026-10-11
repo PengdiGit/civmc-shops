@@ -10,7 +10,8 @@
 <meta property="og:site_name" content="CivMC Shops">
 <meta property="og:title" content="Shop - CivMC Shops">
 <meta property="og:description" content="CivMC shop page — listings, reviews, and location.">
-<meta property="og:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/chest.png">
+<meta property="og:url" content="https://civshops.pengworld.net/shops/">
+<meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/chest.png">
 <meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="../style.css?v=20">
 </head>
@@ -570,7 +571,7 @@ document.querySelector("main").addEventListener("click", async e => {
       ? embedHref({ shop: shopId, listing: hlListingId || undefined })
       : location.href.split("#")[0];
     const ok = await copyText(shareUrl);
-    setMsg(msg, ok ? "Shop link copied (Discord-friendly embed)." : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");
+    setMsg(msg, ok ? "Shop link copied." : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");
     return;
   }
   if (act === "copy-coords") {
