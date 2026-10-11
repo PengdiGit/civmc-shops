@@ -778,8 +778,23 @@ img.avatar {
   font-size: .75rem;
   opacity: .75;
 }
-.barrel-peek { max-width: 360px; }
-.barrel-peek-overlay { z-index: 85; }
+.bundle-peek-overlay,
+.bundle-editor-overlay { z-index: 85; }
+.bundle-modal-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.bundle-modal-hint {
+  margin: 0 0 10px;
+  font-size: .82rem;
+}
 
 .listing-extras {
   margin-top: 6px;
@@ -809,86 +824,95 @@ img.avatar {
   line-height: 1.4;
   white-space: pre-wrap;
 }
-.barrel-gui {
+
+/* Minecraft inventory-style bundle panel (bundleui.png: 842x358, slots at 22,79 pitch 90) */
+.bundle-gui {
+  --bundle-native-w: 842;
+  --bundle-native-h: 358;
+  --slot-origin-x: 22;
+  --slot-origin-y: 79;
+  --slot-pitch: 90;
+  --gui-scale: 0.5;
+  --slot-px: calc(var(--slot-pitch) * var(--gui-scale) * 1px);
+  --icon-px: calc(var(--slot-pitch) * var(--gui-scale) * 0.72 * 1px);
+
+  box-sizing: border-box;
+  width: calc(var(--bundle-native-w) * var(--gui-scale) * 1px);
+  height: calc(var(--bundle-native-h) * var(--gui-scale) * 1px);
+  padding:
+    calc(var(--slot-origin-y) * var(--gui-scale) * 1px)
+    calc((var(--bundle-native-w) - var(--slot-origin-x) - var(--slot-pitch) * 9) * var(--gui-scale) * 1px)
+    calc((var(--bundle-native-h) - var(--slot-origin-y) - var(--slot-pitch) * 3) * var(--gui-scale) * 1px)
+    calc(var(--slot-origin-x) * var(--gui-scale) * 1px);
   display: grid;
-  grid-template-columns: repeat(9, 28px);
-  gap: 2px;
-  width: max-content;
-  padding: 6px;
-  background: linear-gradient(180deg, #8b6a3f 0%, #6e5130 40%, #5a4228 100%);
-  border: 2px solid #3a2a18;
-  border-radius: 2px;
-  box-shadow: inset 0 0 0 1px #c4a06a, 0 2px 0 #2a1e10;
+  grid-template-columns: repeat(9, var(--slot-px));
+  grid-template-rows: repeat(3, var(--slot-px));
+  gap: 0;
+  align-content: start;
+  justify-content: start;
+  background-color: #c6c6c6;
+  background-image: url("bundleui.png");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  border: none;
+  border-radius: 0;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, .35);
 }
-.barrel-gui.compact {
-  grid-template-columns: repeat(9, 22px);
-  gap: 1px;
-  padding: 4px;
-  transform-origin: left top;
-}
-.barrel-gui.compact .slot {
-  width: 16px;
-  height: 16px;
-  border: 0;
-  background: transparent;
-  padding: 0;
-}
-.barrel-gui.compact .icon {
-  width: 16px;
-  height: 16px;
-}
-.barrel-slot {
+.bundle-gui.compact { --gui-scale: 0.32; }
+.bundle-slot {
   position: relative;
-  width: 28px;
-  height: 28px;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #8b8b8b;
-  border: 2px solid;
-  border-color: #373737 #fff #fff #373737;
+  background: transparent;
+  border: 0;
   box-sizing: border-box;
   padding: 0;
   margin: 0;
   cursor: default;
   color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
 }
-.barrel-gui.compact .barrel-slot {
-  width: 22px;
-  height: 22px;
-  border-width: 1px;
+.bundle-gui-edit .bundle-slot { cursor: pointer; }
+.bundle-gui-edit .bundle-slot:hover,
+.bundle-gui-edit .bundle-slot:focus-visible {
+  outline: 2px solid #ffff8b;
+  outline-offset: -3px;
+  z-index: 1;
 }
-.barrel-gui-edit .barrel-slot { cursor: pointer; }
-.barrel-gui-edit .barrel-slot:hover {
-  outline: 1px solid #ffff8b;
-  outline-offset: -1px;
-}
-.barrel-slot .slot {
-  width: 20px;
-  height: 20px;
+.bundle-slot .slot {
+  width: var(--icon-px);
+  height: var(--icon-px);
   border: 0;
   background: transparent;
+  border-radius: 0;
   padding: 0;
   box-shadow: none;
 }
-.barrel-slot .icon {
-  width: 20px;
-  height: 20px;
+.bundle-slot .icon {
+  width: var(--icon-px);
+  height: var(--icon-px);
   image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
-.barrel-qty {
+.bundle-qty {
   position: absolute;
-  right: 1px;
-  bottom: 0;
-  font-size: 10px;
+  right: 3px;
+  bottom: 2px;
+  font-size: max(9px, calc(11px * var(--gui-scale) / 0.5));
   font-weight: 700;
   color: #fff;
-  text-shadow: 1px 1px 0 #000;
+  text-shadow: 1px 1px 0 #3f3f3f, 0 1px 0 #000, 1px 0 0 #000;
   line-height: 1;
   pointer-events: none;
+  z-index: 2;
 }
-.barrel-editor { max-width: 360px; }
-.barrel-editor-overlay { z-index: 85; }
 .dash-listing-extra {
   display: grid;
   gap: 6px;
@@ -2078,7 +2102,7 @@ p.sub a:hover, .cname a:hover, .comment a:hover, .review a:hover { color: var(--
   position: fixed; inset: 0; background: rgba(0,0,0,.65);
   display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px;
 }
-.picker-overlay { z-index: 90; } /* above barrel editor when picking slot items */
+.picker-overlay { z-index: 90; } /* above bundle editor when picking slot items */
 .picker {
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
   width: 100%; max-width: 520px; max-height: 80vh;
@@ -2103,6 +2127,11 @@ button.pickbtn img {
 .modal {
   background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
   width: 100%; max-width: 400px; padding: 16px;
+}
+.modal.bundle-peek,
+.modal.bundle-editor {
+  max-width: min(460px, calc(100vw - 32px));
+  width: max-content;
 }
 .modal h2 { margin-top: 0; }
 .ui-modal-overlay { z-index: 95; }
