@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>My shops - CivMC Shops</title>
-<link rel="stylesheet" href="../style.css?v=8">
+<link rel="stylesheet" href="../style.css?v=9">
 </head>
 <body class="dash-page">
 <nav id="nav"></nav>
@@ -656,14 +656,46 @@ async function expirePastSales(shops) {
   }
 }
 
+const DASH_SHOP_SELECT = "*, listings(*), shop_members(user_id, role, created_at, profiles(username, mc_username, avatar_path, is_business))";
+
+async function loadEditableShops() {
+  const uid = me.session.user.id;
+  const ownedRes = await sb.from("shops").select(DASH_SHOP_SELECT).eq("owner_id", uid).order("created_at");
+  if (ownedRes.error) return ownedRes;
+  const memberRes = await sb.from("shop_members").select("shop_id").eq("user_id", uid).eq("role", "co_owner");
+  if (memberRes.error) return memberRes;
+  const have = new Set((ownedRes.data || []).map(s => String(s.id)));
+  const ids = (memberRes.data || []).map(m => m.shop_id).filter(id => !have.has(String(id)));
+  let extra = [];
+  if (ids.length) {
+    const coRes = await sb.from("shops").select(DASH_SHOP_SELECT).in("id", ids);
+    if (coRes.error) return coRes;
+    extra = coRes.data || [];
+  }
+  const shops = [...(ownedRes.data || []), ...extra];
+  shops.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  return { data: shops, error: null };
+}
+
+function dashCoOwnerHtml(s) {
+  const cos = shopMembersOf(s).filter(m => m.role === "co_owner");
+  if (!cos.length) return "";
+  const creator = String(s.owner_id) === String(me.session.user.id);
+  return `<div class="dash-coowners">${cos.map(m => {
+    const name = userName(m.profiles);
+    const remove = creator
+      ? `<button type="button" class="small" data-act="remove-coowner" data-user="${esc(m.user_id)}" data-name="${esc(name)}">Remove</button>`
+      : "";
+    return `<span class="dash-coowner"><b>${esc(name)}</b>${remove}</span>`;
+  }).join("")}</div>`;
+}
+
 async function render(resetShop) {
-  const { data: shops, error } = await sb
-    .from("shops").select("*, listings(*)")
-    .eq("owner_id", me.session.user.id)
-    .order("created_at");
+  const { data: shops, error } = await loadEditableShops();
   if (error) { setMsg(msg, error.message, "err"); return; }
 
-  await expirePastSales(shops || []);
+  const shopRows = shops || [];
+  await expirePastSales(shopRows);
 
   const box = document.getElementById("shops");
 
@@ -682,20 +714,21 @@ async function render(resetShop) {
   });
 
   shopsData = {};
-  shops.forEach(s => {
+  shopRows.forEach(s => {
     if (!Array.isArray(s.group_order)) s.group_order = [];
     s.listings = sortListingsOwnerOrder(s.listings || [], s);
     shopsData[s.id] = s;
   });
-  paintOwnerAlerts(shops || []);
-  if (!shops.length) {
+  paintOwnerAlerts(shopRows);
+  if (!shopRows.length) {
     box.innerHTML = emptyState("No shops yet. Press + New Shop to create one.");
     clearDashDirty();
     return;
   }
 
-  box.innerHTML = shops.map(s => {
+  box.innerHTML = shopRows.map(s => {
     const nList = (s.listings || []).length;
+    const creator = String(s.owner_id) === String(me.session.user.id);
     return `
     <div class="card collapse-section dash-shop-card" data-shop="${s.id}" data-collapse="dash-shop-${s.id}">
       <div class="top">
@@ -706,9 +739,11 @@ async function render(resetShop) {
           ${shopIcon(s, "card")}
           <div><a href="../shops/?id=${s.id}" style="color:inherit"><b>${shopName(s)}</b></a>
             ${saleBadgeHtml(s)}
+            ${creator ? "" : '<span class="tag">co-owner</span>'}
             ${s.is_open === false ? '<span class="tag warn">closed - hidden from public</span>' : ""}
             ${s.timed_out ? '<span class="tag bad">timed out - hidden</span>' : ""}
-            <div class="meta">${placeHtml(s) ? placeHtml(s) + " \u00b7 " : ""}${coordsHtml(s.x, s.z)}${nList ? " \u00b7 " + nList + " listing" + (nList === 1 ? "" : "s") : ""}</div></div>
+            <div class="meta">${placeHtml(s) ? placeHtml(s) + " \u00b7 " : ""}${coordsHtml(s.x, s.z)}${nList ? " \u00b7 " + nList + " listing" + (nList === 1 ? "" : "s") : ""}</div>
+            ${dashCoOwnerHtml(s)}</div>
         </div>
         <div class="action-cluster dash-shop-actions">
           ${iconBtn("external", { tag: "a", title: "Preview shop", attrs: `href="../shops/?id=${s.id}" target="_blank" rel="noopener"` })}
@@ -723,7 +758,10 @@ async function render(resetShop) {
           ${s.is_open === false
             ? iconBtn("eye", { primary: true, title: "Open shop", attrs: 'data-act="open-shop"' })
             : iconBtn("eyeOff", { title: "Close shop", attrs: 'data-act="close-shop"' })}
-          ${iconBtn("trash", { danger: true, title: "Delete shop", attrs: 'data-act="del-shop"' })}
+          ${creator ? iconBtn("share", { title: "Copy a 1-hour co-owner invite link", attrs: 'data-act="share-shop"' }) : ""}
+          ${creator
+            ? iconBtn("trash", { danger: true, title: "Delete shop", attrs: 'data-act="del-shop"' })
+            : `<button type="button" class="small" data-act="leave-shop">Leave</button>`}
         </div>
       </div>
 
@@ -1207,6 +1245,48 @@ document.getElementById("shops").addEventListener("click", async e => {
   if (act === "pick") { openItemPicker(name => setPick(btn, name)); return; }
 
   const shopElEarly = btn.closest("[data-shop]");
+  if (act === "share-shop" && shopElEarly) {
+    const shopId = shopElEarly.dataset.shop;
+    btn.disabled = true;
+    const { data, error } = await sb.rpc("create_shop_invite", { sid: Number(shopId) });
+    btn.disabled = false;
+    if (error) { setMsg(msg, error.message, "err"); return; }
+    const url = shopInviteUrl(data);
+    const ok = await copyText(url);
+    setMsg(msg, ok
+      ? "Invite link copied. It lasts 1 hour and one player can join as a co-owner."
+      : "Couldn't copy. Invite link: " + url, ok ? "ok" : "err");
+    return;
+  }
+  if (act === "remove-coowner" && shopElEarly) {
+    const shopId = shopElEarly.dataset.shop;
+    const name = btn.dataset.name || "this player";
+    if (!await confirmModal({
+      title: "Remove co-owner",
+      body: `Remove ${name} from this shop? They will no longer be able to edit it.`,
+      confirmLabel: "Remove",
+      danger: true
+    })) return;
+    const { error } = await sb.rpc("remove_shop_co_owner", { sid: Number(shopId), member_id: btn.dataset.user });
+    if (error) { setMsg(msg, error.message, "err"); return; }
+    setMsg(msg, "Co-owner removed.", "ok");
+    render();
+    return;
+  }
+  if (act === "leave-shop" && shopElEarly) {
+    const shopId = shopElEarly.dataset.shop;
+    if (!await confirmModal({
+      title: "Leave shop",
+      body: "You will stop being a co-owner and this shop will disappear from My Shops.",
+      confirmLabel: "Leave shop",
+      danger: true
+    })) return;
+    const { error } = await sb.rpc("leave_shop", { sid: Number(shopId) });
+    if (error) { setMsg(msg, error.message, "err"); return; }
+    setMsg(msg, "You left the shop.", "ok");
+    render();
+    return;
+  }
   if (act === "open-add-listing" && shopElEarly) {
     addingListingSlot = { shopId: shopElEarly.dataset.shop, groupKey: btn.dataset.group ?? "" };
     render();

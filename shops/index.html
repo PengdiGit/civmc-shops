@@ -81,6 +81,7 @@
 <script>
 const params = new URLSearchParams(location.search);
 const shopId = params.get("id");
+const inviteToken = params.get("invite");
 const focusId = params.get("listing");
 const findQ = norm(params.get("q") || "");
 const msg = document.getElementById("msg");
@@ -121,9 +122,12 @@ function isFindHighlight(l) {
   return false;
 }
 
+function viewerOwnsShop() {
+  return userOwnsShop(shop, me && me.id);
+}
 function renderShopCompare() {
   paintCompareTray(comparePins, { here: loadHereCoords() });
-  paintListings(isStaff(me), !!(me && shop && shop.owner_id === me.id));
+  paintListings(isStaff(me), viewerOwnsShop());
 }
 
 function buildGroupNavEntries(list) {
@@ -269,7 +273,7 @@ async function castTip(listingId, vote) {
     if (error) { setMsg(msg, error.message, "err"); return; }
   }
   await loadTips();
-  paintListings(isStaff(me), !!(me && shop && shop.owner_id === me.id));
+  paintListings(isStaff(me), viewerOwnsShop());
 }
 
 async function load() {
@@ -281,11 +285,11 @@ async function load() {
 
   const { data: s, error } = await sb
     .from("shops")
-    .select("*, listings(*), profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business)")
+    .select("*, listings(*), profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business), shop_members(user_id, role, created_at, profiles(username, mc_username, discord_username, avatar_path, timed_out, is_business))")
     .eq("id", shopId)
     .single();
 
-  const isOwner = !!(s && me && s.owner_id === me.id);
+  const isOwner = !!(s && userOwnsShop(s, me && me.id));
   const hidden = s && (s.timed_out || s.archived || s.is_open === false || (s.profiles && s.profiles.timed_out));
   if (error || !s || (hidden && !staff && !isOwner)) {
     document.getElementById("name").textContent = "Shop not found";
@@ -294,7 +298,6 @@ async function load() {
     return;
   }
   shop = s;
-
   document.title = s.name + " - CivMC Shops";
   document.getElementById("name").innerHTML = shopName(s) + (saleBadgeHtml(s) ? " " + saleBadgeHtml(s) : "");
   document.getElementById("shopicon").innerHTML = shopIcon(s, "hero");
@@ -310,7 +313,7 @@ async function load() {
   }
   const newest = allListings.reduce((m, l) => (!m || l.updated_at > m ? l.updated_at : m), null);
   const parts = [];
-  parts.push(ownerChip(s.profiles, s.owner_id));
+  parts.push(ownerChipsHtml(s));
   const place = placeHtml(s);
   if (place) parts.push(place);
   parts.push(coordsHtml(s.x, s.z) + (s.x != null && s.z != null
@@ -375,8 +378,8 @@ async function load() {
   firstLoad = false;
 }
 
-document.getElementById("lq").addEventListener("input", () => paintListings(isStaff(me), !!(me && shop && shop.owner_id === me.id)));
-document.getElementById("lstock").addEventListener("change", () => paintListings(isStaff(me), !!(me && shop && shop.owner_id === me.id)));
+document.getElementById("lq").addEventListener("input", () => paintListings(isStaff(me), viewerOwnsShop()));
+document.getElementById("lstock").addEventListener("change", () => paintListings(isStaff(me), viewerOwnsShop()));
 document.getElementById("shop-group-sidebar").addEventListener("click", e => {
   const b = e.target.closest("[data-group-jump]");
   if (b) jumpToGroupSection(b.dataset.groupJump);
@@ -466,8 +469,7 @@ async function loadReviews(staff, isOwner) {
 
 document.getElementById("rsort").addEventListener("change", () => {
   reviewSort = document.getElementById("rsort").value || "newest";
-  const isOwner = !!(me && shop && shop.owner_id === me.id);
-  paintReviewList(isStaff(me), isOwner);
+  paintReviewList(isStaff(me), viewerOwnsShop());
 });
 
 function composerHtml(parent, placeholder) {
@@ -480,7 +482,7 @@ function composerHtml(parent, placeholder) {
 function commentHtml(c, rootId, staff) {
   const mine = me && c.author_id === me.id;
   const pr = c.profiles;
-  const isOwnerAuthor = shop && c.author_id === shop.owner_id;
+  const isOwnerAuthor = userOwnsShop(shop, c.author_id);
   let b = "";
   if (isVerified(me)) b += iconBtn("reply", { title: "Reply", attrs: `data-act="reply" data-root="${rootId}" data-name="${esc(userName(pr))}"` });
   if (!mine) b += iconBtn("flag", { cls: "btn-report", title: "Report comment", attrs: `data-act="report" data-type="comment" data-id="${c.id}"` });
@@ -670,7 +672,87 @@ document.querySelector("main").addEventListener("click", async e => {
   load();
 });
 
-load();
+function inviteUuidOk(v) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v || ""));
+}
+
+async function handleInvite() {
+  if (!inviteToken) return "continue";
+  if (!inviteUuidOk(inviteToken)) {
+    if (!shopId) document.getElementById("name").textContent = "Shop invite";
+    setMsg(msg, "That invite link isn't valid.", "err");
+    return shopId ? "continue" : "stop";
+  }
+  const session = await getSession();
+  me = session ? await getProfile(session.user.id) : null;
+  const { data, error } = await sb.rpc("preview_shop_invite", { invite_id: inviteToken });
+  const status = data && data.status;
+  if (error || !data || status === "missing") {
+    if (!shopId) document.getElementById("name").textContent = "Shop invite";
+    setMsg(msg, "That invite link isn't valid.", "err");
+    return shopId ? "continue" : "stop";
+  }
+  if (status === "used") {
+    if (!shopId) document.getElementById("name").textContent = "Shop invite";
+    setMsg(msg, "That invite was already used.", "err");
+    return shopId ? "continue" : "stop";
+  }
+  if (status === "expired") {
+    if (!shopId) document.getElementById("name").textContent = "Shop invite";
+    setMsg(msg, "That invite has expired. Ask the shop creator for a new link.", "err");
+    return shopId ? "continue" : "stop";
+  }
+  const shopNameText = data.shop_name || "this shop";
+  if (!me) {
+    document.getElementById("name").textContent = data.shop_name || "Shop invite";
+    document.getElementById("banner").innerHTML = `<div class="banner">You are invited to join <b>${esc(shopNameText)}</b> as a co-owner. <a href="${loginHref()}">Log in</a> to accept. The link works once and expires in an hour.</div>`;
+    return "stop";
+  }
+  if (data.already_member) {
+    if (!shopId && data.shop_id) {
+      location.replace(pageHref("shops", { id: data.shop_id }));
+      return "stop";
+    }
+    return "already";
+  }
+  if (stillTimedOut(me)) return "timeout";
+  if (!isVerified(me)) return "verify";
+  const yes = await confirmModal({
+    title: "Join as co-owner",
+    body: `Join ${shopNameText} as a co-owner? You will be able to edit it from My Shops. This link works once.`,
+    confirmLabel: "Join shop"
+  });
+  if (!yes) {
+    if (shopId) return "continue";
+    document.getElementById("name").textContent = data.shop_name || "Shop invite";
+    setMsg(msg, "Invite not accepted.", "ok");
+    return "stop";
+  }
+  const acc = await sb.rpc("accept_shop_invite", { invite_id: inviteToken });
+  if (acc.error) {
+    setMsg(msg, acc.error.message, "err");
+    return shopId ? "continue" : "stop";
+  }
+  const id = (acc.data && acc.data.shop_id) || data.shop_id;
+  location.replace(pageHref("shops", { id, joined: "1" }));
+  return "stop";
+}
+
+async function boot() {
+  const next = await handleInvite();
+  if (next === "stop") return;
+  await load();
+  if (next === "verify") setMsg(msg, "Verify your account before you can join this shop as a co-owner.", "err");
+  else if (next === "timeout") setMsg(msg, "Your account is timed out, so you can't join this shop.", "err");
+  else if (next === "already") setMsg(msg, "You already have access to this shop.", "ok");
+  else if (params.get("joined") === "1") {
+    setMsg(msg, "You joined this shop as a co-owner. Edit it from My Shops.", "ok");
+    const clean = new URL(location.href);
+    clean.searchParams.delete("joined");
+    history.replaceState(null, "", clean.pathname + clean.search + clean.hash);
+  }
+}
+boot();
 </script>
 </body>
 </html>
