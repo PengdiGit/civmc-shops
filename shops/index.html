@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shop - CivMC Shops</title>
-<link rel="stylesheet" href="../style.css?v=18">
+<link rel="stylesheet" href="../style.css?v=19">
 </head>
 <body class="shop-page">
 <nav id="nav"></nav>
@@ -77,7 +77,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=15"></script>
+<script src="../app.js?v=16"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const shopId = params.get("id");
@@ -281,7 +281,7 @@ async function load() {
 
   const { data: s, error } = await sb
     .from("shops")
-    .select("*, listings(*), profiles(username, mc_username, discord_username, avatar_path, timed_out)")
+    .select("*, listings(*), profiles(username, mc_username, discord_username, avatar_path, timed_out, is_business)")
     .eq("id", shopId)
     .single();
 
@@ -492,6 +492,7 @@ function commentHtml(c, rootId, staff) {
       <div class="head">
         <span class="cname">${avatarImg(pr, 24)}<a href="../profile/?id=${c.author_id}">${esc(userName(pr))}</a>
           ${isOwnerAuthor ? '<span class="tag owner">owner</span>' : ""}
+          ${pr && pr.is_business ? '<span class="tag role-business">business</span>' : ""}
           <span class="meta">\u00b7 ${agoText(c.created_at)}</span> ${c.timed_out ? '<span class="tag bad">hidden</span>' : ""}</span>
         <span class="action-cluster">${b}</span>
       </div>
@@ -500,7 +501,7 @@ function commentHtml(c, rootId, staff) {
 }
 
 async function loadComments(staff) {
-  const { data, error } = await sb.from("comments").select("*, profiles(username, mc_username, avatar_path)")
+  const { data, error } = await sb.from("comments").select("*, profiles(username, mc_username, avatar_path, is_business)")
     .eq("shop_id", shopId).order("created_at", { ascending: true });
   const box = document.getElementById("comments");
   if (error) { box.innerHTML = '<p class="meta">Couldn\'t load comments.</p>'; return; }

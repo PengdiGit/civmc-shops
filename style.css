@@ -433,6 +433,12 @@ a.small:hover { border-color: var(--accent); color: var(--accent); }
   border-color: var(--line);
   background: color-mix(in srgb, var(--bg) 40%, transparent);
 }
+.tag.role-business {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--line));
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-weight: 600;
+}
 .chip {
   font-size: .72rem; padding: 2px 7px; border-radius: 3px;
   background: var(--bg); border: 1px solid var(--line); color: var(--accent); white-space: nowrap;

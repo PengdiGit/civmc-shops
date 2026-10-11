@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Moderation - CivMC Shops</title>
-<link rel="stylesheet" href="../style.css?v=7">
+<link rel="stylesheet" href="../style.css?v=8">
 </head>
 <body class="mod-page">
 <nav id="nav"></nav>
@@ -105,7 +105,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=15"></script>
+<script src="../app.js?v=16"></script>
 <script>
 const msg = document.getElementById("msg");
 const filter = document.getElementById("filter");
@@ -212,7 +212,7 @@ function render() {
   document.getElementById("users").innerHTML = data.users
     .filter(u => !u.is_head && (!u.is_admin || me.is_head) && hit(userName(u), u.mc_username))
     .map(u => `<div class="listing">
-      <div>${esc(userName(u))} ${u.is_admin ? '<span class="tag">admin</span>' : ""} ${u.is_mod ? '<span class="tag">mod</span>' : ""}
+      <div>${esc(userName(u))} ${u.is_admin ? '<span class="tag">admin</span>' : ""} ${u.is_mod ? '<span class="tag">mod</span>' : ""} ${u.is_business ? '<span class="tag role-business">business</span>' : ""}
         ${!u.verified_at ? '<span class="tag warn">unverified</span>' : ""} ${stillTimedOut(u) ? `<span class="tag bad">timed out</span> <span class="meta">${esc(timeoutUntilLabel(u))}</span>` : ""}</div>
       ${canTimeoutUser(u) ? tbtn("user", u.id, !stillTimedOut(u)) : ""}
     </div>`).join("") || '<p class="meta">None.</p>';

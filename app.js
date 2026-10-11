@@ -1069,9 +1069,12 @@ function emptyState(text, actionHref, actionLabel) {
     : "";
   return `<div class="empty"><p>${text}</p>${btn}</div>`;
 }
+function businessTag(p) {
+  return p && p.is_business ? ' <span class="tag role-business">business</span>' : "";
+}
 function ownerChip(p, ownerId) {
   if (!p || !ownerId) return '<span class="meta">owner: ?</span>';
-  return `<a class="owner-chip" href="${pageHref("profile", { id: ownerId })}">${avatarImg(p, 22)} ${esc(userName(p))}</a>`;
+  return `<a class="owner-chip" href="${pageHref("profile", { id: ownerId })}">${avatarImg(p, 22)} ${esc(userName(p))}</a>${businessTag(p)}`;
 }
 // "Mount Augusta \u00b7 Commonwealth" style place line for cards / meta
 // Soft city/nation aliases (display + filter matching without rewriting DB rows)
@@ -1159,7 +1162,7 @@ function writeCompareHash(pins) {
 
 // Cross-page compare tray (sessionStorage + optional #cmp=)
 const COMPARE_STORE_KEY = "civmc_compare_pins";
-const COMPARE_LISTING_SELECT = "*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out))";
+const COMPARE_LISTING_SELECT = "*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles(username, mc_username, discord_username, avatar_path, timed_out, is_business))";
 function loadCompareSpecs() {
   try {
     const arr = JSON.parse(sessionStorage.getItem(COMPARE_STORE_KEY) || "[]");
@@ -2193,7 +2196,7 @@ function setMsg(el, text, kind) {
 function ownerHtml(p, ownerId) {
   if (!p) return "owner: ?";
   const link = ownerId ? `<a href="${pageHref("profile", { id: ownerId })}">${esc(userName(p))}</a>` : esc(userName(p));
-  return "owner: " + link + (p.discord_username ? " \u00b7 Discord: " + esc(p.discord_username) : "");
+  return "owner: " + link + businessTag(p) + (p.discord_username ? " \u00b7 Discord: " + esc(p.discord_username) : "");
 }
 
 // timeout / untimeout a shop, listing, comment or review (mods + admins). returns error text or null

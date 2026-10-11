@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profile - CivMC Shops</title>
-<link rel="stylesheet" href="../style.css?v=19">
+<link rel="stylesheet" href="../style.css?v=20">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
@@ -98,7 +98,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=15"></script>
+<script src="../app.js?v=16"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let id = params.get("id");
@@ -299,6 +299,7 @@ async function load() {
   if (p.is_head) tags += ' <span class="tag">head admin</span>';
   else if (p.is_admin) tags += ' <span class="tag">admin</span>';
   else if (p.is_mod) tags += ' <span class="tag">mod</span>';
+  if (p.is_business) tags += ' <span class="tag role-business">business</span>';
   if (p.timed_out) tags += ' <span class="tag bad">timed out</span>';
   document.getElementById("tags").innerHTML = tags;
 
@@ -308,8 +309,10 @@ async function load() {
   const dcName = p.discord_username || "";
   const pronouns = (p.pronouns || "").trim();
   const timezone = (p.timezone || "").trim();
+  const location = p.is_business ? placeHtml({ city: p.place_city, nation: p.place_nation }) : "";
   document.getElementById("facts").innerHTML =
     `<dt>Username</dt><dd class="fact-copy" data-copy="${esc(login)}" title="Click to copy" role="button" tabindex="0"><b>${esc(primary)}</b></dd>
+     ${p.is_business ? `<dt>Location</dt><dd>${location || "—"}</dd>` : ""}
      <dt>Minecraft</dt><dd${mcName ? ` class="fact-copy" data-copy="${esc(mcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${esc(mcName || "—")}</dd>
      <dt>Discord</dt><dd${dcName ? ` class="fact-copy" data-copy="${esc(dcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${dcName ? `<b>${esc(dcName)}</b>` : '<span class="meta">not set</span>'}</dd>
      <dt>Pronouns</dt><dd>${pronouns ? esc(pronouns) : '<span class="meta">N/A</span>'}</dd>
@@ -355,7 +358,11 @@ async function load() {
     syncHlUi(p.highlight_color || null);
     const verified = isVerified(p);
     document.getElementById("picnote").textContent = verified
-      ? (p.avatar_path ? "You're using a custom picture." : "You're using your Minecraft head. Upload a picture to replace it.")
+      ? (p.avatar_path
+        ? "You're using a custom picture."
+        : (p.is_business && !mcName
+          ? "You're using a default picture. Upload a picture to replace it."
+          : "You're using your Minecraft head. Upload a picture to replace it."))
       : "Verified accounts can upload a custom picture. Until then you get your Minecraft head.";
     document.getElementById("picfile").disabled = !verified;
     document.getElementById("savepic").disabled = !verified;
@@ -403,7 +410,7 @@ async function load() {
     shopBox.className = "";
     shopBox.innerHTML = own
       ? emptyState("You don't have a shop yet.", "../dashboard/", "Create a shop")
-      : emptyState("This player hasn't opened a shop yet.");
+      : emptyState(p.is_business ? "This account hasn't opened a shop yet." : "This player hasn't opened a shop yet.");
   } else {
     shopBox.className = "shop-grid profile-shop-grid";
     shopBox.innerHTML = full.map(s => {

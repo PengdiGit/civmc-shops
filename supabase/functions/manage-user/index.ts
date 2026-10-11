@@ -5,6 +5,8 @@
 //   update_account : admins. Login username, Discord, Minecraft, and an optional new password.
 //     Head can edit any account, including their own. Other admins can edit users, mods, and themselves.
 //     They cannot edit the head or other admins. The current password cannot be read back (Auth stores a hash).
+//     Business accounts: Minecraft is optional, city/nation stay required, and a new password is the shared
+//     login (must_change_password stays off). Business accounts cannot be made mods or admins.
 // Timeouts: optional hours (1 / 24 / 168). Omit or null = until staff lifts.
 // Auth ban_duration matches so login unlocks when the window ends; profile flag uses timed_out_until.
 // Deploy: supabase functions deploy manage-user
@@ -16,6 +18,11 @@ const cors = {
 };
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+
+function cleanPlace(value: unknown): string | null {
+  const s = String(value ?? "").trim();
+  return s ? s : null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -45,11 +52,24 @@ Deno.serve(async (req) => {
     const mc = String(body.mc_username || "").trim();
     const discord = String(body.discord_username || "").trim();
     const password = body.password == null ? "" : String(body.password);
+    const business = !!editTarget.is_business;
 
     if (!/^[a-z0-9_]{3,20}$/.test(username)) return json({ error: "Login username: 3-20 letters, numbers or _." }, 400);
-    if (!mc || mc.length > 32) return json({ error: "Need a Minecraft name (max 32 characters)." }, 400);
+    if (mc.length > 32) return json({ error: "Minecraft name is too long (max 32 characters)." }, 400);
+    if (!business && !mc) return json({ error: "Need a Minecraft name (max 32 characters)." }, 400);
     if (discord.length > 40) return json({ error: "Discord username is too long (max 40)." }, 400);
     if (password && (password.length < 8 || password.length > 72)) return json({ error: "Password needs 8-72 characters." }, 400);
+
+    let place_city: string | null = null;
+    let place_nation: string | null = null;
+    if (business) {
+      const cityRaw = String(body.place_city ?? "").trim();
+      const nationRaw = String(body.place_nation ?? "").trim();
+      if (cityRaw.length > 60 || nationRaw.length > 60) return json({ error: "City and nation can be at most 60 characters." }, 400);
+      place_city = cleanPlace(cityRaw);
+      place_nation = cleanPlace(nationRaw);
+      if (!place_city && !place_nation) return json({ error: "Need a city, a nation, or both." }, 400);
+    }
 
     if (username !== (editTarget.username || "")) {
       const { data: clash, error: cErr } = await admin.from("profiles")
@@ -60,10 +80,15 @@ Deno.serve(async (req) => {
 
     const patch: Record<string, unknown> = {
       username,
-      mc_username: mc,
+      mc_username: business ? (mc || null) : mc,
       discord_username: discord || null,
     };
-    if (password) patch.must_change_password = !self;
+    if (business) {
+      patch.place_city = place_city;
+      patch.place_nation = place_nation;
+    }
+    // Business passwords are the shared login. Don't nag the next person to change it.
+    if (password && !business) patch.must_change_password = !self;
 
     const { error: pErr } = await admin.from("profiles").update(patch).eq("id", user_id);
     if (pErr) {
@@ -85,6 +110,7 @@ Deno.serve(async (req) => {
           mc_username: editTarget.mc_username,
           discord_username: editTarget.discord_username,
           must_change_password: editTarget.must_change_password,
+          ...(business ? { place_city: editTarget.place_city, place_nation: editTarget.place_nation } : {}),
         }).eq("id", user_id);
         const taken = /already|registered|exists/i.test(aErr.message);
         return json({ error: taken ? "That login username is taken." : aErr.message }, 400);
@@ -157,6 +183,7 @@ Deno.serve(async (req) => {
   };
   if (roles[action]) {
     if (!me.is_head) return json({ error: "Only the head admin can change roles." }, 403);
+    if (target.is_business) return json({ error: "Business accounts can't be mods or admins." }, 400);
     const { error } = await admin.from("profiles").update(roles[action]).eq("id", user_id);
     if (error) return json({ error: error.message }, 400);
     return json({ ok: true });
