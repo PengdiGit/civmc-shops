@@ -2156,6 +2156,20 @@ button.pickbtn img {
 .ui-modal-body { margin: 0 0 14px; color: var(--dim); line-height: 1.45; }
 .ui-modal-list-body { margin: 0 0 14px; max-height: min(52vh, 360px); overflow: auto; }
 .ui-modal-actions { justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.ui-modal-account { max-width: 440px; }
+.acct-edit-fields { display: flex; flex-direction: column; }
+.acct-edit-fields label { margin-top: 10px; font-size: .88rem; font-weight: 600; }
+.acct-edit-fields input {
+  width: 100%; box-sizing: border-box; margin-top: 4px;
+  padding: 8px 10px; font: inherit; color: var(--text);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
+}
+.acct-edit-fields input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  outline-offset: 1px;
+}
+.acct-edit-fields input:disabled { opacity: .7; }
+.acct-edit-note { margin: 6px 0 0; }
 .follow-modal-list { display: grid; gap: 6px; }
 .follow-modal-row {
   display: flex;
@@ -3029,6 +3043,18 @@ body.admin-page .mod-list > .listing > div:first-child {
   min-width: 0;
   flex: 1;
 }
+body.admin-page .acct-open { cursor: pointer; border-radius: 4px; }
+body.admin-page .acct-open:focus-visible {
+  outline: 2px solid color-mix(in srgb, #8ab0c0 70%, transparent);
+  outline-offset: 2px;
+}
+body.admin-page .acct-name {
+  font-weight: 600;
+  border-bottom: 1px solid color-mix(in srgb, #8ab0c0 35%, transparent);
+}
+body.admin-page .acct-open:hover .acct-name,
+body.admin-page .acct-open:focus-visible .acct-name { color: #8ab0c0; }
+body.admin-page .acct-hint { margin: 0 0 8px; }
 body.admin-page .admin-card {
   background:
     linear-gradient(160deg,

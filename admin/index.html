@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin - CivMC Shops</title>
-<link rel="stylesheet" href="../style.css?v=8">
+<link rel="stylesheet" href="../style.css?v=9">
 </head>
 <body class="admin-page">
 <nav id="nav"></nav>
@@ -55,6 +55,7 @@
       </div>
       <div class="collapse-body" id="collapse-accounts">
         <div class="msg" id="usermsg"></div>
+        <p class="meta acct-hint">Click an account to view or edit its login, Discord, and Minecraft name, or to set a new password.</p>
         <div class="mod-list" id="users"></div>
       </div>
     </section>
@@ -316,6 +317,26 @@ async function findAliasHits(from, field) {
 
 function roleLabel(a) { return a.is_head ? "head admin" : a.is_admin ? "admin" : a.is_mod ? "mod" : "user"; }
 
+function loginName(a) { return (a && (a.login_username || a.username)) || ""; }
+
+function accountById(id) {
+  return accounts.find(a => a.id === id) || viewUsers.find(u => u.id === id) || null;
+}
+
+function canEditAccount(u) {
+  if (!me || !me.is_admin || !u) return false;
+  if (u.is_head && u.id !== me.id) return false;
+  if (u.is_admin && !me.is_head && u.id !== me.id) return false;
+  return true;
+}
+
+function accountOpen(a, extra) {
+  return `<div class="acct-open" data-acct="${a.id}" tabindex="0" role="button" aria-label="View ${esc(userName(a))}">
+    <span class="acct-name">${esc(userName(a))}</span>
+    ${extra}
+  </div>`;
+}
+
 function roleBadge(a) {
   const cls = a.is_head ? "role-head" : a.is_admin ? "role-admin" : a.is_mod ? "role-mod" : "role-user";
   return `<span class="tag ${cls}">${roleLabel(a)}</span>`;
@@ -352,18 +373,16 @@ function paintLists() {
     document.getElementById("users").innerHTML = accounts
       .filter(a => hit(userName(a), a.mc_username, a.discord_username, a.login_username))
       .map(a => `<div class="listing">
-        <div><a href="../profile/?id=${a.id}" style="color:inherit">${esc(userName(a))}</a>
-          ${roleBadge(a)} ${statusBadge(a)}
-          <span class="meta">\u00b7 MC ${esc(a.mc_username)} \u00b7 ${esc(a.discord_username || "-")} \u00b7 made ${fmtDate(a.created_at)} \u00b7 last ${fmtDate(a.last_sign_in_at)}</span></div>
+        ${accountOpen(a, `${roleBadge(a)} ${statusBadge(a)}
+          <span class="meta">\u00b7 MC ${esc(a.mc_username)} \u00b7 ${esc(a.discord_username || "-")} \u00b7 made ${fmtDate(a.created_at)} \u00b7 last ${fmtDate(a.last_sign_in_at)}</span>`)}
         <div class="acct-actions">${roleButtons(a)}</div>
       </div>`).join("") || '<p class="meta">None.</p>';
   } else {
     document.getElementById("users").innerHTML = viewUsers
       .filter(u => hit(userName(u), u.mc_username, u.discord_username, u.login_username))
-      .map(u => `<div class="listing"><div>${esc(userName(u))}
-        ${roleBadge(u)}
+      .map(u => `<div class="listing">${accountOpen(u, `${roleBadge(u)}
         ${u.verified_at ? '<span class="tag ok">verified</span>' : '<span class="tag warn">unverified</span>'}
-        ${u.timed_out ? '<span class="tag bad">timed out</span>' : ""}</div></div>`).join("") || '<p class="meta">None.</p>';
+        ${u.timed_out ? '<span class="tag bad">timed out</span>' : ""}`)}</div>`).join("") || '<p class="meta">None.</p>';
   }
 
   document.getElementById("shops").innerHTML = shopRows
@@ -443,9 +462,101 @@ async function render() {
 
 filter.addEventListener("input", paintLists);
 
+function openAccountEditor(id) {
+  const a = accountById(id);
+  if (!a) return;
+  const editable = canEditAccount(a);
+  const self = a.id === me.id;
+  closeUiModal();
+  const root = document.createElement("div");
+  root.id = "ui-modal-root";
+  root.className = "modal-overlay ui-modal-overlay";
+  const lock = editable ? "" : " disabled";
+  root.innerHTML = `<div class="modal ui-modal ui-modal-account" role="dialog" aria-modal="true" aria-labelledby="acct-edit-title">
+    <h2 id="acct-edit-title">${editable ? "Edit account" : "Account"}</h2>
+    <p class="meta" style="margin:0 0 4px">${esc(userName(a))} \u00b7 ${roleLabel(a)}</p>
+    <p class="acct-edit-note meta">${editable
+      ? "The current password can't be shown. Leave it blank to keep it, or type a new one (8+ characters)."
+      : "Only the head admin can change this account."}</p>
+    <form id="acct-edit-form" class="acct-edit-fields" autocomplete="off">
+      <label for="edit-un">Login username</label>
+      <input id="edit-un" type="text" maxlength="20" autocomplete="off" required${lock} value="${esc(loginName(a))}">
+      <label for="edit-dc">Discord username</label>
+      <input id="edit-dc" type="text" maxlength="40" autocomplete="off"${lock} value="${esc(a.discord_username || "")}">
+      <label for="edit-mc">Minecraft username</label>
+      <input id="edit-mc" type="text" maxlength="32" autocomplete="off" required${lock} value="${esc(a.mc_username || "")}">
+      <label for="edit-pw">Password</label>
+      <input id="edit-pw" type="text" maxlength="72" autocomplete="new-password"${lock} placeholder="${editable ? "Leave blank to keep the current password" : "Can't be shown"}" value="">
+      <div class="msg" id="acct-edit-msg"></div>
+      <div class="ui-modal-actions row">
+        <button type="button" class="small" data-ui-cancel>${editable ? "Cancel" : "Close"}</button>
+        ${editable ? '<button type="submit" class="primary small" data-ui-save>Save</button>' : ""}
+      </div>
+    </form>
+  </div>`;
+  document.body.appendChild(root);
+  document.body.classList.add("ui-modal-open");
+  const form = root.querySelector("#acct-edit-form");
+  const errEl = root.querySelector("#acct-edit-msg");
+  let saving = false;
+  const done = () => { if (!saving) closeUiModal(); };
+  root.querySelector("[data-ui-cancel]").onclick = done;
+  root.addEventListener("click", e => { if (e.target === root) done(); });
+  root.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); done(); }
+  });
+  if (!editable) {
+    root.querySelector("[data-ui-cancel]").focus();
+    return;
+  }
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    if (saving) return;
+    const username = root.querySelector("#edit-un").value.trim().toLowerCase();
+    const discord = root.querySelector("#edit-dc").value.trim();
+    const mc = root.querySelector("#edit-mc").value.trim();
+    const password = root.querySelector("#edit-pw").value;
+    if (!/^[a-z0-9_]{3,20}$/.test(username)) { setMsg(errEl, "Login username: 3-20 letters, numbers or _.", "err"); return; }
+    if (!mc || mc.length > 32) { setMsg(errEl, "Need a Minecraft name (max 32 characters).", "err"); return; }
+    if (discord.length > 40) { setMsg(errEl, "Discord username is too long (max 40).", "err"); return; }
+    if (password && (password.length < 8 || password.length > 72)) { setMsg(errEl, "Password needs 8-72 characters.", "err"); return; }
+    saving = true;
+    const saveBtn = root.querySelector("[data-ui-save]");
+    saveBtn.disabled = true;
+    setMsg(errEl, "Saving...");
+    const payload = { action: "update_account", user_id: a.id, username, mc_username: mc, discord_username: discord };
+    if (password) payload.password = password;
+    const r = await callFn("manage-user", payload);
+    saving = false;
+    saveBtn.disabled = false;
+    if (!r.ok) { setMsg(errEl, r.message, "err"); return; }
+    closeUiModal();
+    let note = "Saved " + username + ".";
+    if (password) note += " New password: " + password + ".";
+    if (self && username !== loginName(a)) note += " Log in as " + username + " next time.";
+    if (self && password) note += " You may need to log in again.";
+    setMsg(usermsg, note, "ok");
+    render();
+  });
+  root.querySelector("#edit-un").focus();
+  root.querySelector("#edit-un").select();
+}
+
+document.querySelector("main").addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const open = e.target.closest(".acct-open");
+  if (!open || e.target !== open) return;
+  e.preventDefault();
+  openAccountEditor(open.dataset.acct);
+});
+
 document.querySelector("main").addEventListener("click", async e => {
   const btn = e.target.closest("button[data-act]");
-  if (!btn) return;
+  if (!btn) {
+    const open = e.target.closest(".acct-open");
+    if (open) openAccountEditor(open.dataset.acct);
+    return;
+  }
   const act = btn.dataset.act;
 
   if (act === "purge-unverified") {

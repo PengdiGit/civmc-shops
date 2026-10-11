@@ -2,6 +2,9 @@
 //   timeout / untimeout : mods, admins, head. Mods: users only. Admins: users + mods. Head: everyone but themselves.
 //   make_mod / remove_mod / make_admin / remove_admin : HEAD ADMIN ONLY
 //   impersonate : HEAD ADMIN ONLY — one-time token so the client can open a session as that user
+//   update_account : admins. Login username, Discord, Minecraft, and an optional new password.
+//     Head can edit any account, including their own. Other admins can edit users, mods, and themselves.
+//     They cannot edit the head or other admins. The current password cannot be read back (Auth stores a hash).
 // Timeouts: optional hours (1 / 24 / 168). Omit or null = until staff lifts.
 // Auth ban_duration matches so login unlocks when the window ends; profile flag uses timed_out_until.
 // Deploy: supabase functions deploy manage-user
@@ -28,6 +31,69 @@ Deno.serve(async (req) => {
 
   const body = await req.json();
   const { action, user_id } = body;
+
+  if (action === "update_account") {
+    if (!(me.is_admin || me.is_head)) return json({ error: "Admins only." }, 403);
+    if (!user_id) return json({ error: "Pick an account." }, 400);
+    const { data: editTarget } = await admin.from("profiles").select("*").eq("id", user_id).single();
+    if (!editTarget) return json({ error: "No such account." }, 404);
+    const self = user_id === me.id;
+    if (editTarget.is_head && !self) return json({ error: "The head admin can't be changed." }, 403);
+    if (editTarget.is_admin && !me.is_head && !self) return json({ error: "Only the head admin can edit other admins." }, 403);
+
+    const username = String(body.username || "").trim().toLowerCase();
+    const mc = String(body.mc_username || "").trim();
+    const discord = String(body.discord_username || "").trim();
+    const password = body.password == null ? "" : String(body.password);
+
+    if (!/^[a-z0-9_]{3,20}$/.test(username)) return json({ error: "Login username: 3-20 letters, numbers or _." }, 400);
+    if (!mc || mc.length > 32) return json({ error: "Need a Minecraft name (max 32 characters)." }, 400);
+    if (discord.length > 40) return json({ error: "Discord username is too long (max 40)." }, 400);
+    if (password && (password.length < 8 || password.length > 72)) return json({ error: "Password needs 8-72 characters." }, 400);
+
+    if (username !== (editTarget.username || "")) {
+      const { data: clash, error: cErr } = await admin.from("profiles")
+        .select("id").eq("username", username).neq("id", user_id).limit(1);
+      if (cErr) return json({ error: cErr.message }, 400);
+      if (clash && clash.length) return json({ error: "That login username is taken." }, 400);
+    }
+
+    const patch: Record<string, unknown> = {
+      username,
+      mc_username: mc,
+      discord_username: discord || null,
+    };
+    if (password) patch.must_change_password = !self;
+
+    const { error: pErr } = await admin.from("profiles").update(patch).eq("id", user_id);
+    if (pErr) {
+      const taken = /duplicate|unique/i.test(pErr.message);
+      return json({ error: taken ? "That login username is taken." : pErr.message }, 400);
+    }
+
+    const authPatch: Record<string, unknown> = {};
+    if (username !== (editTarget.username || "")) {
+      authPatch.email = username + "@civmc.local";
+      authPatch.email_confirm = true;
+    }
+    if (password) authPatch.password = password;
+    if (Object.keys(authPatch).length) {
+      const { error: aErr } = await admin.auth.admin.updateUserById(user_id, authPatch);
+      if (aErr) {
+        await admin.from("profiles").update({
+          username: editTarget.username,
+          mc_username: editTarget.mc_username,
+          discord_username: editTarget.discord_username,
+          must_change_password: editTarget.must_change_password,
+        }).eq("id", user_id);
+        const taken = /already|registered|exists/i.test(aErr.message);
+        return json({ error: taken ? "That login username is taken." : aErr.message }, 400);
+      }
+      if (password && !self) await admin.rpc("kill_sessions", { uid: user_id });
+    }
+    return json({ ok: true });
+  }
+
   if (!user_id || user_id === me.id) return json({ error: "Pick a different account." }, 400);
 
   const { data: target } = await admin.from("profiles").select("*").eq("id", user_id).single();
