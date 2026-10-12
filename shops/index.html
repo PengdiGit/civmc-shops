@@ -106,6 +106,9 @@ const findQ = norm(params.get("q") || "");
 const msg = document.getElementById("msg");
 let firstLoad = true;
 let me = null;
+function sharedAccount(p) {
+  return !!(p && (p.is_business || p.is_nation));
+}
 let shop = null;
 let isFav = false;
 let allListings = [];
@@ -512,6 +515,7 @@ async function loadReviews(staff, isOwner) {
   if (!me) form.innerHTML = `<p class="meta"><a href="${loginHref()}">Log in</a> to review this shop.</p>`;
   else if (isOwner) form.innerHTML = `<p class="meta">You can't review your own shop. Use Reply on a review to respond.</p>`;
   else if (!isVerified(me)) form.innerHTML = `<p class="note">${verifyHelp()}</p>`;
+  else if (sharedAccount(me)) form.innerHTML = `<p class="meta">Nation and business accounts can't leave reviews.</p>`;
   else if (mineExists) form.innerHTML = `<p class="meta">You've reviewed this shop. Delete your review to write a new one.</p>`;
   else if (!form.querySelector("textarea")) {
     form.innerHTML = `
@@ -547,7 +551,7 @@ function commentHtml(c, rootId, staff) {
   const pr = c.profiles;
   const isOwnerAuthor = userOwnsShop(shop, c.author_id);
   let b = "";
-  if (isVerified(me)) b += iconBtn("reply", { title: "Reply", attrs: `data-act="reply" data-root="${rootId}" data-name="${esc(userName(pr))}"` });
+  if (isVerified(me) && !sharedAccount(me)) b += iconBtn("reply", { title: "Reply", attrs: `data-act="reply" data-root="${rootId}" data-name="${esc(userName(pr))}"` });
   if (!mine) b += iconBtn("flag", { cls: "btn-report", title: "Report comment", attrs: `data-act="report" data-type="comment" data-id="${c.id}"` });
   if (staff) b += iconBtn(c.timed_out ? "eye" : "eyeOff", { cls: "btn-timeout", title: c.timed_out ? "Unhide comment" : "Hide comment", attrs: `data-act="comment-timeout" data-id="${c.id}" data-to="${c.timed_out ? 0 : 1}"` });
   if (me && (me.is_admin || mine)) b += iconBtn("trash", { danger: true, title: "Delete comment", attrs: `data-act="comment-delete" data-id="${c.id}" data-path="${esc(c.image_path || "")}"` });
@@ -582,6 +586,7 @@ async function loadComments(staff) {
   const form = document.getElementById("cform");
   if (!me) form.innerHTML = `<p class="meta"><a href="${loginHref()}">Log in</a> to comment or report.</p>`;
   else if (!isVerified(me)) form.innerHTML = `<p class="note">${verifyHelp()}</p>`;
+  else if (sharedAccount(me)) form.innerHTML = `<p class="meta">Nation and business accounts can't comment.</p>`;
   else if (!form.querySelector("textarea")) form.innerHTML = composerHtml("", "Say something about this shop (500 characters max). You can add a picture too.");
 }
 
@@ -631,6 +636,7 @@ document.querySelector("main").addEventListener("click", async e => {
       : await sb.from("favorites").insert({ user_id: me.id, shop_id: Number(shopId) });
     err = res.error ? res.error.message : null;
   } else if (act === "reply") {
+    if (sharedAccount(me)) { setMsg(msg, "Nation and business accounts can't comment.", "err"); return; }
     const rb = document.getElementById("rb-" + btn.dataset.root);
     if (rb.innerHTML) { rb.innerHTML = ""; return; }
     document.querySelectorAll(".replybox").forEach(x => x.innerHTML = "");
@@ -640,6 +646,7 @@ document.querySelector("main").addEventListener("click", async e => {
     ta.focus();
     return;
   } else if (act === "post") {
+    if (sharedAccount(me)) { setMsg(msg, "Nation and business accounts can't comment.", "err"); return; }
     const box = btn.closest(".composer");
     const ta = box.querySelector("textarea");
     const file = box.querySelector("input[type=file]").files[0];
@@ -662,6 +669,7 @@ document.querySelector("main").addEventListener("click", async e => {
     setMsg(msg, "");
     if (box.dataset.parent) box.parentElement.innerHTML = "";
   } else if (act === "post-review") {
+    if (sharedAccount(me)) { setMsg(msg, "Nation and business accounts can't leave reviews.", "err"); return; }
     const res = await sb.from("reviews").insert({
       shop_id: Number(shopId), author_id: me.id,
       rating: Number(document.getElementById("rrating").value),
