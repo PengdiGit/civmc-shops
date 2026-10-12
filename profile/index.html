@@ -287,6 +287,19 @@ document.getElementById("own").addEventListener("click", e => {
   updatePrev(field, "bioprev");
 });
 
+function placeProfileMetaFacts(underTags) {
+  const meta = document.getElementById("meta-facts");
+  const tags = document.getElementById("tags");
+  const bio = document.getElementById("bio");
+  if (!meta || !tags || !bio) return;
+  meta.hidden = false;
+  if (underTags) {
+    if (meta.previousElementSibling !== tags) tags.after(meta);
+  } else if (bio.nextElementSibling !== meta) {
+    bio.after(meta);
+  }
+}
+
 async function load() {
   const session = await getSession();
   myId = session ? session.user.id : null;
@@ -364,14 +377,9 @@ async function load() {
   const nationLabel = p.is_nation ? placeHtml({ city: "", nation: p.place_nation }) : "";
   const mcFact = `<dt>Minecraft</dt><dd${mcName ? ` class="fact-copy" data-copy="${esc(mcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${esc(mcName || "—")}</dd>`;
   const dcFact = `<dt>Discord</dt><dd${dcName ? ` class="fact-copy" data-copy="${esc(dcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${dcName ? `<b>${esc(dcName)}</b>` : '<span class="meta">not set</span>'}</dd>`;
-  const metaHtml =
-    `<dt>${org ? "Since" : "Member since"}</dt><dd title="${esc(p.created_at ? new Date(p.created_at).toLocaleString() : "")}">${esc(since)}</dd>
-     <dt>${org ? "Last active" : "Last seen"}</dt><dd>${org && !p.last_seen_at ? '<span class="meta">unknown</span>' : lastSeenHtml(p.last_seen_at)}</dd>`;
-  const business = !!(p.is_business && !p.is_nation);
   const factsHtml = org
     ? [
         p.is_nation ? `<dt>Nation</dt><dd>${nationLabel || "—"}</dd>` : "",
-        p.is_nation ? metaHtml : "",
         mcName ? mcFact : "",
         dcName ? dcFact : ""
       ].filter(Boolean).join("")
@@ -382,18 +390,10 @@ async function load() {
        <dt>Timezone</dt><dd>${timezone ? esc(timezone) : '<span class="meta">N/A</span>'}</dd>`;
   factsEl.innerHTML = factsHtml;
   factsEl.hidden = !factsHtml;
-  const metaFacts = document.getElementById("meta-facts");
-  const side = document.querySelector(".profile-hero-side");
-  if (p.is_nation) {
-    metaFacts.innerHTML = "";
-    metaFacts.hidden = true;
-    if (metaFacts.parentElement !== side) side.appendChild(metaFacts);
-  } else {
-    metaFacts.hidden = false;
-    metaFacts.innerHTML = metaHtml;
-    if (business) document.getElementById("tags").insertAdjacentElement("afterend", metaFacts);
-    else if (metaFacts.parentElement !== side) side.appendChild(metaFacts);
-  }
+  document.getElementById("meta-facts").innerHTML =
+    `<dt>${org ? "Since" : "Member since"}</dt><dd title="${esc(p.created_at ? new Date(p.created_at).toLocaleString() : "")}">${esc(since)}</dd>
+     <dt>${org ? "Last active" : "Last seen"}</dt><dd>${org && !p.last_seen_at ? '<span class="meta">unknown</span>' : lastSeenHtml(p.last_seen_at)}</dd>`;
+  placeProfileMetaFacts(!!p.is_business && !p.is_nation);
 
   const bioEl = document.getElementById("bio");
   if (p.bio) bioEl.innerHTML = mcText(p.bio);
