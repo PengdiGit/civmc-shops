@@ -1184,7 +1184,7 @@ async function showItems(term) {
         const col = mode.value === "sell" ? "sell_item" : "want_item";
         uq = uq.or(`${col}.ilike.%${safeTerm}%,enchants.ilike.%${safeTerm}%`);
       }
-      if (inStockOnly) uq = uq.eq("in_stock", true);
+      // Unknowns are discoveries — show even when out of stock (common for /cti punches).
       if (!enchantMode && enchantFilter) {
         const safeEnch = String(enchantFilter).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
         if (safeEnch) uq = uq.ilike("enchants", "%" + safeEnch + "%");

@@ -23,6 +23,9 @@ const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_MAX_PLAYER = 40;
 const RATE_MAX_IP = 80;
 const MAX_MATCH_DIST = 48;
+// Pre-unknown gate: Chebyshev (square) radius — max(|dx|,|dz|) <= 50, i.e. a 100×100 box.
+// Separate from Euclidean MAX_MATCH_DIST used for auto-stock matching.
+const NEARBY_KNOWN_RADIUS = 50;
 const LOG_PRUNE_HOURS = 24;
 const UNKNOWN_PRUNE_DAYS = 7;
 
@@ -86,7 +89,7 @@ type UnknownRow = {
   notes: string | null;
   x: number;
   z: number;
-  nl: string;
+  nl: string | null;
   fingerprint: string;
 };
 
@@ -154,6 +157,71 @@ function listingCoords(l: ListingRow, shop: ShopRow): { x: number; z: number } |
   const z = l.z != null ? l.z : shop.z;
   if (x == null || z == null) return null;
   return { x, z };
+}
+
+/** Chebyshev distance on XZ (square radius). */
+function chebyshev(ax: number, az: number, bx: number, bz: number): number {
+  return Math.max(Math.abs(ax - bx), Math.abs(az - bz));
+}
+
+/**
+ * If a public known listing already has the same trade within NEARBY_KNOWN_RADIUS
+ * (Chebyshev / square) of the scan punch, skip creating an unknown listing.
+ * Does not require auto_stock_enabled — any live site listing counts.
+ */
+async function findNearbyKnownListing(
+  admin: Admin,
+  inItem: string,
+  inAmt: number,
+  inUnit: string,
+  outItem: string,
+  outAmt: number,
+  outUnit: string,
+  blockX: number,
+  blockZ: number,
+): Promise<{ listing_id: number; shop_id: number } | null> {
+  const { data: shops, error } = await admin
+    .from("shops")
+    .select(
+      "id, x, z, stock_nl, auto_stock_enabled, listings(id, shop_id, want_item, want_amount, want_unit, sell_item, sell_amount, sell_unit, stock, in_stock, timed_out, enchants, notes, bundle_contents, x, z)",
+    )
+    .eq("archived", false)
+    .eq("timed_out", false);
+
+  if (error || !shops?.length) return null;
+
+  let best: { listing_id: number; shop_id: number; d: number } | null = null;
+  for (const shop of shops as ShopRow[]) {
+    for (const l of shop.listings || []) {
+      if (l.timed_out) continue;
+      if (
+        !tradeMatch(
+          l.want_item,
+          l.want_amount,
+          l.want_unit,
+          l.sell_item,
+          l.sell_amount,
+          l.sell_unit,
+          inItem,
+          inAmt,
+          inUnit,
+          outItem,
+          outAmt,
+          outUnit,
+        )
+      ) {
+        continue;
+      }
+      const c = listingCoords(l, shop);
+      if (!c) continue;
+      const d = chebyshev(c.x, c.z, blockX, blockZ);
+      if (d > NEARBY_KNOWN_RADIUS) continue;
+      if (!best || d < best.d || (d === best.d && l.id < best.listing_id)) {
+        best = { listing_id: l.id, shop_id: shop.id, d };
+      }
+    }
+  }
+  return best ? { listing_id: best.listing_id, shop_id: best.shop_id } : null;
 }
 
 function makeFingerprint(
@@ -276,6 +344,29 @@ async function handleUnknown(
     });
   }
 
+  // Gate: same trade already listed nearby on the site → do not create/update unknown.
+  const nearbyKnown = await findNearbyKnownListing(
+    admin,
+    opts.inItem,
+    opts.inAmt,
+    opts.inUnit,
+    opts.outItem,
+    opts.outAmt,
+    opts.outUnit,
+    opts.blockX,
+    opts.blockZ,
+  );
+  if (nearbyKnown) {
+    return json({
+      updated: false,
+      unknown: false,
+      reason: "nearby_known_listing",
+      listing_id: nearbyKnown.listing_id,
+      shop_id: nearbyKnown.shop_id,
+      prior_miss: opts.missReason,
+    });
+  }
+
   void pruneUnknowns(admin);
 
   const { data: rows, error } = await admin
@@ -290,7 +381,8 @@ async function handleUnknown(
   type UCand = { row: UnknownRow; d2: number };
   let cands: UCand[] = [];
   for (const u of (rows || []) as UnknownRow[]) {
-    if (normNl(u.nl) !== nlKey) continue;
+    // If scan has NL, require the same NL. If not, match any nearby same trade.
+    if (nlKey && normNl(u.nl) !== nlKey) continue;
     if (!tradeMatch(u.want_item, u.want_amount, u.want_unit, u.sell_item, u.sell_amount, u.sell_unit, opts.inItem, opts.inAmt, opts.inUnit, opts.outItem, opts.outAmt, opts.outUnit)) {
       continue;
     }
@@ -394,7 +486,7 @@ async function handleUnknown(
     x: opts.blockX,
     y: opts.blockY,
     z: opts.blockZ,
-    nl: opts.nl,
+    nl: opts.nl || null,
     last_player: opts.player,
     fingerprint: fp,
     updated_at: now,
@@ -431,6 +523,7 @@ Deno.serve(async (req) => {
   }
 
   const player = String(body.player || "").trim();
+  // NL optional: missing → skip real shop match, unknown listing only.
   const nl = String(body.nl || "").trim();
   const stock = asInt(body.stock);
   const blockX = asInt(body.block_x);
@@ -453,7 +546,7 @@ Deno.serve(async (req) => {
 
   if (!player || player.length > 32) return json({ error: "Need player name." }, 400);
   if (!/^[A-Za-z0-9_]{1,32}$/.test(player)) return json({ error: "Bad player name." }, 400);
-  if (!nl || nl.length > 64) return json({ error: "Need nl." }, 400);
+  if (nl.length > 64) return json({ error: "nl too long." }, 400);
   if (stock == null || stock < 0 || stock > 1_000_000) {
     return json({ error: "Need stock >= 0." }, 400);
   }
@@ -524,6 +617,9 @@ Deno.serve(async (req) => {
 
   if (sErr) return json({ error: sErr.message }, 400);
   const nlKey = normNl(nl);
+  if (!nlKey) {
+    return handleUnknown(admin, { ...unknownOpts, missReason: "no_nl" });
+  }
   const shopRows = ((shops || []) as ShopRow[]).filter((s) => normNl(s.stock_nl) === nlKey);
 
   if (!shopRows.length) {
