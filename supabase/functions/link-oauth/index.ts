@@ -157,11 +157,62 @@ async function finishDiscord(code: string, redirectUri: string) {
   return { discord_id: String(me.id), discord_username: String(username).slice(0, 40) };
 }
 
-async function finishMinecraft(code: string, redirectUri: string) {
+function xerrMessage(xerr: unknown): string | null {
+  const n = Number(xerr);
+  if (!n) return null;
+  const map: Record<number, string> = {
+    2148916227: "This Microsoft account is banned from Xbox Live.",
+    2148916233: "This Microsoft account has no Xbox profile yet. Sign into minecraft.net or Xbox once, then try again.",
+    2148916235: "Xbox Live is not available for this account's country.",
+    2148916236: "This account needs adult verification on Xbox (South Korea).",
+    2148916237: "This account needs adult verification on Xbox (South Korea).",
+    2148916238: "This Microsoft account is under 18 / needs to be added to a Microsoft family.",
+  };
+  return map[n] || `Xbox error ${n}.`;
+}
+
+function microsoftIdFromToken(tok: Record<string, unknown>, fallback?: string): string {
+  if (tok.id_token) {
+    try {
+      const mid = JSON.parse(new TextDecoder().decode(fromB64url(String(tok.id_token).split(".")[1])));
+      if (mid?.oid) return String(mid.oid);
+      if (mid?.sub) return String(mid.sub);
+    } catch { /* fall through */ }
+  }
+  return String(fallback || crypto.randomUUID());
+}
+
+async function lookupMcUuid(name: string): Promise<{ uuid: string; name: string } | null> {
+  const clean = name.trim();
+  if (!/^[A-Za-z0-9_]{1,16}$/.test(clean)) return null;
+  const urls = [
+    `https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(clean)}`,
+    `https://api.minecraftservices.com/minecraft/profile/lookup/name/${encodeURIComponent(clean)}`,
+  ];
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, { headers: { Accept: "application/json" } });
+      if (r.status === 404) return null;
+      if (!r.ok) continue;
+      const j = await r.json();
+      const id = String(j.id || j.uuid || "").replace(/-/g, "").toLowerCase();
+      const n = String(j.name || clean);
+      if (/^[a-f0-9]{32}$/.test(id)) return { uuid: id, name: n.slice(0, 32) };
+    } catch { /* try next */ }
+  }
+  return null;
+}
+
+type McLinkResult =
+  | { mode: "oauth"; microsoft_id: string; mc_uuid: string; mc_username: string }
+  | { mode: "soft"; microsoft_id: string; reason: string };
+
+async function finishMinecraft(code: string, redirectUri: string): Promise<McLinkResult> {
   const id = Deno.env.get("MICROSOFT_CLIENT_ID");
   const secret = Deno.env.get("MICROSOFT_CLIENT_SECRET");
   if (!id || !secret) throw new Error("Microsoft OAuth is not configured yet.");
 
+  // Only Xbox scopes — mixing User.Read / openid here can break XboxLive.signin.
   const body = new URLSearchParams({
     client_id: id,
     client_secret: secret,
@@ -180,9 +231,20 @@ async function finishMinecraft(code: string, redirectUri: string) {
     throw new Error(tok.error_description || tok.error || "Microsoft token exchange failed.");
   }
 
+  const soft = (reason: string, fallbackId?: string): McLinkResult => ({
+    mode: "soft",
+    microsoft_id: microsoftIdFromToken(tok, fallbackId),
+    reason,
+  });
+
+  const xboxHeaders = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "x-xbl-contract-version": "1",
+  };
   const xboxRes = await fetch("https://user.auth.xboxlive.com/user/authenticate", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: xboxHeaders,
     body: JSON.stringify({
       Properties: {
         AuthMethod: "RPS",
@@ -193,33 +255,53 @@ async function finishMinecraft(code: string, redirectUri: string) {
       TokenType: "JWT",
     }),
   });
-  const xbox = await xboxRes.json();
-  if (!xboxRes.ok || !xbox.Token) throw new Error("Xbox Live login failed. Use a personal Microsoft account that owns Minecraft Java.");
-  const uhs = xbox?.DisplayClaims?.xui?.[0]?.uhs;
-  if (!uhs) throw new Error("Xbox Live user hash missing.");
+  const xboxText = await xboxRes.text();
+  let xbox: Record<string, unknown> = {};
+  try { xbox = JSON.parse(xboxText); } catch { /* ignore */ }
+  if (!xboxRes.ok || !xbox.Token) {
+    const hint = xerrMessage(xbox.XErr) || xboxText.slice(0, 120) || xboxRes.statusText;
+    return soft("Xbox Live step failed (" + hint + "). Confirm your Java username below for now.");
+  }
+  const xui = (xbox as { DisplayClaims?: { xui?: Array<{ uhs?: string; xid?: string }> } })?.DisplayClaims?.xui?.[0];
+  const uhs = xui?.uhs;
+  if (!uhs) return soft("Xbox Live user hash missing. Confirm your Java username below for now.");
 
   const xstsRes = await fetch("https://xsts.auth.xboxlive.com/xsts/authorize", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: xboxHeaders,
     body: JSON.stringify({
       Properties: { SandboxId: "RETAIL", UserTokens: [xbox.Token] },
       RelyingParty: "rp://api.minecraftservices.com/",
       TokenType: "JWT",
     }),
   });
-  const xsts = await xstsRes.json();
+  const xstsText = await xstsRes.text();
+  let xsts: Record<string, unknown> = {};
+  try { xsts = JSON.parse(xstsText); } catch { /* ignore */ }
   if (!xstsRes.ok || !xsts.Token) {
-    throw new Error("Minecraft XSTS failed. This Microsoft account may not own Minecraft Java.");
+    const hint = xerrMessage(xsts.XErr) || xstsText.slice(0, 120) || xstsRes.statusText;
+    return soft("Minecraft XSTS failed (" + hint + "). Confirm your Java username below for now.", xui?.xid);
   }
 
   const mcLogin = await fetch("https://api.minecraftservices.com/authentication/login_with_xbox", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ identityToken: `XBL3.0 x=${uhs};${xsts.Token}` }),
   });
-  const mcTok = await mcLogin.json();
+  const mcTokText = await mcLogin.text();
+  let mcTok: Record<string, unknown> = {};
+  try { mcTok = JSON.parse(mcTokText); } catch { /* ignore */ }
   if (!mcLogin.ok || !mcTok.access_token) {
-    throw new Error("Minecraft login failed. Make sure this account owns Java Edition.");
+    if (mcLogin.status === 403) {
+      return soft(
+        "Mojang has not allowlisted this Azure app yet. Confirm your Java username below (temporary until approval).",
+        xui?.xid,
+      );
+    }
+    return soft(
+      "Minecraft login failed (" + mcLogin.status + "). Confirm your Java username below for now.",
+      xui?.xid,
+    );
   }
 
   const profRes = await fetch("https://api.minecraftservices.com/minecraft/profile", {
@@ -227,22 +309,15 @@ async function finishMinecraft(code: string, redirectUri: string) {
   });
   const prof = await profRes.json();
   if (!profRes.ok || !prof.id || !prof.name) {
-    throw new Error("No Minecraft Java profile on this account (Game Pass users: open the launcher once first).");
+    return soft("No Java profile on this Microsoft account yet. Confirm your username below, or open the Minecraft launcher once.", xui?.xid);
   }
 
-  // Microsoft oid from id_token if present; else xbox xui xid
-  let microsoft_id = String(xbox?.DisplayClaims?.xui?.[0]?.xid || prof.id);
-  if (tok.id_token) {
-    try {
-      const mid = JSON.parse(new TextDecoder().decode(fromB64url(String(tok.id_token).split(".")[1])));
-      if (mid?.oid) microsoft_id = String(mid.oid);
-      else if (mid?.sub) microsoft_id = String(mid.sub);
-    } catch { /* keep xbox id */ }
-  }
-
-  const mc_uuid = String(prof.id).replace(/-/g, "").toLowerCase();
-  const mc_username = String(prof.name).slice(0, 32);
-  return { microsoft_id, mc_uuid, mc_username };
+  return {
+    mode: "oauth",
+    microsoft_id: microsoftIdFromToken(tok, xui?.xid || prof.id),
+    mc_uuid: String(prof.id).replace(/-/g, "").toLowerCase(),
+    mc_username: String(prof.name).slice(0, 32),
+  };
 }
 
 Deno.serve(async (req) => {
@@ -329,10 +404,25 @@ Deno.serve(async (req) => {
 
       if (provider === "minecraft") {
         const m = await finishMinecraft(code, redirectUri);
-        const { data: takenMc } = await admin.from("profiles").select("id").eq("mc_uuid", m.mc_uuid).neq("id", user.id).maybeSingle();
-        if (takenMc) return json({ error: "That Minecraft account is already linked to another CivMC Shops account." }, 400);
         const { data: takenMs } = await admin.from("profiles").select("id").eq("microsoft_id", m.microsoft_id).neq("id", user.id).maybeSingle();
         if (takenMs) return json({ error: "That Microsoft account is already linked to another CivMC Shops account." }, 400);
+
+        if (m.mode === "soft") {
+          const { error } = await admin.from("profiles").update({
+            microsoft_id: m.microsoft_id,
+            mc_link_method: "soft_pending",
+          }).eq("id", user.id);
+          if (error) return json({ error: error.message }, 400);
+          return json({
+            ok: true,
+            provider: "minecraft",
+            needs_mc_name: true,
+            reason: m.reason,
+          });
+        }
+
+        const { data: takenMc } = await admin.from("profiles").select("id").eq("mc_uuid", m.mc_uuid).neq("id", user.id).maybeSingle();
+        if (takenMc) return json({ error: "That Minecraft account is already linked to another CivMC Shops account." }, 400);
 
         let civinfo_known: boolean | null = null;
         try {
@@ -344,6 +434,7 @@ Deno.serve(async (req) => {
           mc_uuid: m.mc_uuid,
           mc_username: m.mc_username,
           mc_linked_at: now,
+          mc_link_method: "oauth",
           civinfo_known,
         }).eq("id", user.id);
         if (error) return json({ error: error.message }, 400);
@@ -358,6 +449,39 @@ Deno.serve(async (req) => {
       return json({ error: e instanceof Error ? e.message : "OAuth failed." }, 400);
     }
     return json({ error: "Unknown provider." }, 400);
+  }
+
+  // Interim until Mojang allowlists the Azure app: Microsoft already linked, user confirms Java name.
+  if (action === "confirm_mc_name") {
+    const user = await bearerUser(admin, req);
+    if (!user) return json({ error: "Not logged in." }, 401);
+    const { data: me } = await admin.from("profiles").select("microsoft_id, mc_uuid").eq("id", user.id).single();
+    if (!me?.microsoft_id) {
+      return json({ error: "Connect Microsoft first (Connect Minecraft button), then confirm your Java username." }, 400);
+    }
+    if (me.mc_uuid) return json({ error: "Minecraft is already linked on this account." }, 400);
+
+    const name = String(body.mc_username || "").trim();
+    const looked = await lookupMcUuid(name);
+    if (!looked) return json({ error: "That Minecraft Java username was not found. Check spelling." }, 400);
+
+    const { data: takenMc } = await admin.from("profiles").select("id").eq("mc_uuid", looked.uuid).neq("id", user.id).maybeSingle();
+    if (takenMc) return json({ error: "That Minecraft account is already linked to another CivMC Shops account." }, 400);
+
+    let civinfo_known: boolean | null = null;
+    try {
+      civinfo_known = await probeCivinfo(looked.name);
+    } catch { civinfo_known = null; }
+
+    const { error } = await admin.from("profiles").update({
+      mc_uuid: looked.uuid,
+      mc_username: looked.name,
+      mc_linked_at: new Date().toISOString(),
+      mc_link_method: "soft",
+      civinfo_known,
+    }).eq("id", user.id);
+    if (error) return json({ error: error.message }, 400);
+    return json({ ok: true, mc_username: looked.name, civinfo_known, soft: true });
   }
 
   return json({ error: "Unknown action." }, 400);

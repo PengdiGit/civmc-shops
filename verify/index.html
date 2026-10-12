@@ -12,7 +12,7 @@
   <div class="auth-wrap verify-wrap">
     <span class="page-eyebrow">Account</span>
     <h1>Connect your accounts</h1>
-    <p class="sub" id="verify-intro">Connect Discord and Minecraft (Microsoft login) to unlock shops, comments, reviews, and uploads. Until then you can browse, favourite, and report.</p>
+    <p class="sub" id="verify-intro">Connect Discord and Minecraft to unlock shops, comments, reviews, and uploads. Until then you can browse, favourite, and report.</p>
     <div class="msg" id="verify-status" hidden></div>
     <div id="verify-countdown" class="verify-countdown" hidden></div>
 
@@ -28,8 +28,16 @@
       <li class="verify-step" id="step-minecraft">
         <div class="verify-step-body">
           <h2>Connect Minecraft</h2>
-          <p class="meta" id="mc-meta">Sign in with the Microsoft account that owns your Minecraft Java profile.</p>
+          <p class="meta" id="mc-meta">Sign in with Microsoft. Until Mojang allowlists our app, you’ll confirm your Java username after.</p>
           <button type="button" class="primary" id="btn-minecraft">Connect Minecraft</button>
+          <div id="mc-soft" hidden style="margin-top:12px">
+            <label for="mc-name">Java username</label>
+            <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:6px">
+              <input id="mc-name" type="text" maxlength="16" placeholder="YourExactMCName" autocomplete="off" style="min-width:12rem">
+              <button type="button" class="primary" id="btn-mc-confirm">Confirm username</button>
+            </div>
+            <p class="meta" id="mc-soft-note" style="margin-top:8px">Temporary until Mojang approves full Microsoft→Minecraft linking.</p>
+          </div>
         </div>
         <div class="verify-step-arrow" aria-hidden="true">&darr;</div>
       </li>
@@ -47,12 +55,23 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=26"></script>
+<script src="../app.js?v=27"></script>
 <script>
 (function () {
   const login = document.getElementById("verify-login");
   if (login) login.href = loginHref();
 })();
+
+function showSoftMc(reason) {
+  const box = document.getElementById("mc-soft");
+  const note = document.getElementById("mc-soft-note");
+  const btnMc = document.getElementById("btn-minecraft");
+  box.hidden = false;
+  btnMc.disabled = true;
+  btnMc.textContent = "Microsoft connected";
+  btnMc.classList.remove("primary");
+  if (reason) note.textContent = reason;
+}
 
 function paintLinked(profile) {
   const status = document.getElementById("verify-status");
@@ -67,6 +86,7 @@ function paintLinked(profile) {
 
   const dcOk = !!(profile && profile.discord_id);
   const mcOk = !!(profile && profile.mc_uuid);
+  const softPending = !!(profile && profile.microsoft_id && !profile.mc_uuid);
   const linked = isLinked(profile);
 
   if (dcOk) {
@@ -77,15 +97,19 @@ function paintLinked(profile) {
   }
   if (mcOk) {
     let t = "Connected as " + (profile.mc_username || "Minecraft");
+    if (profile.mc_link_method === "soft") t += " (temporary link)";
     if (profile.civinfo_known === true) t += " · seen on CivInfo";
     else if (profile.civinfo_known === false) t += " · not found on CivInfo (ok)";
     mcMeta.textContent = t + ".";
     btnMc.disabled = true;
     btnMc.textContent = "Minecraft connected";
     btnMc.classList.remove("primary");
+    document.getElementById("mc-soft").hidden = true;
+  } else if (softPending) {
+    showSoftMc("Microsoft is linked. Enter the Java username on that account.");
   }
 
-  if (profile && profile.verified_at) {
+  if (profile && profile.verified_at && linked) {
     intro.hidden = true;
     document.getElementById("verify-steps").hidden = true;
     countdown.hidden = true;
@@ -160,6 +184,11 @@ async function startLink(provider, btn) {
     history.replaceState({}, "", pageHref("verify"));
     if (!r.ok) {
       setMsg(status, r.message, "err");
+    } else if (r.data.needs_mc_name) {
+      setMsg(status, r.data.reason || "Microsoft linked. Confirm your Java username below.", "ok");
+      showSoftMc(r.data.reason);
+      profile = await getProfile(session.user.id) || profile;
+      renderNav().catch(() => {});
     } else {
       setMsg(status, r.data.provider === "discord"
         ? "Discord connected as " + (r.data.discord_username || "you") + "."
@@ -178,6 +207,19 @@ async function startLink(provider, btn) {
   document.getElementById("btn-minecraft").onclick = function () {
     if (profile.mc_uuid) return;
     startLink("minecraft", this);
+  };
+  document.getElementById("btn-mc-confirm").onclick = async function () {
+    const name = document.getElementById("mc-name").value.trim();
+    status.hidden = false;
+    setMsg(status, "Looking up " + name + "…");
+    this.disabled = true;
+    const r = await callFn("link-oauth", { action: "confirm_mc_name", mc_username: name });
+    this.disabled = false;
+    if (!r.ok) { setMsg(status, r.message, "err"); return; }
+    setMsg(status, "Minecraft linked as " + (r.data.mc_username || name) + ".", "ok");
+    profile = await getProfile(session.user.id) || profile;
+    paintLinked(profile);
+    renderNav().catch(() => {});
   };
 })();
 </script>
