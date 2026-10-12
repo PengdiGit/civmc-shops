@@ -524,16 +524,17 @@ function fillItemList() {
 
 // ------------------------------------------------------------ items, units, deals
 // item textures: the item "oak boat" is Minecraft_Items/oak_boat.png (folder name must match EXACTLY, GitHub Pages is case-sensitive)
-// Resolve from the page URL so nested clean-URL folders (/home/, /shops/, …) hit the root Minecraft_Items/ folder.
+// Always resolve from the site root. Pretty URLs (/shops/{slug}/, /profile/{user}/) are two levels deep, so "../Minecraft_Items" would miss.
 const ITEM_IMG_ALIAS = { essence: "ender eye" }; // Civ slang → eyes of ender
 const itemImg = name => {
   const key = norm(name || "");
   const file = ITEM_IMG_ALIAS[key] || key;
   const filePart = encodeURIComponent(file.replace(/ /g, "_")) + ".png";
+  const path = siteBase() + "/Minecraft_Items/" + filePart;
   try {
-    return new URL("../Minecraft_Items/" + filePart, location.href).href;
+    return new URL(path, location.origin).href;
   } catch (e) {
-    return siteBase() + "/Minecraft_Items/" + filePart;
+    return path;
   }
 };
 function itemIcon(name, big) {
