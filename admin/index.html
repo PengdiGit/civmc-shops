@@ -55,7 +55,7 @@
   <div class="mod-tools">
     <div class="stickybar mod-filterbar">
       <label class="mod-filter-label" for="filter">Filter tools</label>
-      <input type="search" id="filter" placeholder="Filter accounts, shops, listings by name or item">
+      <input type="search" id="filter" placeholder="Filter accounts, shops, listings, unknowns by name or item">
     </div>
 
     <section class="mod-section mod-section--list collapse-section" data-collapse="accounts" aria-labelledby="admin-users-h">
@@ -214,6 +214,26 @@
     </section>
   </div>
 
+  <div id="unknowns-wrap" style="display:none">
+    <section class="mod-section mod-section--list collapse-section admin-collapse" data-collapse="unknowns" aria-labelledby="admin-unknowns-h">
+      <div class="mod-section-head">
+        <h2 id="admin-unknowns-h">
+          <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-unknowns">
+            <span class="collapse-chevron" aria-hidden="true"></span>
+            <span class="mod-section-head-text">
+              <span class="mod-section-title">Unknown listings</span>
+              <span class="meta">Head admin only. Crowd-scanned exchanges not claimed on the site. Delete removes them until a new scan rediscovers them.</span>
+            </span>
+          </button>
+        </h2>
+      </div>
+      <div class="collapse-body" id="collapse-unknowns">
+        <div class="msg" id="unknownmsg"></div>
+        <div class="mod-stack" id="unknowns"></div>
+      </div>
+    </section>
+  </div>
+
   <section class="mod-section mod-section--stale collapse-section admin-collapse" data-collapse="stale" aria-labelledby="admin-stale-h">
     <div class="mod-section-head">
       <h2 id="admin-stale-h">
@@ -247,6 +267,7 @@ let accounts = [];
 let viewUsers = [];
 let shopRows = [];
 let listingRows = [];
+let unknownRows = [];
 let aliasPreviewRows = [];
 
 async function load() {
@@ -260,6 +281,7 @@ async function load() {
     if (typeof bindPlaceFieldsIn === "function") bindPlaceFieldsIn(document.getElementById("form"));
     document.getElementById("pending-wrap").style.display = "block";
     document.getElementById("sales-wrap").style.display = "block";
+    document.getElementById("unknowns-wrap").style.display = "block";
     setupSalesUi();
   } else {
     document.getElementById("headnote").textContent = "Only the head admin can review signups and make or remove mods and admins.";
@@ -461,14 +483,62 @@ function paintLists() {
         <span class="meta">\u00b7 <a href="${l.shops ? shopPath(l.shops, { listing: l.id }) : pageHref("shops", { id: l.shop_id, listing: l.id })}">${esc(l.shops ? l.shops.name : "?")}</a></span>
         ${l.timed_out ? '<span class="tag bad">timed out</span>' : ""}</div>
     </div>`).join("") || '<p class="meta">None.</p>';
+
+  paintUnknowns(hit);
+}
+
+function paintUnknowns(hitFn) {
+  const box = document.getElementById("unknowns");
+  if (!box || !me || !me.is_head) return;
+  const hit = hitFn || (() => true);
+  const rows = unknownRows.filter(u => hit(
+    u.sell_item, u.want_item, u.last_player, u.notes, u.enchants,
+    u.x, u.z, u.nl
+  ));
+  if (!rows.length) {
+    box.innerHTML = '<p class="meta">' + (unknownRows.length ? "No unknowns match this filter." : "No unknown listings right now.") + "</p>";
+    return;
+  }
+  box.innerHTML = rows.map(u => {
+    const player = u.last_player ? esc(u.last_player) : "—";
+    const ench = u.enchants ? ` \u00b7 ${esc(u.enchants)}` : "";
+    const notes = u.notes ? ` \u00b7 ${esc(u.notes)}` : "";
+    return `<div class="card admin-card listing" data-unknown-id="${u.id}">
+      <div class="top">
+        <div>
+          ${itemText(u.want_amount, u.want_item, u.want_unit)} <span class="arrow">&rarr;</span> ${itemText(u.sell_amount, u.sell_item, u.sell_unit)}
+          ${stockHtml(u)}
+          <span class="tag warn">unknown</span>
+          <div class="meta" style="margin-top:4px">${coordsHtml(u.x, u.z)}${u.y != null ? " y" + esc(u.y) : ""}
+            \u00b7 last player ${player}${ench}${notes}
+            \u00b7 first ${fmtDate(u.created_at)} \u00b7 scan ${updatedHtml(u.updated_at, { prefix: false })}
+            \u00b7 <a href="${pageHref("unknown", { id: String(u.id) })}">open</a></div>
+        </div>
+        <div class="inline-actions">
+          ${iconBtn("trash", { danger: true, cls: "btn-report", title: "Delete unknown listing", attrs: `data-act="del-unknown" data-id="${u.id}"` })}
+        </div>
+      </div>
+    </div>`;
+  }).join("");
 }
 
 async function render() {
   if (me.is_head) {
-    const r = await callFn("review-signup", { action: "list" });
+    const [r, unk] = await Promise.all([
+      callFn("review-signup", { action: "list" }),
+      callFn("manage-unknown", { action: "list" })
+    ]);
     if (!r.ok) { setMsg(usermsg, r.message, "err"); }
     else {
       accounts = r.data.accounts;
+    }
+    const unknownmsg = document.getElementById("unknownmsg");
+    if (!unk.ok) {
+      setMsg(unknownmsg, unk.message, "err");
+      unknownRows = [];
+    } else {
+      setMsg(unknownmsg, "");
+      unknownRows = unk.data.unknowns || [];
     }
 
     const awaiting = (r.ok && r.data.awaiting_links) || accounts.filter(a =>
@@ -499,6 +569,7 @@ async function render() {
   } else {
     const { data: users } = await sb.from("profiles").select("*").order("username");
     viewUsers = users || [];
+    unknownRows = [];
   }
 
   const [{ data: shops }, { data: listings }] = await Promise.all([
@@ -681,8 +752,28 @@ document.querySelector("main").addEventListener("click", async e => {
     return;
   }
 
-  if (!btn.dataset.id && act !== "del" && act !== "transfer") return;
+  if (!btn.dataset.id && act !== "del" && act !== "transfer" && act !== "del-unknown") return;
   let r;
+
+  if (act === "del-unknown") {
+    if (!me.is_head) { setMsg(document.getElementById("unknownmsg"), "Only the head admin can delete unknown listings.", "err"); return; }
+    const id = btn.dataset.id || btn.closest("[data-unknown-id]")?.dataset.unknownId;
+    const row = unknownRows.find(u => String(u.id) === String(id));
+    const label = row
+      ? (row.want_item + " → " + row.sell_item + " at " + row.x + ", " + row.z)
+      : "this unknown listing";
+    if (!await confirmModal({
+      title: "Delete unknown listing",
+      body: "Delete " + label + "? A later scan can recreate it if the chest is still there.",
+      confirmLabel: "Delete unknown",
+      danger: true
+    })) return;
+    r = await callFn("manage-unknown", { action: "delete", id: Number(id) });
+    if (!r.ok) { setMsg(document.getElementById("unknownmsg"), r.message, "err"); return; }
+    setMsg(document.getElementById("unknownmsg"), "Deleted.", "ok");
+    render();
+    return;
+  }
 
   if (act === "transfer") {
     if (!me.is_head) { setMsg(msg, "Only the head admin can transfer shops.", "err"); return; }
