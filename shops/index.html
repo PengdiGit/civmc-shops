@@ -89,9 +89,9 @@
 <script src="../app.js?v=23"></script>
 <script>
 const params = new URLSearchParams(location.search);
-// /shops/?id=1 · /shops/1/ · /shops/pfa-exchange/
+// /shops/?id=1 · /shops/1/ · /shops/pfa-exchange/ · /shops/?slug=pfa-exchange
 let shopId = params.get("id");
-let shopSlugParam = null;
+let shopSlugParam = (params.get("slug") || "").trim().toLowerCase() || null;
 {
   const pathSlug = (location.pathname.match(/\/shops\/([^/]+)\/?$/) || [])[1];
   if (pathSlug) {
