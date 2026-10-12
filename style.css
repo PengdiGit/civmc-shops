@@ -2010,6 +2010,23 @@ body.find-page > main {
 }
 .profile-hero img.avatar { width: 128px; height: 128px; border-radius: 8px; }
 .profile-hero h1 { margin: 0 0 6px; }
+.profile-kicker {
+  margin: 0 0 2px;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+body.org-nation.profile-page { --profile-highlight: var(--warn); }
+body.org-nation.profile-page .profile-kicker { color: var(--warn); }
+body.org-business.profile-page .profile-kicker { color: var(--accent); }
+body.org-profile .profile-hero img.avatar.org-mark {
+  image-rendering: pixelated;
+  object-fit: contain;
+  background: color-mix(in srgb, var(--bg) 55%, var(--panel));
+  padding: 18px;
+  box-sizing: border-box;
+}
 .profile-hero .bio {
   margin: 0;
   padding: 0;
@@ -2082,6 +2099,7 @@ body.find-page > main {
   padding: 2px 14px 8px; margin: 0 0 8px;
 }
 .profile-reviews .review:first-child { border-top: 0; }
+.profile-tabs[hidden] { display: none !important; }
 .profile-tabs {
   display: flex; gap: 4px; flex-wrap: wrap;
   margin: 4px 0 14px; padding: 4px;

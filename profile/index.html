@@ -13,7 +13,7 @@
 <meta property="og:url" content="https://civshops.pengworld.net/profile/">
 <meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/player_head.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="../style.css?v=21">
+<link rel="stylesheet" href="../style.css?v=22">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
@@ -25,6 +25,7 @@
       <button type="button" id="follower-count" class="profile-follower-count" hidden>0 Followers</button>
     </div>
     <div class="profile-hero-identity">
+      <p class="profile-kicker" id="kicker" hidden></p>
       <h1 id="name">Loading...</h1>
       <div class="row" id="tags"></div>
       <dl class="facts" id="facts"></dl>
@@ -46,12 +47,13 @@
     <div class="edit-panel" id="own" hidden>
       <h2 style="margin-top:0">Edit profile</h2>
 
-      <label for="bioedit">Bio (Minecraft colour codes work here)</label>
+      <label for="bioedit" id="bio-label">Bio (Minecraft colour codes work here)</label>
       <div class="palette" id="palette-bio"></div>
       <textarea class="mcfield" id="bioedit" rows="3" maxlength="300" placeholder="&7Tell people what you trade... (3 lines, 300 characters max)"></textarea>
       <div class="preview" id="bioprev"></div>
       <div class="row" style="margin-top:6px"><button id="savebio">Save bio</button></div>
 
+      <div id="player-identity">
       <div class="row" style="gap:12px;flex-wrap:wrap;margin-top:12px">
         <div style="flex:1;min-width:140px">
           <label for="pronounsedit">Pronouns (optional)</label>
@@ -63,6 +65,7 @@
         </div>
       </div>
       <div class="row" style="margin-top:6px"><button id="saveidentity">Save pronouns / timezone</button></div>
+      </div>
 
       <label>Highlight colour</label>
       <p class="meta" style="margin:0 0 6px">Colour for boxes on your public profile. Default keeps the normal border.</p>
@@ -81,7 +84,7 @@
         <button id="usehead">Use my Minecraft head</button>
       </div>
 
-      <p class="note">Your Minecraft name and Discord name can't be changed here. To change those, or anything else about your account, <span class="pfa"></span>. Change your password in <a href="../settings/">Settings</a>.</p>
+      <p class="note" id="edit-note">Your Minecraft name and Discord name can't be changed here. To change those, or anything else about your account, <span class="pfa"></span>. Change your password in <a href="../settings/">Settings</a>.</p>
     </div>
   </div>
 
@@ -315,14 +318,32 @@ async function load() {
     }
   } catch (e) {}
   const shareUrl = profileShareUrl(p, p.id);
+  const org = !!(p.is_nation || p.is_business);
+  const nationName = String(p.place_nation || "").trim();
+  const display = (p.is_nation && nationName) ? nationName : primary;
+  const orgMark = org && !p.avatar_path && !p.mc_username
+    ? siteBase() + "/Minecraft_Items/" + (p.is_nation ? "white_banner.png" : "chest.png")
+    : "";
+  document.body.classList.toggle("org-profile", org);
+  document.body.classList.toggle("org-nation", !!p.is_nation);
+  document.body.classList.toggle("org-business", !!p.is_business && !p.is_nation);
+  const kicker = document.getElementById("kicker");
+  kicker.hidden = !org;
+  kicker.textContent = p.is_nation ? "Nation" : (p.is_business ? "Business" : "");
+  const fallbackDesc = p.is_nation
+    ? ("Nation account" + (nationName ? " · " + nationName : ""))
+    : (p.is_business ? "Business account on CivMC Shops" : "CivMC trader");
   setPageMeta({
-    title: primary + " - CivMC Shops",
-    description: (stripCodes(p.bio || "") || [p.mc_username && ("MC: " + p.mc_username), p.discord_username && ("Discord: " + p.discord_username)].filter(Boolean).join(" · ") || "CivMC trader").replace(/\s+/g, " ").slice(0, 180),
+    title: display + (org ? (p.is_nation ? " · Nation" : " · Business") : "") + " - CivMC Shops",
+    description: (stripCodes(p.bio || "") || [!org && p.mc_username && ("MC: " + p.mc_username), !org && p.discord_username && ("Discord: " + p.discord_username)].filter(Boolean).join(" · ") || fallbackDesc).replace(/\s+/g, " ").slice(0, 180),
     url: shareUrl,
-    image: avatarUrl(p, 128)
+    image: orgMark || avatarUrl(p, 128)
   });
-  document.getElementById("name").textContent = primary;
-  document.getElementById("avatar").innerHTML = avatarImg(p, 128);
+  document.title = display + (org ? (p.is_nation ? " · Nation" : " · Business") : "") + " - CivMC Shops";
+  document.getElementById("name").textContent = display;
+  document.getElementById("avatar").innerHTML = orgMark
+    ? `<img class="avatar org-mark" width="128" height="128" src="${esc(orgMark)}" alt="">`
+    : avatarImg(p, 128);
   applyHighlight(p.highlight_color || null);
 
   let tags = p.verified_at ? '<span class="tag ok">verified</span>' : '<span class="tag warn">unverified</span>';
@@ -341,23 +362,28 @@ async function load() {
   const pronouns = (p.pronouns || "").trim();
   const timezone = (p.timezone || "").trim();
   const nationLabel = p.is_nation ? placeHtml({ city: "", nation: p.place_nation }) : "";
-  document.getElementById("facts").innerHTML =
-    `<dt>Username</dt><dd class="fact-copy" data-copy="${esc(login)}" title="Click to copy" role="button" tabindex="0"><b>${esc(primary)}</b></dd>
-     ${p.is_nation ? `<dt>Nation</dt><dd>${nationLabel || "—"}</dd>` : ""}
-     <dt>Minecraft</dt><dd${mcName ? ` class="fact-copy" data-copy="${esc(mcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${esc(mcName || "—")}</dd>
-     <dt>Discord</dt><dd${dcName ? ` class="fact-copy" data-copy="${esc(dcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${dcName ? `<b>${esc(dcName)}</b>` : '<span class="meta">not set</span>'}</dd>
-     <dt>Pronouns</dt><dd>${pronouns ? esc(pronouns) : '<span class="meta">N/A</span>'}</dd>
-     <dt>Timezone</dt><dd>${timezone ? esc(timezone) : '<span class="meta">N/A</span>'}</dd>`;
+  const mcFact = `<dt>Minecraft</dt><dd${mcName ? ` class="fact-copy" data-copy="${esc(mcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${esc(mcName || "—")}</dd>`;
+  const dcFact = `<dt>Discord</dt><dd${dcName ? ` class="fact-copy" data-copy="${esc(dcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${dcName ? `<b>${esc(dcName)}</b>` : '<span class="meta">not set</span>'}</dd>`;
+  document.getElementById("facts").innerHTML = org
+    ? `<dt>Login</dt><dd class="fact-copy" data-copy="${esc(login)}" title="Click to copy" role="button" tabindex="0"><b>${esc(primary)}</b></dd>
+       ${p.is_nation ? `<dt>Nation</dt><dd>${nationLabel || "—"}</dd>` : ""}
+       ${mcName ? mcFact : ""}
+       ${dcName ? dcFact : ""}`
+    : `<dt>Username</dt><dd class="fact-copy" data-copy="${esc(login)}" title="Click to copy" role="button" tabindex="0"><b>${esc(primary)}</b></dd>
+       ${mcFact}
+       ${dcFact}
+       <dt>Pronouns</dt><dd>${pronouns ? esc(pronouns) : '<span class="meta">N/A</span>'}</dd>
+       <dt>Timezone</dt><dd>${timezone ? esc(timezone) : '<span class="meta">N/A</span>'}</dd>`;
   document.getElementById("meta-facts").innerHTML =
-    `<dt>Member since</dt><dd title="${esc(p.created_at ? new Date(p.created_at).toLocaleString() : "")}">${esc(since)}</dd>
-     <dt>Last seen</dt><dd>${lastSeenHtml(p.last_seen_at)}</dd>`;
+    `<dt>${org ? "Since" : "Member since"}</dt><dd title="${esc(p.created_at ? new Date(p.created_at).toLocaleString() : "")}">${esc(since)}</dd>
+     <dt>${org ? "Last active" : "Last seen"}</dt><dd>${org && !p.last_seen_at ? '<span class="meta">unknown</span>' : lastSeenHtml(p.last_seen_at)}</dd>`;
 
   const bioEl = document.getElementById("bio");
   if (p.bio) bioEl.innerHTML = mcText(p.bio);
-  else bioEl.innerHTML = own ? "" : '<span class="meta">No bio yet.</span>';
+  else bioEl.innerHTML = own ? "" : `<span class="meta">${org ? "No description yet." : "No bio yet."}</span>`;
 
   let act = "";
-  if (!own && myId) act += `<button class="small btn-report" id="rep">Report user</button>`;
+  if (!own && myId) act += `<button class="small btn-report" id="rep">${org ? "Report account" : "Report user"}</button>`;
   const actionsEl = document.getElementById("actions");
   actionsEl.innerHTML = act;
   actionsEl.hidden = !act;
@@ -384,20 +410,41 @@ async function load() {
     const bioEdit = document.getElementById("bioedit");
     bioEdit.value = clampBioLines(p.bio || "");
     updatePrev(bioEdit, "bioprev");
+    document.getElementById("player-identity").hidden = org;
     document.getElementById("pronounsedit").value = p.pronouns || "";
     document.getElementById("timezoneedit").value = p.timezone || "";
+    document.getElementById("bio-label").textContent = org
+      ? "Description (Minecraft colour codes work here)"
+      : "Bio (Minecraft colour codes work here)";
+    bioEdit.placeholder = p.is_nation
+      ? "&7What this nation runs... (3 lines, 300 characters max)"
+      : (p.is_business
+        ? "&7What you sell, and where to find you... (3 lines, 300 characters max)"
+        : "&7Tell people what you trade... (3 lines, 300 characters max)");
+    const editNote = document.getElementById("edit-note");
+    if (org) {
+      editNote.textContent = p.is_nation
+        ? "The nation is set by the head admin. Extra detail goes in the description. Change the password in Settings."
+        : "Mention a place in the description if you want one. Login details are changed by the head admin. Change the password in Settings.";
+    } else {
+      editNote.innerHTML = 'Your Minecraft name and Discord name can\'t be changed here. To change those, or anything else about your account, <span class="pfa"></span>. Change your password in <a href="../settings/">Settings</a>.';
+      const pfa = editNote.querySelector(".pfa");
+      if (pfa) pfa.textContent = PFA_HELP;
+    }
+    const headBtn = document.getElementById("usehead");
+    headBtn.textContent = (org && !mcName) ? "Remove picture" : "Use my Minecraft head";
     syncHlUi(p.highlight_color || null);
     const verified = isVerified(p);
     document.getElementById("picnote").textContent = verified
       ? (p.avatar_path
         ? "You're using a custom picture."
-        : ((p.is_business || p.is_nation) && !mcName
-          ? "You're using a default picture. Upload a picture to replace it."
+        : (org
+          ? "Upload a picture for this account. Until then it shows a " + (p.is_nation ? "banner." : "chest.")
           : "You're using your Minecraft head. Upload a picture to replace it."))
       : "Verified accounts can upload a custom picture. Until then you get your Minecraft head.";
     document.getElementById("picfile").disabled = !verified;
     document.getElementById("savepic").disabled = !verified;
-    document.getElementById("usehead").disabled = !p.avatar_path;
+    headBtn.disabled = !p.avatar_path;
   }
 
   let totalListings = 0;
@@ -421,19 +468,22 @@ async function load() {
   });
 
   const rating = ratingSummary(allReviews);
-  if (isTrustedTrader(allReviews)) {
+  if (!org && isTrustedTrader(allReviews)) {
     document.getElementById("tags").innerHTML += " " + trustedBadge(allReviews);
   }
   document.getElementById("stats").innerHTML = `
     <div class="stat"><div class="big">${full.length}</div><div class="lbl">Shops</div></div>
     <div class="stat"><div class="big">${totalListings}</div><div class="lbl">Listings</div></div>
-    <div class="stat"><div class="big">${rating ? rating.avg.toFixed(1) : " - "}</div><div class="lbl">${rating ? "Avg rating (" + rating.count + ")" : "No ratings"}</div></div>
+    <div class="stat"><div class="big">${rating ? rating.avg.toFixed(1) : " - "}</div><div class="lbl">${rating ? (org ? "Shop rating (" : "Avg rating (") + rating.count + ")" : "No ratings"}</div></div>
     <div class="stat"><div class="big">${active ? "Active" : "Quiet"}</div><div class="lbl">${active ? "Updated in last 7 days" : "No recent listing updates"}</div></div>
-    <div class="stat"><div class="big" style="font-size:1rem">${esc(since)}</div><div class="lbl">Member since</div></div>`;
+    <div class="stat"><div class="big" style="font-size:1rem">${esc(since)}</div><div class="lbl">${org ? "Since" : "Member since"}</div></div>`;
 
-  document.getElementById("shops-sub").textContent = full.length
+  const shopCountLine = full.length
     ? full.length + " shop" + (full.length === 1 ? "" : "s") + " \u00b7 " + totalListings + " listing" + (totalListings === 1 ? "" : "s")
     : "";
+  document.getElementById("shops-sub").textContent = org
+    ? [(p.is_nation ? "Run by this nation" : "Run by this business"), shopCountLine].filter(Boolean).join(" \u00b7 ")
+    : shopCountLine;
   document.getElementById("tab-shops").textContent = "Shops" + (full.length ? " (" + full.length + ")" : "");
 
   const shopBox = document.getElementById("shops");
@@ -452,31 +502,36 @@ async function load() {
     }).join("");
   }
 
-  const { data: written } = await sb.from("reviews")
-    .select("*, shops(id, name, styled_name)")
-    .eq("author_id", p.id)
-    .order("created_at", { ascending: false })
-    .limit(40);
-  const okReviews = (written || []).filter(r => !r.timed_out);
-  document.getElementById("reviews-sub").textContent = okReviews.length
-    ? okReviews.length + " public review" + (okReviews.length === 1 ? "" : "s")
-    : "";
-  document.getElementById("tab-reviews").textContent = "Reviews written" + (okReviews.length ? " (" + okReviews.length + ")" : "");
-  document.getElementById("myreviews").innerHTML = okReviews.length
-    ? `<div class="profile-reviews">${okReviews.map(r => `
-        <div class="review">
-          <div class="top">
-            <span><span class="stars">${starsText(r.rating)}</span>
-              <a href="${r.shops ? shopPath(r.shops) : pageHref("shops", { id: r.shop_id })}">${r.shops ? shopName(r.shops) : "shop"}</a>
-              ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
-              <span class="meta">\u00b7 ${agoText(r.created_at)}</span></span>
-          </div>
-          ${r.body ? `<p class="body">${esc(r.body)}</p>` : ""}
-          ${r.owner_reply ? `<div class="owner-reply"><span class="tag owner">owner reply</span>
-            <p class="body">${esc(r.owner_reply)}</p>
-            ${r.owner_reply_at ? `<span class="meta">${agoText(r.owner_reply_at)}</span>` : ""}</div>` : ""}
-        </div>`).join("")}</div>`
-    : '<p class="meta">No public reviews written yet.</p>';
+  document.querySelector(".profile-tabs").hidden = org;
+  if (org) {
+    if (activeTab === "reviews") activeTab = "shops";
+  } else {
+    const { data: written } = await sb.from("reviews")
+      .select("*, shops(id, name, styled_name)")
+      .eq("author_id", p.id)
+      .order("created_at", { ascending: false })
+      .limit(40);
+    const okReviews = (written || []).filter(r => !r.timed_out);
+    document.getElementById("reviews-sub").textContent = okReviews.length
+      ? okReviews.length + " public review" + (okReviews.length === 1 ? "" : "s")
+      : "";
+    document.getElementById("tab-reviews").textContent = "Reviews written" + (okReviews.length ? " (" + okReviews.length + ")" : "");
+    document.getElementById("myreviews").innerHTML = okReviews.length
+      ? `<div class="profile-reviews">${okReviews.map(r => `
+          <div class="review">
+            <div class="top">
+              <span><span class="stars">${starsText(r.rating)}</span>
+                <a href="${r.shops ? shopPath(r.shops) : pageHref("shops", { id: r.shop_id })}">${r.shops ? shopName(r.shops) : "shop"}</a>
+                ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
+                <span class="meta">\u00b7 ${agoText(r.created_at)}</span></span>
+            </div>
+            ${r.body ? `<p class="body">${esc(r.body)}</p>` : ""}
+            ${r.owner_reply ? `<div class="owner-reply"><span class="tag owner">owner reply</span>
+              <p class="body">${esc(r.owner_reply)}</p>
+              ${r.owner_reply_at ? `<span class="meta">${agoText(r.owner_reply_at)}</span>` : ""}</div>` : ""}
+          </div>`).join("")}</div>`
+      : '<p class="meta">No public reviews written yet.</p>';
+  }
   switchTab(activeTab);
 }
 
@@ -591,7 +646,8 @@ document.getElementById("usehead").onclick = async () => {
   const { error } = await sb.from("profiles").update({ avatar_path: null }).eq("id", shown.id);
   if (error) { setMsg(msg, error.message, "err"); return; }
   if (old) sb.storage.from("uploads").remove([old]);
-  setMsg(msg, "Using your Minecraft head again.", "ok");
+  const clearingMark = shown && (shown.is_nation || shown.is_business) && !shown.mc_username;
+  setMsg(msg, clearingMark ? "Picture removed." : "Using your Minecraft head again.", "ok");
   load();
 };
 
