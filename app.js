@@ -1322,7 +1322,7 @@ function writeCompareHash(pins) {
 
 // Cross-page compare tray (sessionStorage + optional #cmp=)
 const COMPARE_STORE_KEY = "civmc_compare_pins";
-const COMPARE_LISTING_SELECT = "*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business))";
+const COMPARE_LISTING_SELECT = "*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business, is_nation))";
 function loadCompareSpecs() {
   try {
     const arr = JSON.parse(sessionStorage.getItem(COMPARE_STORE_KEY) || "[]");

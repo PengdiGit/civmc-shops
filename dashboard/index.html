@@ -71,7 +71,7 @@
 <script src="../item-picker.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=18"></script>
+<script src="../app.js?v=19"></script>
 <script>
 let me = null;
 let shopsData = {};                 // shop id -> shop (with listings), from the last load
@@ -656,7 +656,7 @@ async function expirePastSales(shops) {
   }
 }
 
-const DASH_SHOP_SELECT = "*, listings(*), shop_members(user_id, role, created_at, profiles(username, mc_username, avatar_path, is_business))";
+const DASH_SHOP_SELECT = "*, listings(*), shop_members(user_id, role, created_at, profiles(username, mc_username, avatar_path, is_business, is_nation))";
 
 async function loadEditableShops() {
   const uid = me.session.user.id;

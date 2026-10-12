@@ -35,7 +35,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=18"></script>
+<script src="../app.js?v=19"></script>
 <script>
 const msg = document.getElementById("msg");
 let me = null;
@@ -64,7 +64,7 @@ async function load() {
 
   const [{ data, error }, { data: peopleData, error: peopleErr }] = await Promise.all([
     sb.from("favorites")
-      .select("id, shop_id, created_at, shops(id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business), shop_members(user_id, role, created_at, profiles(username, mc_username, avatar_path, is_business)), listings(id, updated_at, stock, in_stock, timed_out), reviews(rating, traded, timed_out))")
+      .select("id, shop_id, created_at, shops(id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business, is_nation), shop_members(user_id, role, created_at, profiles(username, mc_username, avatar_path, is_business, is_nation)), listings(id, updated_at, stock, in_stock, timed_out), reviews(rating, traded, timed_out))")
       .eq("user_id", me).order("created_at", { ascending: false }),
     sb.from("follows")
       .select("id, following_id, created_at, profiles!follows_following_id_fkey(id, username, mc_username, discord_username, avatar_path, verified_at, timed_out)")

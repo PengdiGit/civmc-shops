@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
     if (target.id) {
       const { data } = await admin
         .from("profiles")
-        .select("id, username, mc_username, discord_username, bio, avatar_path, is_business, place_city, place_nation, verified_at, timed_out, timed_out_until")
+        .select("id, username, mc_username, discord_username, bio, avatar_path, is_business, is_nation, place_city, place_nation, verified_at, timed_out, timed_out_until")
         .eq("id", target.id)
         .maybeSingle();
       p = data;
@@ -232,14 +232,14 @@ Deno.serve(async (req) => {
       const needle = String(target.name).trim();
       const { data: byUser } = await admin
         .from("profiles")
-        .select("id, username, mc_username, discord_username, bio, avatar_path, is_business, place_city, place_nation, verified_at, timed_out, timed_out_until")
+        .select("id, username, mc_username, discord_username, bio, avatar_path, is_business, is_nation, place_city, place_nation, verified_at, timed_out, timed_out_until")
         .ilike("username", needle)
         .limit(10);
       p = (byUser || []).find((x) => String(x.username || "").toLowerCase() === needle.toLowerCase()) || (byUser && byUser[0]) || null;
       if (!p) {
         const { data: byMc } = await admin
           .from("profiles")
-          .select("id, username, mc_username, discord_username, bio, avatar_path, is_business, place_city, place_nation, verified_at, timed_out, timed_out_until")
+          .select("id, username, mc_username, discord_username, bio, avatar_path, is_business, is_nation, place_city, place_nation, verified_at, timed_out, timed_out_until")
           .ilike("mc_username", needle)
           .limit(10);
         p = (byMc || []).find((x) => String(x.mc_username || "").toLowerCase() === needle.toLowerCase()) || (byMc && byMc[0]) || null;
@@ -262,9 +262,11 @@ Deno.serve(async (req) => {
     const bits = [];
     if (mc && mc.toLowerCase() !== String(primary).toLowerCase()) bits.push("MC: " + mc);
     if (p.discord_username) bits.push("Discord: " + p.discord_username);
-    if (p.is_business) {
-      const place = placeLine(p.place_city as string, p.place_nation as string);
-      if (place) bits.push(place);
+    if (p.is_nation) {
+      const nationName = String(p.place_nation || "").trim();
+      if (nationName) bits.push(nationName);
+      bits.push("nation");
+    } else if (p.is_business) {
       bits.push("business");
     }
     if (p.verified_at) bits.push("verified");
