@@ -2004,6 +2004,9 @@ body.find-page > main {
   margin: 0;
   padding: 0;
 }
+body.org-business.profile-page .profile-hero-side {
+  align-self: start;
+}
 .profile-hero > #actions {
   grid-column: 2;
   margin-top: 4px;

@@ -13,7 +13,7 @@
 <meta property="og:url" content="https://civshops.pengworld.net/profile/">
 <meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/player_head.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="../style.css?v=22">
+<link rel="stylesheet" href="../style.css?v=23">
 </head>
 <body class="profile-page">
 <nav id="nav"></nav>
@@ -287,6 +287,19 @@ document.getElementById("own").addEventListener("click", e => {
   updatePrev(field, "bioprev");
 });
 
+function placeProfileMetaFacts(underTags) {
+  const meta = document.getElementById("meta-facts");
+  const tags = document.getElementById("tags");
+  const bio = document.getElementById("bio");
+  if (!meta || !tags || !bio) return;
+  meta.hidden = false;
+  if (underTags) {
+    if (meta.previousElementSibling !== tags) tags.after(meta);
+  } else if (bio.nextElementSibling !== meta) {
+    bio.after(meta);
+  }
+}
+
 async function load() {
   const session = await getSession();
   myId = session ? session.user.id : null;
@@ -380,6 +393,7 @@ async function load() {
   document.getElementById("meta-facts").innerHTML =
     `<dt>${org ? "Since" : "Member since"}</dt><dd title="${esc(p.created_at ? new Date(p.created_at).toLocaleString() : "")}">${esc(since)}</dd>
      <dt>${org ? "Last active" : "Last seen"}</dt><dd>${org && !p.last_seen_at ? '<span class="meta">unknown</span>' : lastSeenHtml(p.last_seen_at)}</dd>`;
+  placeProfileMetaFacts(!!p.is_business && !p.is_nation);
 
   const bioEl = document.getElementById("bio");
   if (p.bio) bioEl.innerHTML = mcText(p.bio);
