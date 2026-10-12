@@ -89,12 +89,12 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=23"></script>
+<script src="../app.js?v=24"></script>
 <script>
 const params = new URLSearchParams(location.search);
-// /shops/?id=1 · /shops/1/ · /shops/pfa-exchange/
+// /shops/?id=1 · /shops/1/ · /shops/pfa-exchange/ · /shops/?slug=pfa-exchange
 let shopId = params.get("id");
-let shopSlugParam = null;
+let shopSlugParam = (params.get("slug") || "").trim().toLowerCase() || null;
 {
   const pathSlug = (location.pathname.match(/\/shops\/([^/]+)\/?$/) || [])[1];
   if (pathSlug) {

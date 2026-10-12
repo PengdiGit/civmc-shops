@@ -190,31 +190,38 @@ async function main() {
   }
 
   const profiles = await sb(
-    "profiles?select=id,username,mc_username,discord_username,bio,avatar_path,is_business,place_city,place_nation,verified_at,timed_out&timed_out=eq.false&order=username",
+    "profiles?select=id,username,mc_username,discord_username,bio,avatar_path,is_business,is_nation,place_city,place_nation,verified_at,timed_out&timed_out=eq.false&order=username",
   );
 
   let profN = 0;
   for (const p of profiles || []) {
     const login = String(p.username || "");
     const mc = String(p.mc_username || "");
-    const primary = (mc && login && mc.toLowerCase() === login.toLowerCase())
+    const nationName = String(p.place_nation || "").trim();
+    let primary = (mc && login && mc.toLowerCase() === login.toLowerCase())
       ? mc
       : (login ? login.charAt(0).toUpperCase() + login.slice(1) : mc) || "Trader";
+    if (p.is_nation && nationName) primary = nationName;
     const bits = [];
+    if (p.is_nation) bits.push("Nation");
+    else if (p.is_business) bits.push("Business");
     if (mc && mc.toLowerCase() !== String(primary).toLowerCase()) bits.push("MC: " + mc);
     if (p.discord_username) bits.push("Discord: " + p.discord_username);
-    if (p.is_business) {
+    if (p.is_business && !p.is_nation) {
       const place = placeLine(p.place_city, p.place_nation);
       if (place) bits.push(place);
-      bits.push("business");
+    } else if (p.is_nation && nationName && nationName.toLowerCase() !== String(primary).toLowerCase()) {
+      bits.push(nationName);
     }
     if (p.verified_at) bits.push("verified");
     let desc = stripMc(p.bio || "").replace(/\s+/g, " ").slice(0, 180);
-    if (!desc) desc = bits.join(" | ") || "CivMC trader on CivMC Shops.";
+    if (!desc) desc = bits.join(" | ") || (p.is_nation ? "Nation account on CivMC Shops." : (p.is_business ? "Business account on CivMC Shops." : "CivMC trader on CivMC Shops."));
     else if (bits.length) desc = desc + " | " + bits.slice(0, 3).join(" | ");
     const image = p.avatar_path
       ? storageUrl(p.avatar_path)
-      : "https://minotar.net/avatar/" + encodeURIComponent(mc || "steve") + "/128";
+      : ((p.is_nation || p.is_business) && !mc)
+        ? SITE + "/Minecraft_Items/" + (p.is_nation ? "white_banner.png" : "chest.png")
+        : "https://minotar.net/avatar/" + encodeURIComponent(mc || "steve") + "/128";
     const loginKey = String(p.username || "").trim().toLowerCase();
     if (!/^[a-z0-9_]{3,20}$/.test(loginKey)) continue;
     const landerUrl = SITE + "/profile/" + loginKey + "/";

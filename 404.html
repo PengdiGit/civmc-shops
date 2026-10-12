@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CivMC Shops</title>
+<meta name="robots" content="noindex">
+<script>
+(function () {
+  var path = location.pathname || "/";
+  var base = "";
+  if (path === "/civmc-shops" || path.indexOf("/civmc-shops/") === 0) {
+    base = "/civmc-shops";
+    path = path.slice(base.length) || "/";
+  }
+  var params = new URLSearchParams(location.search);
+  var hash = location.hash || "";
+
+  var prof = path.match(/^\/profile\/([^/]+)\/?$/);
+  if (prof) {
+    var slug = decodeURIComponent(prof[1]);
+    if (/^[0-9a-f-]{36}$/i.test(slug)) {
+      if (!params.get("id")) params.set("id", slug);
+    } else if (!params.get("name") && !params.get("id")) {
+      params.set("name", slug);
+    }
+    location.replace(base + "/profile/?" + params.toString() + hash);
+    return;
+  }
+
+  var shop = path.match(/^\/shops\/([^/]+)\/?$/);
+  if (shop) {
+    var shopSlug = decodeURIComponent(shop[1]);
+    if (/^\d+$/.test(shopSlug)) {
+      if (!params.get("id")) params.set("id", shopSlug);
+    } else if (!params.get("slug") && !params.get("id")) {
+      params.set("slug", shopSlug);
+    }
+    location.replace(base + "/shops/?" + params.toString() + hash);
+    return;
+  }
+
+  location.replace(base + "/home/" + hash);
+})();
+</script>
+</head>
+<body style="font-family:system-ui,sans-serif;background:#1a1c18;color:#e8eadf;padding:24px">
+<p><a id="fallback" href="/home/" style="color:#7fb35a">CivMC Shops</a></p>
+<script>
+document.getElementById("fallback").href = (location.pathname.indexOf("/civmc-shops") === 0 ? "/civmc-shops" : "") + "/home/";
+</script>
+</body>
+</html>
