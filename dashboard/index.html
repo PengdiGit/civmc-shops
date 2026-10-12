@@ -71,7 +71,7 @@
 <script src="../item-picker.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=24"></script>
+<script src="../app.js?v=26"></script>
 <script>
 let me = null;
 let shopsData = {};                 // shop id -> shop (with listings), from the last load
@@ -250,9 +250,9 @@ async function load() {
   document.getElementById("toggle-new-shop").onclick = () => setNewShopOpen(true);
   document.getElementById("cancel-new-shop").onclick = () => setNewShopOpen(false);
 
-  if (!isVerified(ctx.profile)) {
+  if (!hasAccountAccess(ctx.profile)) {
     document.getElementById("verify").innerHTML = `
-      <div class="banner"><b>Account not verified.</b> You can browse, favourite, and report, but not create shops, comment, review, or upload. <a href="../verify/">Verify here</a> (${PFA_HELP}).</div>`;
+      <div class="banner"><b>Connect Discord + Minecraft.</b> You can browse, favourite, and report, but not create shops, comment, review, or upload. <a href="../verify/">Verify here</a>.</div>`;
     document.querySelectorAll("#newshop input, #newshop textarea, #newshop button").forEach(el => el.disabled = true);
   }
   setupNewShopForm();

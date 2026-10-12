@@ -18,22 +18,38 @@
   </header>
 
   <div id="pending-wrap" style="display:none">
-    <section class="mod-section mod-section--pending collapse-section admin-collapse" data-collapse="pending" aria-labelledby="admin-pending-h">
+    <section class="mod-section mod-section--pending collapse-section admin-collapse" data-collapse="awaiting" aria-labelledby="admin-awaiting-h">
       <div class="mod-section-head">
-        <h2 id="admin-pending-h">
-          <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-pending">
+        <h2 id="admin-awaiting-h">
+          <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-awaiting">
             <span class="collapse-chevron" aria-hidden="true"></span>
             <span class="mod-section-head-text">
-              <span class="mod-section-title">Signup requests</span>
-              <span class="meta">Match Discord + Minecraft to the CivShop ticket. Accept unlocks the account; deny deletes it. Unverified accounts expire after 24 hours.</span>
+              <span class="mod-section-title">Awaiting links</span>
+              <span class="meta">New accounts that have not connected Discord + Minecraft yet. Deny deletes them. Incomplete accounts expire after 24 hours.</span>
             </span>
           </button>
         </h2>
       </div>
-      <div class="collapse-body" id="collapse-pending">
+      <div class="collapse-body" id="collapse-awaiting">
         <div class="msg" id="purgemsg"></div>
-        <button type="button" class="small btn-report" data-act="purge-unverified">Purge expired unverified now</button>
-        <div class="mod-stack" id="pending"></div>
+        <button type="button" class="small btn-report" data-act="purge-unverified">Purge expired incomplete now</button>
+        <div class="mod-stack" id="awaiting"></div>
+      </div>
+    </section>
+    <section class="mod-section mod-section--pending collapse-section admin-collapse" data-collapse="ready" aria-labelledby="admin-ready-h">
+      <div class="mod-section-head">
+        <h2 id="admin-ready-h">
+          <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-ready">
+            <span class="collapse-chevron" aria-hidden="true"></span>
+            <span class="mod-section-head-text">
+              <span class="mod-section-title">Ready for review</span>
+              <span class="meta">Both accounts linked — they already have full site access. Accept only adds the public verified badge; Deny deletes the account.</span>
+            </span>
+          </button>
+        </h2>
+      </div>
+      <div class="collapse-body" id="collapse-ready">
+        <div class="mod-stack" id="ready"></div>
       </div>
     </section>
   </div>
@@ -222,7 +238,7 @@
 <script src="../config.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=24"></script>
+<script src="../app.js?v=26"></script>
 <script>
 const msg = document.getElementById("msg");
 const usermsg = document.getElementById("usermsg");
@@ -386,7 +402,9 @@ function roleBadge(a) {
 function statusBadge(a) {
   let s = a.verified_at
     ? '<span class="tag ok">verified</span>'
-    : '<span class="tag warn">unverified</span>';
+    : (a.discord_id && a.mc_uuid)
+      ? '<span class="tag ok">linked</span>'
+      : '<span class="tag warn">unlinked</span>';
   if (a.timed_out) s += ' <span class="tag bad">timed out</span>';
   return s;
 }
@@ -458,18 +476,32 @@ async function render() {
       if (ap > 0) setMsg(purgemsg, "Auto-purged " + ap + " expired unverified account" + (ap === 1 ? "" : "s") + " on load.", "ok");
     }
 
-    const pending = accounts.filter(a => !a.verified_at && !a.is_admin && !a.is_mod && !a.is_head)
-      .sort((a, b) => a.created_at < b.created_at ? -1 : 1);
-    document.getElementById("pending").innerHTML = pending.map(a => `
-      <div class="card admin-card">
+    const awaiting = (r.ok && r.data.awaiting_links) || accounts.filter(a =>
+      !a.verified_at && !a.is_admin && !a.is_mod && !a.is_head && !a.is_business && !a.is_nation && !(a.discord_id && a.mc_uuid));
+    const ready = (r.ok && r.data.ready_for_review) || accounts.filter(a =>
+      !a.verified_at && !a.is_admin && !a.is_mod && !a.is_head && !a.is_business && !a.is_nation && a.discord_id && a.mc_uuid);
+
+    function queueCard(a, opts) {
+      const dc = a.discord_username || (a.discord_id ? "linked" : "—");
+      const mc = a.mc_username || (a.mc_uuid ? "linked" : "—");
+      const civ = a.civinfo_known === true ? " · CivInfo: yes" : a.civinfo_known === false ? " · CivInfo: no" : "";
+      const left = !(a.discord_id && a.mc_uuid) ? ` · <b>${timeLeft(a.created_at)}</b> left` : "";
+      const actions = opts.accept
+        ? `<button class="small primary" data-act="accept" data-id="${a.id}">Accept</button>
+           <button class="small btn-report" data-act="deny" data-id="${a.id}">Deny</button>`
+        : `<button class="small btn-report" data-act="deny" data-id="${a.id}">Deny</button>`;
+      return `<div class="card admin-card">
         <div class="top">
-          <div><b>${esc(userName(a))}</b> <span class="meta">MC ${esc(a.mc_username)} \u00b7 Discord: ${esc(a.discord_username || "?")} \u00b7 signed up ${fmtDate(a.created_at)} \u00b7 <b>${timeLeft(a.created_at)}</b> left</span></div>
-          <div class="inline-actions">
-            <button class="small primary" data-act="accept" data-id="${a.id}">Accept</button>
-            <button class="small btn-report" data-act="deny" data-id="${a.id}">Deny</button>
-          </div>
+          <div><b>${esc(userName(a))}</b> <span class="meta">MC ${esc(mc)} \u00b7 Discord: ${esc(dc)}${civ} \u00b7 signed up ${fmtDate(a.created_at)}${left}</span></div>
+          <div class="inline-actions">${actions}</div>
         </div>
-      </div>`).join("") || '<p class="meta">No pending signups.</p>';
+      </div>`;
+    }
+
+    document.getElementById("awaiting").innerHTML = awaiting.map(a => queueCard(a, { accept: false })).join("")
+      || '<p class="meta">No accounts waiting to link.</p>';
+    document.getElementById("ready").innerHTML = ready.map(a => queueCard(a, { accept: true })).join("")
+      || '<p class="meta">No linked accounts waiting for the verified badge.</p>';
   } else {
     const { data: users } = await sb.from("profiles").select("*").order("username");
     viewUsers = users || [];
@@ -752,9 +784,14 @@ document.querySelector("main").addEventListener("click", async e => {
     })) return;
     r = await callFn("review-signup", { action: "delete", user_id: btn.dataset.id });
   } else if (act === "accept" || act === "deny") {
+    if (act === "accept" && !await confirmModal({
+      title: "Accept account",
+      body: "Add the public verified badge? This does not change their permissions (linking already unlocked the site).",
+      confirmLabel: "Accept"
+    })) return;
     if (act === "deny" && !await confirmModal({
-      title: "Deny signup",
-      body: "Deny and DELETE this account and its comments? This can't be undone.",
+      title: "Deny / delete account",
+      body: "Delete this account and everything tied to it? This can't be undone.",
       confirmLabel: "Deny and delete",
       danger: true
     })) return;

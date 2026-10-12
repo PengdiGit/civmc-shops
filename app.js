@@ -1194,7 +1194,7 @@ function fmtRate(r) {
 
 // ------------------------------------------------------------ pictures, stars, help text
 const PFA_CONTACT_CHANNEL = "https://discord.com/channels/1547194944253460501/1547194946044305426";
-const PFA_HELP = 'open a "CivShop" ticket in "contact PFA" on the Discord';
+const PFA_HELP = "connect Discord and Minecraft on the verify page";
 const HEAD_URL = "https://minotar.net/avatar/";   // default profile picture = the person's Minecraft head
 
 const publicUrl = path => sb.storage.from("uploads").getPublicUrl(path).data.publicUrl;
@@ -1825,15 +1825,30 @@ function timeLeft(createdAt) {
   const m = Math.floor(ms / 60000);
   return m < 1 ? "under a minute" : Math.floor(m / 60) + "h " + (m % 60) + "m";
 }
-/** True when the account can be auto-purged (unverified, not staff/head). */
+/** Discord + Minecraft OAuth both linked. */
+function isLinked(p) {
+  return !!(p && p.discord_id && p.mc_uuid);
+}
+/**
+ * Full account perms (shops, comments, reviews, uploads).
+ * Linked OAuth, public badge, staff, or shared/admin-created accounts.
+ */
+function hasAccountAccess(p) {
+  if (!p || stillTimedOut(p)) return false;
+  if (p.is_admin || p.is_mod || p.is_head || p.is_business || p.is_nation) return true;
+  if (isLinked(p)) return true;
+  if (p.verified_at) return true;
+  return false;
+}
+/** Banner: signed up but not yet linked (and not staff/shared/admin-created). */
 function needsVerification(p) {
-  return !!(p && !p.verified_at && !p.is_admin && !p.is_mod && !p.is_head);
+  return !!(p && !isLinked(p) && !p.verified_at && !p.is_admin && !p.is_mod && !p.is_head && !p.is_business && !p.is_nation);
 }
 function deleteCountdownText(createdAt) {
   const left = timeLeft(createdAt);
   return left === "expired"
-    ? "your account is past the verification window and may be deleted soon"
-    : "your account will be deleted in " + left;
+    ? "your account is past the linking window and may be deleted soon"
+    : "connect Discord + Minecraft within " + left + " or the account may be deleted";
 }
 
 // ------------------------------------------------------------ Minecraft-style text + shop icons
@@ -2202,6 +2217,7 @@ async function getProfile(uid) {
   return data;
 }
 const isStaff = p => !!(p && (p.is_admin || p.is_mod) && !stillTimedOut(p));
+/** Public verified badge only (head admin Accept). Prefer hasAccountAccess for permissions. */
 const isVerified = p => !!(p && p.verified_at && !stillTimedOut(p));
 
 async function kickTimedOut() {
@@ -2322,7 +2338,7 @@ async function renderNav() {
   if (nagProfile && !isImpersonating()) maybeNagPassword(nagProfile);
 }
 
-/** Fixed top banner for logged-in unverified accounts subject to 24h purge. */
+/** Fixed top banner for logged-in accounts that still need Discord + Minecraft linking. */
 function renderVerifyBanner(profile) {
   const existing = document.getElementById("verify-banner");
   const onVerifyPage = currentPageSlug() === "verify";
@@ -2348,7 +2364,7 @@ function renderVerifyBanner(profile) {
   document.body.classList.add("has-verify-banner");
   const countdown = deleteCountdownText(profile.created_at);
   bar.innerHTML =
-    `<span class="verify-banner-text">Not verified - <b>${esc(countdown)}</b>.</span>` +
+    `<span class="verify-banner-text">Connect Discord + Minecraft - <b>${esc(countdown)}</b>.</span>` +
     `<a class="primary small verify-banner-cta" href="${pageHref("verify")}">verify here</a>`;
   syncTopChromeOffset();
   observeTopChrome();
@@ -2356,6 +2372,22 @@ function renderVerifyBanner(profile) {
     syncTopChromeOffset();
     requestAnimationFrame(syncTopChromeOffset);
   });
+}
+
+/** Same-origin verify URL for OAuth redirects (keeps the Supabase session). */
+function oauthVerifyRedirectUri() {
+  const path = pageHref("verify");
+  return location.origin + (path.startsWith("/") ? path : "/" + path);
+}
+
+/** Start Discord or Minecraft OAuth linking; returns {ok, url} or {ok:false, message}. */
+async function startOAuthLink(provider) {
+  return callFn("link-oauth", { action: "start", provider, redirect_uri: oauthVerifyRedirectUri() });
+}
+
+/** Finish OAuth after redirect back to /verify/?code=&state= */
+async function finishOAuthLink(code, state) {
+  return callFn("link-oauth", { action: "finish", code, state, redirect_uri: oauthVerifyRedirectUri() });
 }
 
 // every 20s: if the account got timed out while the page is open, log out

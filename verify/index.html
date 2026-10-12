@@ -11,91 +11,174 @@
 <main>
   <div class="auth-wrap verify-wrap">
     <span class="page-eyebrow">Account</span>
-    <h1>Verify your account</h1>
-    <p class="sub" id="verify-intro">Needed to comment, review, upload, or create shops. Until then you can browse, favourite, and report.</p>
+    <h1>Connect your accounts</h1>
+    <p class="sub" id="verify-intro">Connect Discord and Minecraft (Microsoft login) to unlock shops, comments, reviews, and uploads. Until then you can browse, favourite, and report.</p>
     <div class="msg" id="verify-status" hidden></div>
     <div id="verify-countdown" class="verify-countdown" hidden></div>
 
     <ol class="verify-steps" id="verify-steps">
-      <li class="verify-step">
+      <li class="verify-step" id="step-discord">
         <div class="verify-step-body">
-          <h2>Join the PFA discord</h2>
-          <p class="meta">Join so you can open a ticket.</p>
-          <a class="primary" id="join-discord" href="https://discord.com/invite/cNHvQb567c" target="_blank" rel="noopener noreferrer">Join</a>
+          <h2>Connect Discord</h2>
+          <p class="meta" id="discord-meta">Sign in with Discord so we know that account is yours.</p>
+          <button type="button" class="primary" id="btn-discord">Connect Discord</button>
         </div>
         <div class="verify-step-arrow" aria-hidden="true">&darr;</div>
       </li>
-      <li class="verify-step">
+      <li class="verify-step" id="step-minecraft">
         <div class="verify-step-body">
-          <h2>Open a "CivShop" ticket in "contact PFA"</h2>
-          <p class="meta">Staff match your Discord and Minecraft names from the ticket.</p>
-          <a class="primary" id="open-ticket" href="https://discord.com/channels/1547194944253460501/1547194946044305426" target="_blank" rel="noopener noreferrer">Click here</a>
+          <h2>Connect Minecraft</h2>
+          <p class="meta" id="mc-meta">Sign in with the Microsoft account that owns your Minecraft Java profile.</p>
+          <button type="button" class="primary" id="btn-minecraft">Connect Minecraft</button>
         </div>
         <div class="verify-step-arrow" aria-hidden="true">&darr;</div>
       </li>
-      <li class="verify-step">
+      <li class="verify-step" id="step-done">
         <div class="verify-step-body">
-          <h2>Fill out the information and wait</h2>
-          <p class="meta">Fill the ticket, then wait for a head admin (up to 24 hours).</p>
+          <h2>You're unlocked</h2>
+          <p class="meta" id="done-meta">Once both are connected you can use the site fully. A head admin may later add the public verified badge (visual only).</p>
         </div>
       </li>
     </ol>
 
-    <p class="meta" id="verify-foot" style="margin-top:18px">Already verified? <a href="../home/">Back to Find</a>. Not signed in? <a id="verify-login" href="../login/">Log in</a>.</p>
+    <p class="meta" id="verify-foot" style="margin-top:18px">Already done? <a href="../home/">Back to Find</a>. Not signed in? <a id="verify-login" href="../login/">Log in</a>.</p>
   </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=24"></script>
+<script src="../app.js?v=26"></script>
 <script>
 (function () {
-  const join = document.getElementById("join-discord");
-  const ticket = document.getElementById("open-ticket");
-  if (join) join.href = PFA_DISCORD_INVITE;
-  if (ticket) ticket.href = PFA_CONTACT_CHANNEL;
   const login = document.getElementById("verify-login");
   if (login) login.href = loginHref();
 })();
 
-(async function () {
+function paintLinked(profile) {
   const status = document.getElementById("verify-status");
   const countdown = document.getElementById("verify-countdown");
-  const steps = document.getElementById("verify-steps");
   const intro = document.getElementById("verify-intro");
   const foot = document.getElementById("verify-foot");
+  const dcMeta = document.getElementById("discord-meta");
+  const mcMeta = document.getElementById("mc-meta");
+  const btnDc = document.getElementById("btn-discord");
+  const btnMc = document.getElementById("btn-minecraft");
+  const stepDone = document.getElementById("step-done");
+
+  const dcOk = !!(profile && profile.discord_id);
+  const mcOk = !!(profile && profile.mc_uuid);
+  const linked = isLinked(profile);
+
+  if (dcOk) {
+    dcMeta.textContent = "Connected as " + (profile.discord_username || profile.discord_id) + ".";
+    btnDc.disabled = true;
+    btnDc.textContent = "Discord connected";
+    btnDc.classList.remove("primary");
+  }
+  if (mcOk) {
+    let t = "Connected as " + (profile.mc_username || "Minecraft");
+    if (profile.civinfo_known === true) t += " · seen on CivInfo";
+    else if (profile.civinfo_known === false) t += " · not found on CivInfo (ok)";
+    mcMeta.textContent = t + ".";
+    btnMc.disabled = true;
+    btnMc.textContent = "Minecraft connected";
+    btnMc.classList.remove("primary");
+  }
+
+  if (profile && profile.verified_at) {
+    intro.hidden = true;
+    document.getElementById("verify-steps").hidden = true;
+    countdown.hidden = true;
+    status.hidden = false;
+    status.className = "msg ok";
+    status.innerHTML = `<b>You're verified.</b> Public badge is on. <a href="../home/">Go to Find</a> · <a href="../dashboard/">My shops</a>`;
+    foot.innerHTML = `<a href="../home/">Back to Find</a>`;
+    return;
+  }
+
+  if (linked) {
+    status.hidden = false;
+    status.className = "msg ok";
+    status.innerHTML = `<b>Accounts connected.</b> You can use shops, comments, and reviews. A head admin may add the public verified badge later.`;
+    countdown.hidden = true;
+    if (stepDone) stepDone.classList.add("verify-step-done");
+    return;
+  }
+
+  if (needsVerification(profile)) {
+    countdown.hidden = false;
+    countdown.innerHTML = `<b>${esc(deleteCountdownText(profile.created_at))}</b>.`;
+  }
+}
+
+async function startLink(provider, btn) {
+  const status = document.getElementById("verify-status");
+  status.hidden = false;
+  setMsg(status, "Opening " + (provider === "discord" ? "Discord" : "Microsoft") + "…");
+  btn.disabled = true;
+  const r = await startOAuthLink(provider);
+  if (!r.ok) {
+    setMsg(status, r.message, "err");
+    btn.disabled = false;
+    return;
+  }
+  location.href = r.data.url;
+}
+
+(async function () {
+  const status = document.getElementById("verify-status");
+  const q = new URLSearchParams(location.search);
+  const oauthErr = q.get("error_description") || q.get("error");
+  const code = q.get("code");
+  const state = q.get("state");
 
   const session = await getSession();
   if (!session) {
     status.hidden = false;
     status.className = "msg";
-    status.innerHTML = `You're not logged in. You can still follow the steps below, then <a href="${esc(loginHref())}">log in</a> with the account you want verified.`;
+    status.innerHTML = `You're not logged in. <a href="${esc(loginHref())}">Log in</a> first, then connect Discord and Minecraft.`;
+    document.getElementById("btn-discord").disabled = true;
+    document.getElementById("btn-minecraft").disabled = true;
     return;
   }
-  const profile = await getProfile(session.user.id);
+
+  let profile = await getProfile(session.user.id);
   if (!profile) {
     status.hidden = false;
     setMsg(status, "Couldn't load your profile.", "err");
     return;
   }
-  if (profile.verified_at) {
-    intro.hidden = true;
-    steps.hidden = true;
-    countdown.hidden = true;
+
+  if (oauthErr) {
     status.hidden = false;
-    status.className = "msg ok";
-    status.innerHTML = `<b>You're verified.</b> You can comment, review, upload pictures, and create shops. <a href="../home/">Go to Find</a> \u00b7 <a href="../dashboard/">My shops</a>`;
-    foot.innerHTML = `<a href="../home/">Back to Find</a>`;
-    return;
-  }
-  if (needsVerification(profile)) {
-    countdown.hidden = false;
-    countdown.innerHTML = `<b>${esc(deleteCountdownText(profile.created_at))}</b>. Verify before then so your account isn't removed.`;
-  } else {
+    setMsg(status, oauthErr, "err");
+    history.replaceState({}, "", pageHref("verify"));
+  } else if (code && state) {
     status.hidden = false;
-    status.className = "msg";
-    status.textContent = "Your account isn't marked verified yet. Follow the steps below if you still need staff to accept you.";
+    setMsg(status, "Finishing connection…");
+    const r = await finishOAuthLink(code, state);
+    history.replaceState({}, "", pageHref("verify"));
+    if (!r.ok) {
+      setMsg(status, r.message, "err");
+    } else {
+      setMsg(status, r.data.provider === "discord"
+        ? "Discord connected as " + (r.data.discord_username || "you") + "."
+        : "Minecraft connected as " + (r.data.mc_username || "you") + ".", "ok");
+      profile = await getProfile(session.user.id) || profile;
+      renderNav().catch(() => {});
+    }
   }
+
+  paintLinked(profile);
+
+  document.getElementById("btn-discord").onclick = function () {
+    if (profile.discord_id) return;
+    startLink("discord", this);
+  };
+  document.getElementById("btn-minecraft").onclick = function () {
+    if (profile.mc_uuid) return;
+    startLink("minecraft", this);
+  };
 })();
 </script>
 </body>

@@ -89,7 +89,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=24"></script>
+<script src="../app.js?v=26"></script>
 <script>
 const params = new URLSearchParams(location.search);
 // /shops/?id=1 · /shops/1/ · /shops/pfa-exchange/ · /shops/?slug=pfa-exchange
@@ -122,7 +122,7 @@ let hlListingId = focusId ? String(focusId) : null;
 let reviewCache = [];
 let reviewSort = "newest";
 
-const verifyHelp = () => `Verified accounts only. <a href="../verify/">Verify here</a> (${PFA_HELP}).`;
+const verifyHelp = () => `Connect Discord and Minecraft first. <a href="../verify/">Verify here</a>.`;
 
 function paintFavBtn() {
   const fb = document.getElementById("favbtn");
@@ -517,7 +517,7 @@ async function loadReviews(staff, isOwner) {
   const form = document.getElementById("rform");
   if (!me) form.innerHTML = `<p class="meta"><a href="${loginHref()}">Log in</a> to review this shop.</p>`;
   else if (isOwner) form.innerHTML = `<p class="meta">You can't review your own shop. Use Reply on a review to respond.</p>`;
-  else if (!isVerified(me)) form.innerHTML = `<p class="note">${verifyHelp()}</p>`;
+  else if (!hasAccountAccess(me)) form.innerHTML = `<p class="note">${verifyHelp()}</p>`;
   else if (sharedAccount(me)) form.innerHTML = `<p class="meta">Nation and business accounts can't leave reviews.</p>`;
   else if (mineExists) form.innerHTML = `<p class="meta">You've reviewed this shop. Delete your review to write a new one.</p>`;
   else if (!form.querySelector("textarea")) {
@@ -554,7 +554,7 @@ function commentHtml(c, rootId, staff) {
   const pr = c.profiles;
   const isOwnerAuthor = userOwnsShop(shop, c.author_id);
   let b = "";
-  if (isVerified(me) && !sharedAccount(me)) b += iconBtn("reply", { title: "Reply", attrs: `data-act="reply" data-root="${rootId}" data-name="${esc(userName(pr))}"` });
+  if (hasAccountAccess(me) && !sharedAccount(me)) b += iconBtn("reply", { title: "Reply", attrs: `data-act="reply" data-root="${rootId}" data-name="${esc(userName(pr))}"` });
   if (!mine) b += iconBtn("flag", { cls: "btn-report", title: "Report comment", attrs: `data-act="report" data-type="comment" data-id="${c.id}"` });
   if (staff) b += iconBtn(c.timed_out ? "eye" : "eyeOff", { cls: "btn-timeout", title: c.timed_out ? "Unhide comment" : "Hide comment", attrs: `data-act="comment-timeout" data-id="${c.id}" data-to="${c.timed_out ? 0 : 1}"` });
   if (me && (me.is_admin || mine)) b += iconBtn("trash", { danger: true, title: "Delete comment", attrs: `data-act="comment-delete" data-id="${c.id}" data-path="${esc(c.image_path || "")}"` });
@@ -588,7 +588,7 @@ async function loadComments(staff) {
 
   const form = document.getElementById("cform");
   if (!me) form.innerHTML = `<p class="meta"><a href="${loginHref()}">Log in</a> to comment or report.</p>`;
-  else if (!isVerified(me)) form.innerHTML = `<p class="note">${verifyHelp()}</p>`;
+  else if (!hasAccountAccess(me)) form.innerHTML = `<p class="note">${verifyHelp()}</p>`;
   else if (sharedAccount(me)) form.innerHTML = `<p class="meta">Nation and business accounts can't comment.</p>`;
   else if (!form.querySelector("textarea")) form.innerHTML = composerHtml("", "Say something about this shop (500 characters max). You can add a picture too.");
 }
@@ -799,7 +799,7 @@ async function handleInvite() {
     return "already";
   }
   if (stillTimedOut(me)) return "timeout";
-  if (!isVerified(me)) return "verify";
+  if (!hasAccountAccess(me)) return "verify";
   const yes = await confirmModal({
     title: "Join as co-owner",
     body: `Join ${shopNameText} as a co-owner? You will be able to edit it from My Shops. This link works once.`,
@@ -825,7 +825,7 @@ async function boot() {
   const next = await handleInvite();
   if (next === "stop") return;
   await load();
-  if (next === "verify") setMsg(msg, "Verify your account before you can join this shop as a co-owner.", "err");
+  if (next === "verify") setMsg(msg, "Connect Discord and Minecraft before you can join this shop as a co-owner.", "err");
   else if (next === "timeout") setMsg(msg, "Your account is timed out, so you can't join this shop.", "err");
   else if (next === "already") setMsg(msg, "You already have access to this shop.", "ok");
   else if (params.get("joined") === "1") {

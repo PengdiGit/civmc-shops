@@ -1,6 +1,7 @@
-// PUBLIC self-signup. The new account is UNVERIFIED: it can log in and comment, but can't
-// make shops until the head admin accepts it. Roles can never be picked here.
-// (also deletes unverified accounts older than 24h)
+// PUBLIC self-signup. Username + password only.
+// Account stays guest-level until Discord + Minecraft are linked via link-oauth.
+// Public verified badge still requires head admin Accept.
+// Also deletes incomplete (unlinked, non-staff) accounts older than 24h.
 // Deploy: supabase functions deploy signup
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -11,14 +12,19 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-
-// Unverified accounts are deleted 24 hours after signup (staff accounts are never touched).
 async function purgeExpired(admin: ReturnType<typeof createClient>) {
   const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const { data: old, error } = await admin.from("profiles").select("id")
-    .is("verified_at", null).eq("is_admin", false).eq("is_mod", false).eq("is_head", false).lt("created_at", cutoff);
+  const { data: old, error } = await admin.from("profiles").select("id, discord_id, mc_uuid")
+    .is("verified_at", null)
+    .eq("is_admin", false).eq("is_mod", false).eq("is_head", false)
+    .eq("is_business", false).eq("is_nation", false)
+    .lt("created_at", cutoff);
   if (error) return;
-  for (const o of old || []) await admin.auth.admin.deleteUser(o.id);   // cascades to their profile + comments
+  for (const o of old || []) {
+    // Keep accounts that finished linking (awaiting Accept badge)
+    if (o.discord_id && o.mc_uuid) continue;
+    await admin.auth.admin.deleteUser(o.id);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -29,13 +35,9 @@ Deno.serve(async (req) => {
   const body = await req.json();
   const username = String(body.username || "").trim().toLowerCase();
   const password = String(body.password || "");
-  const mc = String(body.mc_username || "").trim();
-  const discord = String(body.discord_username || "").trim();
 
   if (!/^[a-z0-9_]{3,20}$/.test(username)) return json({ error: "Login username: 3-20 letters, numbers or _." }, 400);
   if (password.length < 8 || password.length > 72) return json({ error: "Password needs 8-72 characters." }, 400);
-  if (!mc || mc.length > 32) return json({ error: "Enter your Minecraft name (max 32 characters)." }, 400);
-  if (discord.length < 2 || discord.length > 40) return json({ error: "Enter your Discord username." }, 400);
 
   const { data: created, error } = await admin.auth.admin.createUser({
     email: username + "@civmc.local", password, email_confirm: true,
@@ -46,8 +48,12 @@ Deno.serve(async (req) => {
   }
 
   const { error: pErr } = await admin.from("profiles").insert({
-    id: created.user.id, username, mc_username: mc, discord_username: discord,
-    verified_at: null, must_change_password: false,   // picked their own password, no popup
+    id: created.user.id,
+    username,
+    mc_username: null,
+    discord_username: null,
+    verified_at: null,
+    must_change_password: false,
   });
   if (pErr) {
     await admin.auth.admin.deleteUser(created.user.id);

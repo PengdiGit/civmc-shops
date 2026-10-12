@@ -13,27 +13,23 @@
     <span class="page-eyebrow">Account</span>
     <h1>Sign up</h1>
     <p class="sub">Already have an account? <a id="login-link" href="../login/">Log in</a>.</p>
-    <p class="meta" style="margin:0 0 14px">Verify within 24 hours or the account is deleted. Until then you can browse, favourite, and report.</p>
+    <p class="meta" style="margin:0 0 14px">Pick a login and password. Then connect Discord and Minecraft to unlock shops, comments, and reviews. Until then you can browse, favourite, and report.</p>
 
     <form class="stack" id="form">
       <label for="u">Login username</label>
       <input id="u" type="text" autocomplete="username" required placeholder="3-20 letters, numbers or _">
       <label for="p">Password</label>
       <input id="p" type="password" autocomplete="new-password" required minlength="8" placeholder="8+ characters">
-      <label for="mc">Minecraft username</label>
-      <input id="mc" type="text" required maxlength="32">
-      <label for="dc">Discord username</label>
-      <input id="dc" type="text" required maxlength="40">
       <div class="msg" id="msg"></div>
       <button class="primary" type="submit">Create account</button>
     </form>
-    <p class="meta" style="margin-top:14px">Next: <a href="../verify/">verify your account</a> on Discord (up to 24 hours).</p>
+    <p class="meta" style="margin-top:14px">Next: <a href="../verify/">connect Discord + Minecraft</a> (within 24 hours).</p>
   </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=24"></script>
+<script src="../app.js?v=26"></script>
 <script>
 (function () {
   const q = new URLSearchParams(location.search);
@@ -47,7 +43,7 @@ getSession().then(s => { if (s) goPostAuth(); });
 
 async function showSignupSuccess() {
   const wrap = document.getElementById("signup-wrap");
-  let countdown = "your account will be deleted in 24h 0m";
+  let countdown = "connect Discord + Minecraft within 24h 0m or the account may be deleted";
   try {
     const s = await getSession();
     const p = s && await getProfile(s.user.id);
@@ -56,13 +52,13 @@ async function showSignupSuccess() {
   wrap.innerHTML = `
     <span class="page-eyebrow">Almost there</span>
     <h1>Account created</h1>
-    <p class="sub msg ok" style="margin-bottom:14px">Signed in. Verify next to unlock shops, comments, and reviews.</p>
-    <p class="meta" style="margin:0 0 14px">Unverified accounts are deleted in about 24 hours (<b>${esc(countdown)}</b>).</p>
+    <p class="sub msg ok" style="margin-bottom:14px">Signed in. Connect Discord and Minecraft to unlock shops, comments, and reviews.</p>
+    <p class="meta" style="margin:0 0 14px"><b>${esc(countdown)}</b>.</p>
     <div class="row" style="flex-wrap:wrap;gap:10px;margin-bottom:12px">
-      <a class="primary" href="../verify/">Verify your account</a>
+      <a class="primary" href="../verify/">Connect accounts</a>
       <a class="small" href="../home/">Browse shops</a>
     </div>
-    <p class="meta">Steps are on the verify page.</p>`;
+    <p class="meta">Until then you can browse, favourite, and report like a guest.</p>`;
   renderNav().catch(() => {});
 }
 
@@ -72,11 +68,7 @@ document.getElementById("form").addEventListener("submit", async e => {
   setMsg(msg, "Creating your account...");
   const username = document.getElementById("u").value.trim().toLowerCase();
   const password = document.getElementById("p").value;
-  const r = await callFn("signup", {
-    username, password,
-    mc_username: document.getElementById("mc").value.trim(),
-    discord_username: document.getElementById("dc").value.trim()
-  });
+  const r = await callFn("signup", { username, password });
   if (!r.ok) { setMsg(msg, r.message, "err"); return; }
   const { error } = await sb.auth.signInWithPassword({ email: username + FAKE_DOMAIN, password });
   if (error) { setMsg(msg, "Account made, but login failed. Try logging in.", "err"); return; }
