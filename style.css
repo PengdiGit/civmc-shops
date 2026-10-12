@@ -2006,6 +2006,7 @@ body.find-page > main {
 }
 body.org-business.profile-page .profile-hero-side {
   align-self: start;
+  padding-top: 28px;
 }
 body.org-nation.profile-page .profile-hero-side {
   align-self: center;
