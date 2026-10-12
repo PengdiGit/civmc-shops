@@ -200,15 +200,15 @@ function absPageHref(slug, search, hash) {
   const path = rel.replace(/^\/civmc-shops(?=\/|$)/, "") || "/";
   return SITE_PUBLIC + (path.startsWith("/") ? path : "/" + path);
 }
-/** Login username for pretty /profile/{username}/ URLs (lowercase). */
+/** Login username for /profile/?name= URLs (lowercase). */
 function profileUsername(p) {
   const u = String((p && (p.username || p.login_username)) || "").trim().toLowerCase();
   return /^[a-z0-9_]{3,20}$/.test(u) ? u : "";
 }
-/** Site-relative profile path: /profile/pengdi/ (preferred) or /profile/?id=… */
+/** Site-relative profile path. Uses the real /profile/ page so new accounts don't 404. */
 function profilePath(p, idFallback) {
   const u = profileUsername(p);
-  if (u) return siteBase() + "/profile/" + encodeURIComponent(u) + "/";
+  if (u) return pageHref("profile", { name: u });
   const id = (p && p.id) || idFallback;
   if (id) return pageHref("profile", { id });
   return pageHref("profile");
@@ -216,9 +216,9 @@ function profilePath(p, idFallback) {
 /** Absolute share URL on civshops.pengworld.net */
 function profileShareUrl(p, idFallback) {
   const u = profileUsername(p);
-  if (u) return SITE_PUBLIC + "/profile/" + encodeURIComponent(u) + "/";
+  if (u) return SITE_PUBLIC + "/profile/?name=" + encodeURIComponent(u);
   const id = (p && p.id) || idFallback;
-  if (id) return SITE_PUBLIC + "/profile/" + encodeURIComponent(String(id)) + "/";
+  if (id) return SITE_PUBLIC + "/profile/?id=" + encodeURIComponent(String(id));
   return SITE_PUBLIC + "/profile/";
 }
 /** URL slug from a shop name: "PFA Exchange" → "pfa-exchange" */
@@ -270,7 +270,7 @@ function shopShareUrl(shop, search, peers) {
 }
 /**
  * Shareable URL on civshops.pengworld.net.
- * Shops: /shops/{name-slug}/ · Profiles: /profile/{username}/
+ * Shops: /shops/{name-slug}/ · Profiles: /profile/?name={username}
  * params: { shop, shopName, listing, profile, name, username, item, enchant, q, mode }
  */
 function embedHref(params) {
@@ -293,9 +293,9 @@ function embedHref(params) {
   }
   const uname = String(p.username || p.name || "").trim().toLowerCase();
   if (uname && /^[a-z0-9_]{3,20}$/.test(uname)) {
-    return SITE_PUBLIC + "/profile/" + encodeURIComponent(uname) + "/";
+    return profileShareUrl({ username: uname });
   }
-  if (p.profile) return SITE_PUBLIC + "/profile/" + encodeURIComponent(String(p.profile)) + "/";
+  if (p.profile) return profileShareUrl(null, p.profile);
   if (p.item) {
     const q = { item: p.item };
     if (p.enchant) q.enchant = p.enchant;
@@ -1758,7 +1758,7 @@ function linkMentions(text) {
   // turn @McName into profile search links (resolved later if we have a map); plain escaped with @Name as link to search
   const escText = esc(text);
   return escText.replace(/@([A-Za-z0-9_]{2,32})/g, (m, name) =>
-    `<a class="mention" href="${siteBase()}/profile/${encodeURIComponent(String(name).toLowerCase())}/">@${esc(name)}</a>`);
+    `<a class="mention" href="${pageHref("profile", { name: String(name).toLowerCase() })}">@${esc(name)}</a>`);
 }
 async function copyText(text) {
   const value = text == null ? "" : String(text);
