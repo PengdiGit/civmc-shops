@@ -2007,6 +2007,9 @@ body.find-page > main {
 body.org-business.profile-page .profile-hero-side {
   align-self: start;
 }
+body.org-nation.profile-page .profile-hero-side {
+  align-self: center;
+}
 .profile-hero > #actions {
   grid-column: 2;
   margin-top: 4px;
