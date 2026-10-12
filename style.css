@@ -2611,16 +2611,19 @@ body.shop-page {
 body.shop-page .shop-storefront {
   margin-top: 8px;
   padding: 16px 18px 14px;
-  padding-right: 72px;
 }
-body.shop-page .shop-storefront .back { display: inline-block; margin-bottom: 10px; }
+body.shop-page .shop-hero-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+body.shop-page .shop-storefront .back { display: inline-block; margin-bottom: 0; }
 body.shop-page .shop-storefront .top { margin-top: 0 !important; }
-body.shop-page .shop-storefront .shop-hero-actions {
-  position: absolute;
-  top: 12px;
-  right: 14px;
-  z-index: 2;
+body.shop-page .shop-storefront .shop-hero-actions { position: static; }
+body.shop-page .shop-jump-feedback {
+  height: 32px; padding: 0 10px; border-radius: 8px; white-space: nowrap;
 }
+body.shop-page #shop-reviews { scroll-margin-top: calc(var(--top-chrome-h) + var(--nav-h) + 10px); }
 body.shop-page .shop-storefront #shop-mod-actions {
   display: contents;
 }
