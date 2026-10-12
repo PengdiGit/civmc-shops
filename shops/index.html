@@ -13,17 +13,20 @@
 <meta property="og:url" content="https://civshops.pengworld.net/shops/">
 <meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/chest.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="../style.css?v=20">
+<link rel="stylesheet" href="../style.css?v=22">
 </head>
 <body class="shop-page">
 <nav id="nav"></nav>
 <main>
   <header class="page-hero shop-storefront">
-    <a class="back" href="../home/">&larr; Back to search</a>
-    <div class="action-cluster shop-hero-actions" id="shop-actions">
-      <button type="button" id="favbtn" class="icon-btn" data-act="fav" hidden title="Favourite this shop" aria-label="Favourite this shop" data-ico="star"></button>
-      <button type="button" id="sharebtn" data-act="share" data-ico="share" title="Copy link to this shop" aria-label="Share shop"></button>
-      <span id="shop-mod-actions"></span>
+    <div class="shop-hero-bar">
+      <a class="back" href="../home/">&larr; Back to search</a>
+      <div class="action-cluster shop-hero-actions" id="shop-actions">
+        <button type="button" class="small shop-jump-feedback" data-act="jump-feedback" title="Jump to reviews and comments">Reviews &amp; comments</button>
+        <button type="button" id="favbtn" class="icon-btn" data-act="fav" hidden title="Favourite this shop" aria-label="Favourite this shop" data-ico="star"></button>
+        <button type="button" id="sharebtn" data-act="share" data-ico="share" title="Copy link to this shop" aria-label="Share shop"></button>
+        <span id="shop-mod-actions"></span>
+      </div>
     </div>
     <div class="top">
       <div class="shophead"><span id="shopicon"></span><div><h1 id="name">Loading...</h1><div id="rating"></div></div></div>
@@ -54,7 +57,7 @@
     </div>
   </div>
 
-  <div class="row" style="align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:18px 0 8px">
+  <div class="row" id="shop-reviews" style="align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:18px 0 8px">
     <h2 style="margin:0">Reviews</h2>
     <label class="meta" style="display:flex;align-items:center;gap:6px">Sort
       <select id="rsort" aria-label="Sort reviews">
@@ -613,6 +616,13 @@ document.querySelector("main").addEventListener("click", async e => {
     const r = toggleComparePin(comparePins, l, shop, false);
     if (!r.ok) { setMsg(msg, r.error, "err"); return; }
     renderShopCompare();
+    return;
+  }
+  if (act === "jump-feedback") {
+    const el = document.getElementById("shop-reviews");
+    if (!el) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
     return;
   }
   if (act === "share") {
