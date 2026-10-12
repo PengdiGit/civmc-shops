@@ -176,7 +176,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../items.js"></script>
-<script src="../app.js?v=24"></script>
+<script src="../app.js?v=25"></script>
 <script src="../place-picker.js"></script>
 <script>
 const q = document.getElementById("q");
@@ -509,8 +509,11 @@ function renderRecentChips() {
     return;
   }
   label.hidden = false;
-  wrap.innerHTML = list.map((r, i) =>
-    `<button type="button" data-recent="${i}" title="${esc(r.mode)}">${esc(r.q)}</button>`).join("");
+  wrap.innerHTML = list.map((r, i) => {
+    const label = (r.mode === "sell" || r.mode === "want") && typeof formatItemName === "function"
+      ? formatItemName(r.q) : r.q;
+    return `<button type="button" data-recent="${i}" title="${esc(r.mode)}">${esc(label)}</button>`;
+  }).join("");
 }
 function listingUnitOf(l, buying) {
   return buying ? (l.want_unit || "") : (l.sell_unit || "");
@@ -1127,14 +1130,15 @@ async function showItems(term) {
     heading.textContent = 'Listings with enchant "' + term + '"';
     title = term + " enchants - CivMC Shops";
   } else {
-    heading.textContent = (mode.value === "sell" ? "Shops selling " : "Shops buying ") + term;
-    title = (mode.value === "sell" ? "Selling " : "Buying ") + term + " - CivMC Shops";
+    const shown = typeof formatItemName === "function" ? formatItemName(term) : term;
+    heading.textContent = (mode.value === "sell" ? "Shops selling " : "Shops buying ") + shown;
+    title = (mode.value === "sell" ? "Selling " : "Buying ") + shown + " - CivMC Shops";
   }
   setPageMeta({
     title,
     description: enchantMode
       ? "Listings with enchant \"" + term + "\" on CivMC Shops."
-      : ((mode.value === "sell" ? "Shops selling " : "Shops buying ") + term + " on CivMC Shops."),
+      : heading.textContent + " on CivMC Shops.",
     url: absPageHref("home", { q: term, mode: mode.value }),
     image: enchantMode ? itemImg("enchanted book") : itemImg(term)
   });
@@ -1156,8 +1160,13 @@ async function showItems(term) {
     query = query.ilike("enchants", "%" + safeTerm + "%");
   } else {
     const col = mode.value === "sell" ? "sell_item" : "want_item";
-    // Match item name OR enchants (so "silk touch" / "protection" finds gear)
-    query = query.or(`${col}.ilike.%${safeTerm}%,enchants.ilike.%${safeTerm}%`);
+    // Match item name OR enchants; expand Civ aliases (fossil ↔ prismarine shard)
+    const needles = (typeof itemSearchNeedles === "function" ? itemSearchNeedles(safeTerm) : [safeTerm])
+      .map(t => String(t).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    const uniq = [...new Set(needles.length ? needles : [safeTerm])];
+    const parts = uniq.flatMap(t => [`${col}.ilike.%${t}%`, `enchants.ilike.%${t}%`]);
+    query = query.or(parts.join(","));
   }
   if (inStockOnly) query = query.eq("in_stock", true);
   if (!enchantMode && enchantFilter) {
@@ -1182,7 +1191,12 @@ async function showItems(term) {
         uq = uq.ilike("enchants", "%" + safeTerm + "%");
       } else {
         const col = mode.value === "sell" ? "sell_item" : "want_item";
-        uq = uq.or(`${col}.ilike.%${safeTerm}%,enchants.ilike.%${safeTerm}%`);
+        const needles = (typeof itemSearchNeedles === "function" ? itemSearchNeedles(safeTerm) : [safeTerm])
+          .map(t => String(t).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim())
+          .filter(Boolean);
+        const uniq = [...new Set(needles.length ? needles : [safeTerm])];
+        const parts = uniq.flatMap(t => [`${col}.ilike.%${t}%`, `enchants.ilike.%${t}%`]);
+        uq = uq.or(parts.join(","));
       }
       // Unknowns are discoveries — show even when out of stock (common for /cti punches).
       if (!enchantMode && enchantFilter) {
@@ -1252,7 +1266,13 @@ wireSearchAutocomplete(q, term => {
     return names.filter(n => !t || norm(n).includes(t)).slice(0, 8);
   }
   if (typeof ITEMS === "undefined") return [];
-  return ITEMS.filter(i => !t || norm(i).includes(t) || norm(i).startsWith(t)).slice(0, 8);
+  const match = i => !t || (typeof itemMatchesSearch === "function"
+    ? itemMatchesSearch(i, t)
+    : (norm(i).includes(t) || norm(i).startsWith(t)));
+  // Suggest display names (fossil) while still matching storage ids (prismarine shard).
+  return ITEMS.filter(match)
+    .map(i => typeof formatItemName === "function" ? formatItemName(i) : i)
+    .slice(0, 8);
 }, { onAccept: () => { /* leave search to Enter / button */ } });
 
 if (typeof bindSearchCombo === "function") {

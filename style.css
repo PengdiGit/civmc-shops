@@ -2152,6 +2152,8 @@ body.profile-page .profile-shop-grid .shop-card.card:hover {
   background: color-mix(in srgb, var(--panel) 82%, var(--bg));
   border-radius: 0 var(--radius) var(--radius) 0;
 }
+.owner-reply .cname { flex-wrap: wrap; }
+.owner-reply .cname img.avatar { width: 24px; height: 24px; border-radius: 4px; }
 .owner-reply .body { margin: 4px 0 2px; }
 .owner-reply .tag.owner { margin-right: 4px; }
 .hl-swatches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

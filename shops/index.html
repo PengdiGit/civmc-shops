@@ -89,7 +89,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=24"></script>
+<script src="../app.js?v=25"></script>
 <script>
 const params = new URLSearchParams(location.search);
 // /shops/?id=1 · /shops/1/ · /shops/pfa-exchange/ · /shops/?slug=pfa-exchange
@@ -139,6 +139,9 @@ function paintFavBtn() {
 
 function listingMatchesFind(l) {
   if (!findQ) return false;
+  if (typeof itemMatchesSearch === "function") {
+    return itemMatchesSearch(l.sell_item, findQ) || itemMatchesSearch(l.want_item, findQ);
+  }
   return norm(l.sell_item + " " + l.want_item).includes(findQ);
 }
 function isFindHighlight(l) {
@@ -212,7 +215,12 @@ function paintListings(staff, isOwner) {
   const q = norm(document.getElementById("lq").value);
   const stock = document.getElementById("lstock").value;
   let list = sortListingsOwnerOrder(allListings, shop);
-  if (q) list = list.filter(l => (l.sell_item + " " + l.want_item).includes(q));
+  if (q) {
+    list = list.filter(l => typeof itemMatchesSearch === "function"
+      ? (itemMatchesSearch(l.sell_item, q) || itemMatchesSearch(l.want_item, q)
+        || norm(String(l.enchants || "")).includes(q))
+      : (l.sell_item + " " + l.want_item).includes(q));
+  }
   if (stock === "hide" || stock === "in") list = list.filter(l => !listingIsOut(l) && !l.timed_out);
   if (stock === "out") list = list.filter(l => listingIsOut(l) || l.timed_out);
   document.getElementById("lcount").textContent = list.length + " shown";
@@ -470,6 +478,12 @@ function paintReviewList(staff, isOwner) {
     " " + honestyBadge(allListings, honestyHistory) +
     (traded ? ` <span class="tag ok" title="Reviewers who checked I traded here">${traded} traded here</span>` : "");
 
+  // Owner reply avatar: shop owner profile; prefer live self when viewing as primary owner
+  const ownerPr = (me && shop && String(shop.owner_id) === String(me.id))
+    ? me
+    : (shop && shop.profiles);
+  const ownerId = shop && shop.owner_id;
+
   box.innerHTML = list.length ? list.map(r => {
     const mine = me && r.author_id === me.id;
     let b = "";
@@ -495,7 +509,7 @@ function paintReviewList(staff, isOwner) {
           <span class="action-cluster">${b}</span>
         </div>
         ${r.body ? `<p class="body">${linkMentions(r.body)}</p>` : ""}
-        ${r.owner_reply ? `<div class="owner-reply"><span class="tag owner">owner reply</span>
+        ${r.owner_reply ? `<div class="owner-reply"><span class="cname">${avatarImg(ownerPr, 24)}${ownerId ? `<a href="${profilePath(ownerPr, ownerId)}">${esc(userName(ownerPr))}</a>` : ""}<span class="tag owner">owner reply</span></span>
           <p class="body">${esc(r.owner_reply)}</p>
           ${r.owner_reply_at ? `<span class="meta">${agoText(r.owner_reply_at)}</span>` : ""}</div>` : ""}
         <div class="replybox" id="rrb-${r.id}"></div>

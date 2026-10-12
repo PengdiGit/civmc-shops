@@ -2,10 +2,19 @@
 // Item names are stored as "oak boat". itemImg() and esc() come from app.js.
 
 // "oak" -> everything with oak in it, "oak boat" -> needs both words, plurals are forgiven
+// Also matches Civ display aliases (e.g. "fossil" → prismarine shard).
 function searchItems(q) {
   const words = q.toLowerCase().replace(/_/g, " ").split(/\s+/).filter(Boolean);
   if (!words.length) return ITEMS;
-  const find = ws => ITEMS.filter(n => ws.every(w => n.includes(w)));
+  const wordHit = (n, w) => {
+    const hay = (n + " " + (typeof formatItemName === "function" ? formatItemName(n) : n)).toLowerCase();
+    if (hay.includes(w)) return true;
+    if (typeof itemSearchNeedles === "function") {
+      return itemSearchNeedles(w).some(needle => hay.includes(needle));
+    }
+    return false;
+  };
+  const find = ws => ITEMS.filter(n => ws.every(w => wordHit(n, w)));
   let hits = find(words);
   if (!hits.length) {
     const singular = words.map(w => (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w));
@@ -13,7 +22,12 @@ function searchItems(q) {
   }
   // names starting with what you typed first, then whole-word matches, then the rest
   const w0 = words[0];
-  const rank = n => (n.startsWith(w0) ? 0 : n.split(" ").includes(w0) ? 1 : 2);
+  const rank = n => {
+    const disp = (typeof formatItemName === "function" ? formatItemName(n) : n).toLowerCase();
+    if (n.startsWith(w0) || disp.startsWith(w0)) return 0;
+    if (n.split(" ").includes(w0) || disp.split(" ").includes(w0)) return 1;
+    return 2;
+  };
   return hits.slice().sort((a, b) => rank(a) - rank(b));
 }
 
@@ -44,9 +58,10 @@ function openItemPicker(onPick) {
     foot.textContent = list.length + " item" + (list.length === 1 ? "" : "s");
     grid.scrollTop = 0;
     if (!list.length) { grid.innerHTML = '<p class="meta" style="grid-column:1/-1">No items match that.</p>'; return; }
-    grid.innerHTML = list.map(n =>
-      `<button type="button" class="pick" data-name="${esc(n)}" title="${esc(n)}"><img src="${itemImg(n)}" alt="${esc(n)}" loading="lazy"></button>`
-    ).join("");
+    grid.innerHTML = list.map(n => {
+      const label = typeof formatItemName === "function" ? formatItemName(n) : n;
+      return `<button type="button" class="pick" data-name="${esc(n)}" title="${esc(label)}"><img src="${itemImg(n)}" alt="${esc(label)}" loading="lazy"></button>`;
+    }).join("");
   }
 
   input.addEventListener("input", draw);
@@ -59,7 +74,10 @@ function openItemPicker(onPick) {
   });
   grid.addEventListener("mouseover", e => {
     const b = e.target.closest("button.pick");
-    if (b) foot.textContent = b.dataset.name;
+    if (b) {
+      const raw = b.dataset.name;
+      foot.textContent = typeof formatItemName === "function" ? formatItemName(raw) : raw;
+    }
   });
   // textures that don't exist show the name as text instead of a broken image
   grid.addEventListener("error", e => {

@@ -525,7 +525,49 @@ function fillItemList() {
 // ------------------------------------------------------------ items, units, deals
 // item textures: the item "oak boat" is Minecraft_Items/oak_boat.png (folder name must match EXACTLY, GitHub Pages is case-sensitive)
 // Always resolve from the site root. Pretty URLs (/shops/{slug}/, /profile/{user}/) are two levels deep, so "../Minecraft_Items" would miss.
-const ITEM_IMG_ALIAS = { essence: "ender eye" }; // Civ slang → eyes of ender
+const ITEM_IMG_ALIAS = {
+  essence: "ender eye", // Civ slang → eyes of ender
+  fossil: "prismarine shard",
+  fossils: "prismarine shard"
+};
+/** CivMC display renames — storage / API / IX ids stay Minecraft names. */
+const ITEM_DISPLAY_RENAMES = {
+  "prismarine shard": "fossil",
+  "prismarine shards": "fossils"
+};
+function formatItemName(name) {
+  const raw = String(name ?? "");
+  const mapped = ITEM_DISPLAY_RENAMES[norm(raw)];
+  return mapped != null ? mapped : raw;
+}
+/** Search needles so fossil ↔ prismarine shard both match (display + storage). */
+function itemSearchNeedles(term) {
+  const t = norm(String(term || ""));
+  if (!t) return [];
+  const needles = new Set([t]);
+  const base = t.length > 3 && t.endsWith("s") && !t.endsWith("ss") ? t.slice(0, -1) : t;
+  if (base === "fossil") {
+    needles.add("fossil");
+    needles.add("fossils");
+    needles.add("prismarine shard");
+    needles.add("prismarine shards");
+  }
+  if (t.includes("prismarine shard") || base === "prismarine shard") {
+    needles.add("prismarine shard");
+    needles.add("prismarine shards");
+    needles.add("fossil");
+    needles.add("fossils");
+  }
+  return [...needles];
+}
+function itemMatchesSearch(itemName, query) {
+  const q = norm(String(query || ""));
+  if (!q) return true;
+  const name = norm(itemName || "");
+  const display = norm(formatItemName(itemName));
+  return itemSearchNeedles(q).some(n => name.includes(n) || display.includes(n))
+    || name.includes(q) || display.includes(q);
+}
 const itemImg = name => {
   const key = norm(name || "");
   const file = ITEM_IMG_ALIAS[key] || key;
@@ -551,9 +593,9 @@ const CURRENCY = { "diamond": 1 };
 
 const rawCount = (amount, unit) => amount * (UNIT_MULT[unit || ""] || 1);
 
-// "[icon] 2 CS diamond"
+// "[icon] 2 CS diamond" — display name may differ from storage id (e.g. fossil)
 function itemText(amount, name, unit, big) {
-  return `<span class="itemline">${itemIcon(name, big)}<b>${amount}${unit ? " " + esc(unit.toUpperCase()) : ""} ${esc(name)}</b></span>`;
+  return `<span class="itemline">${itemIcon(name, big)}<b>${amount}${unit ? " " + esc(unit.toUpperCase()) : ""} ${esc(formatItemName(name))}</b></span>`;
 }
 
 function isBundleItem(name) {
@@ -904,7 +946,7 @@ function bundleContentsPreviewHtml(contents, opts) {
   for (let i = 0; i < 27; i++) {
     const s = bySlot[i];
     if (s) {
-      const tip = [s.item, s.amount > 1 ? "x" + s.amount : "", s.enchants || "", s.notes || ""].filter(Boolean).join(" · ");
+      const tip = [formatItemName(s.item), s.amount > 1 ? "x" + s.amount : "", s.enchants || "", s.notes || ""].filter(Boolean).join(" · ");
       cells += `<span class="bundle-slot filled" title="${esc(tip)}">${itemIcon(s.item, false)}${s.amount > 1 ? `<span class="bundle-qty">${s.amount}</span>` : ""}</span>`;
     } else {
       cells += `<span class="bundle-slot empty" aria-hidden="true"></span>`;
@@ -1026,7 +1068,7 @@ function openBundleContentsEditor(initial) {
     function paint() {
       grid.innerHTML = slots.map((s, i) => {
         if (!s) return `<button type="button" class="bundle-slot empty" data-slot="${i}" title="Empty slot ${i + 1}" aria-label="Empty slot ${i + 1}"></button>`;
-        const tip = [s.item, "x" + s.amount, s.enchants, s.notes].filter(Boolean).join(" · ");
+        const tip = [formatItemName(s.item), "x" + s.amount, s.enchants, s.notes].filter(Boolean).join(" · ");
         return `<button type="button" class="bundle-slot filled" data-slot="${i}" title="${esc(tip)}" aria-label="${esc(tip)}">${itemIcon(s.item, false)}${s.amount > 1 ? `<span class="bundle-qty">${s.amount}</span>` : ""}</button>`;
       }).join("");
     }
@@ -1661,7 +1703,7 @@ function compareMarkdown(pins) {
     const r = dealRate(l, p.buying);
     const place = [s.city, s.nation && s.nation !== s.city ? s.nation : null].filter(Boolean).join(" \u00b7 ");
     lines.push(`${i + 1}. **${shopPlainName(s)}**${place ? ` (${place})` : ""}`);
-    lines.push(`   - ${l.want_amount}${l.want_unit ? " " + l.want_unit.toUpperCase() : ""} ${l.want_item} → ${l.sell_amount}${l.sell_unit ? " " + l.sell_unit.toUpperCase() : ""} ${l.sell_item}`);
+    lines.push(`   - ${l.want_amount}${l.want_unit ? " " + l.want_unit.toUpperCase() : ""} ${formatItemName(l.want_item)} → ${l.sell_amount}${l.sell_unit ? " " + l.sell_unit.toUpperCase() : ""} ${formatItemName(l.sell_item)}`);
     if (r != null) lines.push(`   - ${fmtRate(r)}`);
     if (s.x != null && s.z != null) lines.push(`   - coords \`${s.x}, ${s.z}\` \u00b7 ${mapUrl(s.x, s.z)}`);
     lines.push(`   - shop: ${pageHref("shops", { id: l.shop_id, listing: l.id })}`);
@@ -2818,7 +2860,7 @@ function collectOwnerAlerts(shops, marketByItem) {
       if (listingStaleAlert(l)) {
         alerts.push({
           kind: "stale", listing: l, shop: s,
-          text: `${l.sell_item}: not updated in ${ALERT_STALE_DAYS}+ days`,
+          text: `${formatItemName(l.sell_item)}: not updated in ${ALERT_STALE_DAYS}+ days`,
           key: "stale:" + l.id
         });
       }
@@ -2828,13 +2870,13 @@ function collectOwnerAlerts(shops, marketByItem) {
         const rate = dealRate(l, false);
         alerts.push({
           kind: "overprice", listing: l, shop: s,
-          text: `${l.sell_item}: sell price ~${fmtRate(rate)} vs market ~${fmtRate(med)}`,
+          text: `${formatItemName(l.sell_item)}: sell price ~${fmtRate(rate)} vs market ~${fmtRate(med)}`,
           key: "overprice:" + l.id
         });
       } else if (listingRestockAlert(l)) {
         alerts.push({
           kind: "restock", listing: l, shop: s,
-          text: `${l.sell_item}: ${listingIsOut(l) ? "out of stock (needs restock)" : "stock nearly gone (" + l.stock + ")"}`,
+          text: `${formatItemName(l.sell_item)}: ${listingIsOut(l) ? "out of stock (needs restock)" : "stock nearly gone (" + l.stock + ")"}`,
           key: "restock:" + l.id
         });
       }

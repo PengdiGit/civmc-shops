@@ -82,7 +82,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=24"></script>
+<script src="../app.js?v=25"></script>
 <script>
 const msg = document.getElementById("msg");
 const unitSel = document.getElementById("unit");
@@ -351,15 +351,16 @@ async function renderIntel() {
   }</div>`;
 
   box.hidden = false;
+  const itemLabel = i => typeof formatItemName === "function" ? formatItemName(i) : i;
   box.innerHTML =
     line("Movers (~7 days)", movers, m =>
-      `<div class="rowline"><a href="#" data-open="${esc(m.i)}">${esc(m.i)}</a>
+      `<div class="rowline"><a href="#" data-open="${esc(m.i)}">${esc(itemLabel(m.i))}</a>
         <span class="delta ${m.pct >= 0 ? "up" : "down"}">${m.pct >= 0 ? "+" : ""}${m.pct.toFixed(0)}%</span></div>`) +
     line("Wide spreads", spreads, s =>
-      `<div class="rowline"><a href="#" data-open="${esc(s.i)}">${esc(s.i)}</a>
+      `<div class="rowline"><a href="#" data-open="${esc(s.i)}">${esc(itemLabel(s.i))}</a>
         <span class="meta">\u00d7 range \u00b7 ${s.m.n} shops</span></div>`) +
     line("Thin markets", thin, t =>
-      `<div class="rowline"><a href="#" data-open="${esc(t.i)}">${esc(t.i)}</a>
+      `<div class="rowline"><a href="#" data-open="${esc(t.i)}">${esc(itemLabel(t.i))}</a>
         <span class="tag warn">${t.m.n} shop${t.m.n === 1 ? "" : "s"}</span></div>`);
 }
 document.getElementById("intel").addEventListener("click", e => {
@@ -371,7 +372,7 @@ document.getElementById("intel").addEventListener("click", e => {
 
 function filteredItems() {
   const f = norm(filterEl.value);
-  return Object.keys(byItem).filter(i => !f || i.includes(f))
+  return Object.keys(byItem).filter(i => !f || (typeof itemMatchesSearch === "function" ? itemMatchesSearch(i, f) : i.includes(f)))
     .sort((a, b) => total(b) - total(a) || a.localeCompare(b));
 }
 
@@ -383,7 +384,7 @@ function renderList() {
   document.getElementById("list").innerHTML = items.map(i => {
     const e = byItem[i];
     return `<div class="mrow mrow-market${i === selected ? " sel" : ""}" data-item="${esc(i)}">
-      <span class="itemname">${itemIcon(i, true)}<b>${esc(i)}</b></span>
+      <span class="itemname">${itemIcon(i, true)}<b>${esc(formatItemName(i))}</b></span>
       <span class="m-spark-cell">${marketSparkline(sparkByItem[i], SELL)}</span>
       <span>${priceCell(e.sell)}</span><span>${priceCell(e.buy)}</span>
       <span>${spreadCell(e)}</span>
@@ -400,13 +401,14 @@ async function openItem(item, opts) {
   renderList();
   const d = document.getElementById("detail");
   d.hidden = false;
+  const display = formatItemName(item);
   document.getElementById("d-icon").innerHTML = itemIcon(item, true);
-  document.getElementById("d-name").textContent = item;
+  document.getElementById("d-name").textContent = display;
   const enchantLabel = enchantModeId && enchantModeId !== "plain" ? enchantModeId : "";
-  const title = (enchantLabel ? item + " (" + enchantLabel + ")" : item) + " - Market - CivMC Shops";
+  const title = (enchantLabel ? display + " (" + enchantLabel + ")" : display) + " - Market - CivMC Shops";
   setPageMeta({
     title,
-    description: "Live diamond market rates for " + item + " on CivMC Shops.",
+    description: "Live diamond market rates for " + display + " on CivMC Shops.",
     url: absPageHref("market", { item, ...(enchantLabel ? { enchant: enchantLabel } : {}) }),
     image: itemImg(item)
   });
