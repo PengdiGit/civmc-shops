@@ -88,10 +88,10 @@ function paintLinked(profile) {
   const linked = isLinked(profile);
 
   if (dcOk) {
-    dcMeta.textContent = "Connected as " + (profile.discord_username || profile.discord_id) + ".";
-    btnDc.disabled = true;
-    btnDc.textContent = "Discord connected";
-    btnDc.classList.remove("primary");
+    dcMeta.textContent = "Connected as @" + (profile.discord_username || profile.discord_id) + ".";
+    btnDc.disabled = false;
+    btnDc.textContent = "Update Discord";
+    btnDc.classList.add("primary");
   }
   if (mcOk) {
     let t = "Connected as " + (profile.mc_username || "Minecraft");
