@@ -616,17 +616,20 @@ function applyFindFilters(rows, shopOf, kind) {
   const sellWant = mode.value === "sell" || mode.value === "want";
   return rows.filter(r => {
     const s = shopOf(r);
+    const unknown = kind === "listing" && !!r.is_unknown;
     if (!s || !placeFilterMatch(s, cityFilter, nationFilter)) return false;
-    if (trustedOnly && !isTrustedTrader(s.reviews)) return false;
-    if (minRating) {
+    // Unknowns are unclaimed discoveries — shop trust/rating/directions do not apply.
+    if (!unknown && trustedOnly && !isTrustedTrader(s.reviews)) return false;
+    if (!unknown && minRating) {
       const sum = ratingSummary(s.reviews);
       if (!sum || sum.avg < minRating) return false;
     }
     if (hasLocationOnly && (s.x == null || s.z == null)) return false;
-    if (hasDirectionsOnly && !shopHasDirections(s)) return false;
+    if (!unknown && hasDirectionsOnly && !shopHasDirections(s)) return false;
     if (inStockOnly) {
       if (kind === "listing") {
-        if (!listingIsInStock(r)) return false;
+        // Match showItems: keep OOS unknowns visible (common for /cti punches).
+        if (!unknown && !listingIsInStock(r)) return false;
       } else if (!shopHasInStockListing(s)) {
         return false;
       }
@@ -1189,9 +1192,10 @@ async function showItems(term) {
         const safeEnch = String(enchantFilter).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
         if (safeEnch) uq = uq.ilike("enchants", "%" + safeEnch + "%");
       }
-      const { data: unknowns } = await uq;
-      data = data.concat((unknowns || []).map(mapUnknownListing));
-    } catch (e) { /* head-only soft fail */ }
+      const { data: unknowns, error: unkErr } = await uq;
+      if (unkErr) console.warn("unknown_listings find", unkErr);
+      else data = data.concat((unknowns || []).map(mapUnknownListing));
+    } catch (e) { console.warn("unknown_listings find", e); }
   }
 
   lastItemRows = data;
