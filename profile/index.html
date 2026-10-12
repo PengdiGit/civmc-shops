@@ -10,7 +10,8 @@
 <meta property="og:site_name" content="CivMC Shops">
 <meta property="og:title" content="Profile - CivMC Shops">
 <meta property="og:description" content="CivMC trader profile on CivMC Shops.">
-<meta property="og:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/player_head.png">
+<meta property="og:url" content="https://civshops.pengworld.net/profile/">
+<meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/player_head.png">
 <meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="../style.css?v=21">
 </head>
@@ -106,11 +107,19 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=19"></script>
+<script src="../app.js?v=22"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let id = params.get("id");
-const nameParam = params.get("name");
+let nameParam = params.get("name");
+{
+  const pathSlug = (location.pathname.match(/\/profile\/([^/]+)\/?$/) || [])[1];
+  if (pathSlug) {
+    const slug = decodeURIComponent(pathSlug);
+    if (/^[0-9a-f-]{36}$/i.test(slug)) id = id || slug;
+    else nameParam = nameParam || slug;
+  }
+}
 const msg = document.getElementById("msg");
 const factsEl = document.getElementById("facts");
 let own = false, myId = null, shown = null, myProfile = null;
@@ -289,7 +298,7 @@ async function load() {
       exact = (byMc || []).find(p => p.mc_username && p.mc_username.toLowerCase() === needle);
       hit = exact || (byMc && byMc[0]);
     }
-    if (hit) { id = hit.id; history.replaceState(null, "", pageHref("profile", { id })); }
+    if (hit) id = hit.id;
   }
   if (!id) { setMsg(msg, "No profile picked.", "err"); return; }
   const { data: p } = await sb.from("profiles").select("*").eq("id", id).single();
@@ -299,10 +308,17 @@ async function load() {
 
   const primary = profileDisplayName(p);
   document.title = primary + " - CivMC Shops";
+  const prettyPath = profilePath(p, p.id);
+  try {
+    if ((location.pathname + location.search) !== prettyPath) {
+      history.replaceState(null, "", prettyPath);
+    }
+  } catch (e) {}
+  const shareUrl = profileShareUrl(p, p.id);
   setPageMeta({
     title: primary + " - CivMC Shops",
     description: (stripCodes(p.bio || "") || [p.mc_username && ("MC: " + p.mc_username), p.discord_username && ("Discord: " + p.discord_username)].filter(Boolean).join(" · ") || "CivMC trader").replace(/\s+/g, " ").slice(0, 180),
-    url: absPageHref("profile", { id: p.id }),
+    url: shareUrl,
     image: avatarUrl(p, 128)
   });
   document.getElementById("name").textContent = primary;
@@ -451,7 +467,7 @@ async function load() {
         <div class="review">
           <div class="top">
             <span><span class="stars">${starsText(r.rating)}</span>
-              <a href="../shops/?id=${r.shop_id}">${r.shops ? shopName(r.shops) : "shop"}</a>
+              <a href="${r.shops ? shopPath(r.shops) : pageHref("shops", { id: r.shop_id })}">${r.shops ? shopName(r.shops) : "shop"}</a>
               ${r.traded ? '<span class="tag ok">traded here</span>' : ""}
               <span class="meta">\u00b7 ${agoText(r.created_at)}</span></span>
           </div>
@@ -489,7 +505,7 @@ document.getElementById("follower-count").onclick = async () => {
   const body = people.length
     ? `<div class="follow-modal-list">${people.map(p => {
         const name = profileDisplayName(p);
-        return `<a class="follow-modal-row" href="../profile/?id=${esc(p.id)}">
+        return `<a class="follow-modal-row" href="${profilePath(p, p.id)}">
           <span class="follow-modal-av">${avatarImg(p, 40)}</span>
           <span class="follow-modal-name">${esc(name)}</span>
         </a>`;
@@ -499,9 +515,9 @@ document.getElementById("follower-count").onclick = async () => {
 };
 
 document.getElementById("shareprof").onclick = async () => {
-  const shareUrl = (shown && shown.id) ? embedHref({ profile: shown.id }) : location.href.split("#")[0];
+  const shareUrl = shown ? profileShareUrl(shown, shown.id) : "https://civshops.pengworld.net/profile/";
   const ok = await copyText(shareUrl);
-  setMsg(msg, ok ? "Profile link copied (Discord-friendly embed)." : "Couldn't copy.", ok ? "ok" : "err");
+  setMsg(msg, ok ? "Profile link copied." : "Couldn't copy.", ok ? "ok" : "err");
 };
 
 document.getElementById("toggledit").onclick = () => {

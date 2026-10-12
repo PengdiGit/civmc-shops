@@ -10,7 +10,8 @@
 <meta property="og:site_name" content="CivMC Shops">
 <meta property="og:title" content="Shop - CivMC Shops">
 <meta property="og:description" content="CivMC shop page — listings, reviews, and location.">
-<meta property="og:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/chest.png">
+<meta property="og:url" content="https://civshops.pengworld.net/shops/">
+<meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/chest.png">
 <meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="../style.css?v=20">
 </head>
@@ -85,10 +86,20 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=19"></script>
+<script src="../app.js?v=22"></script>
 <script>
 const params = new URLSearchParams(location.search);
-const shopId = params.get("id");
+// /shops/?id=1 · /shops/1/ · /shops/pfa-exchange/
+let shopId = params.get("id");
+let shopSlugParam = null;
+{
+  const pathSlug = (location.pathname.match(/\/shops\/([^/]+)\/?$/) || [])[1];
+  if (pathSlug) {
+    const slug = decodeURIComponent(pathSlug);
+    if (/^\d+$/.test(slug)) shopId = shopId || slug;
+    else shopSlugParam = slug.toLowerCase();
+  }
+}
 const inviteToken = params.get("invite");
 const focusId = params.get("listing");
 const findQ = norm(params.get("q") || "");
@@ -284,7 +295,30 @@ async function castTip(listingId, vote) {
   paintListings(isStaff(me), viewerOwnsShop());
 }
 
+let shopSlugPeers = null;
+async function loadShopSlugPeers() {
+  if (shopSlugPeers) return shopSlugPeers;
+  const { data: rows } = await sb.from("shops").select("id, name").eq("archived", false).limit(500);
+  shopSlugPeers = rows || [];
+  return shopSlugPeers;
+}
+
+async function resolveShopIdFromSlug(slug) {
+  if (!slug) return null;
+  if (/^\d+$/.test(slug)) return slug;
+  const m = slug.match(/-(\d+)$/);
+  const list = await loadShopSlugPeers();
+  // Prefer unique name-slug; collision landers use name-id
+  let hit = list.find(s => shopSlug(s, list) === slug);
+  if (!hit) hit = list.find(s => (shopSlugBase(s.name) + "-" + s.id) === slug);
+  if (!hit && m) hit = list.find(s => String(s.id) === m[1]);
+  return hit ? String(hit.id) : null;
+}
+
 async function load() {
+  if (!shopId && shopSlugParam) {
+    shopId = await resolveShopIdFromSlug(shopSlugParam);
+  }
   if (!shopId) { setMsg(msg, "No shop picked.", "err"); return; }
 
   const session = await getSession();
@@ -307,14 +341,23 @@ async function load() {
   }
   shop = s;
   document.title = s.name + " - CivMC Shops";
+  const peers = await loadShopSlugPeers();
+  // Pretty share URL in the address bar: /shops/pfa-exchange/
+  try {
+    const pretty = shopPath(s, hlListingId ? { listing: hlListingId } : null, peers);
+    if ((location.pathname + location.search) !== pretty) {
+      history.replaceState(null, "", pretty);
+    }
+  } catch (e) {}
   const placePlain = [canonicalPlace(s.city), canonicalPlace(s.nation)].filter(Boolean)
     .filter((v, i, a) => a.findIndex(x => String(x).toLowerCase() === String(v).toLowerCase()) === i)
     .join(" · ");
   const placeBits = [placePlain, s.x != null && s.z != null ? s.x + ", " + s.z : ""].filter(Boolean).join(" · ");
+  const shareUrl = shopShareUrl(s, null, peers);
   setPageMeta({
     title: s.name + " - CivMC Shops",
     description: (stripCodes(s.description || "") || placeBits || "CivMC shop").replace(/\s+/g, " ").slice(0, 180),
-    url: absPageHref("shops", { id: s.id, ...(hlListingId ? { listing: hlListingId } : {}) }),
+    url: shareUrl,
     image: s.icon_path ? publicUrl(s.icon_path) : itemImg(s.icon_item || "chest")
   });
   document.getElementById("name").innerHTML = shopName(s) + (saleBadgeHtml(s) ? " " + saleBadgeHtml(s) : "");
@@ -437,7 +480,7 @@ function paintReviewList(staff, isOwner) {
     return `
       <div class="review" id="review-${r.id}">
         <div class="top">
-          <span class="cname">${avatarImg(pr, 24)}<a href="../profile/?id=${r.author_id}">${esc(userName(pr))}</a>
+          <span class="cname">${avatarImg(pr, 24)}<a href="${profilePath(pr, r.author_id)}">${esc(userName(pr))}</a>
             <span class="stars">${starsText(r.rating)}</span>
             ${pr && pr.is_nation ? '<span class="tag role-nation">nation</span>' : ""}
             ${pr && pr.is_business ? '<span class="tag role-business">business</span>' : ""}
@@ -512,7 +555,7 @@ function commentHtml(c, rootId, staff) {
   return `
     <div class="comment" id="comment-${c.id}">
       <div class="head">
-        <span class="cname">${avatarImg(pr, 24)}<a href="../profile/?id=${c.author_id}">${esc(userName(pr))}</a>
+        <span class="cname">${avatarImg(pr, 24)}<a href="${profilePath(pr, c.author_id)}">${esc(userName(pr))}</a>
           ${isOwnerAuthor ? '<span class="tag owner">owner</span>' : ""}
           ${pr && pr.is_nation ? '<span class="tag role-nation">nation</span>' : ""}
           ${pr && pr.is_business ? '<span class="tag role-business">business</span>' : ""}
@@ -568,11 +611,12 @@ document.querySelector("main").addEventListener("click", async e => {
     return;
   }
   if (act === "share") {
-    const shareUrl = shopId
-      ? embedHref({ shop: shopId, listing: hlListingId || undefined })
-      : location.href.split("#")[0];
+    const peers = await loadShopSlugPeers();
+    const shareUrl = shop
+      ? shopShareUrl(shop, hlListingId ? { listing: hlListingId } : null, peers)
+      : "https://civshops.pengworld.net/shops/";
     const ok = await copyText(shareUrl);
-    setMsg(msg, ok ? "Shop link copied (Discord-friendly embed)." : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");
+    setMsg(msg, ok ? "Shop link copied." : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");
     return;
   }
   if (act === "copy-coords") {

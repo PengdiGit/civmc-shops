@@ -1,9 +1,9 @@
-// Public Open Graph / Discord / Slack link previews for shops, profiles, and market items.
-// Crawlers get HTML with og:* tags; humans are redirected to the live GitHub Pages site.
+// Per-shop / per-profile Open Graph HTML for Discord/Slack (and oEmbed JSON).
+// Called by the civshops bot proxy (Cloudflare Worker or nginx) — crawlers never need this URL in chat.
 // Deploy: supabase functions deploy embed --no-verify-jwt
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SITE = "https://pengdigit.github.io/civmc-shops";
+const SITE = "https://civshops.pengworld.net";
 const THEME = "#7fb35a";
 const HEAD_URL = "https://minotar.net/avatar/";
 const cors = {
@@ -55,6 +55,8 @@ type Embed = {
   url: string;
   image: string;
   siteName?: string;
+  authorName?: string;
+  authorUrl?: string;
 };
 
 function pageHtml(e: Embed) {
@@ -63,6 +65,8 @@ function pageHtml(e: Embed) {
   const url = e.url || SITE + "/home/";
   const image = e.image || itemImg("chest");
   const site = e.siteName || "CivMC Shops";
+  const embBase = (Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "") + "/functions/v1/embed";
+  const oembed = embBase + "?format=oembed&url=" + encodeURIComponent(url);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -83,13 +87,28 @@ function pageHtml(e: Embed) {
 <meta name="twitter:description" content="${esc(desc)}">
 <meta name="twitter:image" content="${esc(image)}">
 <link rel="canonical" href="${esc(url)}">
-<meta http-equiv="refresh" content="0;url=${esc(url)}">
-<script>location.replace(${JSON.stringify(url)})</script>
+<link type="application/json+oembed" href="${esc(oembed)}">
 </head>
 <body style="font-family:system-ui,sans-serif;background:#1a1c18;color:#e8eadf;padding:24px">
-<p><a href="${esc(url)}" style="color:${THEME}">Continue to ${esc(site)}</a></p>
+<p><a href="${esc(url)}" style="color:${THEME}">Open ${esc(title)}</a></p>
 </body>
 </html>`;
+}
+
+function oembedJson(e: Embed) {
+  const body: Record<string, unknown> = {
+    version: "1.0",
+    type: "link",
+    title: e.title,
+    provider_name: e.siteName || "CivMC Shops",
+    provider_url: SITE + "/",
+    thumbnail_url: e.image,
+    thumbnail_width: 128,
+    thumbnail_height: 128,
+  };
+  if (e.authorName) body.author_name = e.authorName;
+  if (e.authorUrl) body.author_url = e.authorUrl;
+  return body;
 }
 
 function htmlResponse(e: Embed, status = 200) {
@@ -98,6 +117,17 @@ function htmlResponse(e: Embed, status = 200) {
     headers: {
       ...cors,
       "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "public, max-age=120",
+    },
+  });
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...cors,
+      "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "public, max-age=120",
     },
   });
@@ -112,17 +142,86 @@ function defaultEmbed(): Embed {
   };
 }
 
+function parseFromPageUrl(page: string) {
+  try {
+    const u = new URL(page);
+    const path = u.pathname.replace(/\/+$/, "") || "/";
+    const shopPath = path.match(/\/shops\/([^/]+)$/);
+    if (shopPath) {
+      const slug = decodeURIComponent(shopPath[1]);
+      if (/^\d+$/.test(slug)) {
+        return {
+          kind: "shop" as const,
+          id: slug,
+          slug: null as string | null,
+          listing: u.searchParams.get("listing"),
+        };
+      }
+      return {
+        kind: "shop" as const,
+        id: null as string | null,
+        slug,
+        listing: u.searchParams.get("listing"),
+      };
+    }
+    if (path.endsWith("/shops") || /\/shops\/?$/.test(path)) {
+      return {
+        kind: "shop" as const,
+        id: u.searchParams.get("id") || u.searchParams.get("shop"),
+        slug: null as string | null,
+        listing: u.searchParams.get("listing"),
+      };
+    }
+    const profPath = path.match(/\/profile\/([^/]+)$/i);
+    if (profPath) {
+      const slug = decodeURIComponent(profPath[1]);
+      if (/^[0-9a-f-]{36}$/i.test(slug)) {
+        return { kind: "profile" as const, id: slug, name: u.searchParams.get("name") };
+      }
+      return { kind: "profile" as const, id: null as string | null, name: slug };
+    }
+    if (path.endsWith("/profile") || /\/profile\/?$/.test(path)) {
+      return {
+        kind: "profile" as const,
+        id: u.searchParams.get("id") || u.searchParams.get("profile"),
+        name: u.searchParams.get("name"),
+      };
+    }
+    if (path.endsWith("/market") || path.includes("/market/")) {
+      return {
+        kind: "market" as const,
+        item: u.searchParams.get("item"),
+        enchant: u.searchParams.get("enchant"),
+      };
+    }
+    if (path.endsWith("/home") || path.includes("/home/") || path === "" || path === "/") {
+      return {
+        kind: "find" as const,
+        q: u.searchParams.get("q") || u.searchParams.get("find") || "",
+        mode: u.searchParams.get("mode") || "sell",
+      };
+    }
+  } catch (_) { /* ignore */ }
+  return null;
+}
+
 function parseTarget(url: URL) {
+  if (url.searchParams.get("url")) {
+    const fromPage = parseFromPageUrl(String(url.searchParams.get("url")));
+    if (fromPage) return fromPage;
+  }
+
   const path = url.pathname.replace(/^\/functions\/v1\/embed\/?/, "").replace(/^\/embed\/?/, "");
   const parts = path.split("/").filter(Boolean);
   const q = url.searchParams;
 
   if (q.get("shop") || (parts[0] === "shop" && parts[1])) {
-    return {
-      kind: "shop" as const,
-      id: q.get("shop") || parts[1],
-      listing: q.get("listing") || (parts[2] === "listing" ? parts[3] : null),
-    };
+    const raw = q.get("shop") || parts[1] || "";
+    const listing = q.get("listing") || (parts[2] === "listing" ? parts[3] : null);
+    if (/^\d+$/.test(raw)) {
+      return { kind: "shop" as const, id: raw, slug: null as string | null, listing };
+    }
+    return { kind: "shop" as const, id: null as string | null, slug: raw.toLowerCase(), listing };
   }
   if (q.get("profile") || q.get("user") || (parts[0] === "profile" && parts[1])) {
     return { kind: "profile" as const, id: q.get("profile") || q.get("user") || parts[1], name: q.get("name") };
@@ -154,19 +253,48 @@ Deno.serve(async (req) => {
   }
 
   const url = new URL(req.url);
+  const wantOembed = url.searchParams.get("format") === "json" ||
+    url.searchParams.get("format") === "oembed" ||
+    url.pathname.includes("oembed");
   const target = parseTarget(url);
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  const respond = (e: Embed, status = 200) =>
+    wantOembed ? jsonResponse(oembedJson(e), status) : htmlResponse(e, status);
+
   if (target.kind === "shop") {
-    const id = Number(target.id);
-    if (!Number.isFinite(id)) return htmlResponse({ ...defaultEmbed(), title: "Shop not found · CivMC Shops" }, 404);
+    let id = Number(target.id);
+    if (!Number.isFinite(id) && target.slug) {
+      const slug = String(target.slug).toLowerCase();
+      const { data: rows } = await admin
+        .from("shops")
+        .select("id, name")
+        .eq("archived", false)
+        .limit(500);
+      const strip = (n: string) =>
+        String(n || "").replace(/[&§][0-9a-fk-or]/gi, "").toLowerCase()
+          .replace(/[''"`]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
+      const list = rows || [];
+      const bases = list.map((s) => ({ s, base: strip(s.name) || ("shop-" + s.id) }));
+      const counts: Record<string, number> = {};
+      for (const { base } of bases) counts[base] = (counts[base] || 0) + 1;
+      let hit = bases.find(({ s, base }) =>
+        (counts[base] > 1 ? base + "-" + s.id : base) === slug
+      );
+      if (!hit) {
+        const m = slug.match(/-(\d+)$/);
+        if (m) hit = bases.find(({ s }) => String(s.id) === m[1]);
+      }
+      if (hit) id = Number(hit.s.id);
+    }
+    if (!Number.isFinite(id)) return respond({ ...defaultEmbed(), title: "Shop not found · CivMC Shops" }, 404);
 
     const { data: s } = await admin
       .from("shops")
-      .select("id, name, styled_name, description, city, nation, icon_item, icon_path, x, z, archived, is_open, timed_out, timed_out_until, owner_id, profiles!shops_owner_id_fkey(username, mc_username, timed_out, timed_out_until)")
+      .select("id, name, styled_name, description, city, nation, icon_item, icon_path, x, z, archived, is_open, timed_out, timed_out_until, owner_id, listings(id), profiles!shops_owner_id_fkey(username, mc_username, timed_out, timed_out_until)")
       .eq("id", id)
       .maybeSingle();
 
@@ -176,7 +304,7 @@ Deno.serve(async (req) => {
       | undefined;
     const hidden = !s || s.archived || s.is_open === false || stillOut(s) || stillOut(owner || null);
     if (hidden) {
-      return htmlResponse({
+      return respond({
         ...defaultEmbed(),
         title: "Shop not found · CivMC Shops",
         description: "That shop doesn't exist or isn't available.",
@@ -187,15 +315,17 @@ Deno.serve(async (req) => {
     const name = stripMc(s.styled_name || s.name || "Shop") || "Shop";
     const ownerName = (owner && (owner.username || owner.mc_username)) || "";
     const place = placeLine(s.city, s.nation);
-    const bits = [];
-    if (ownerName) bits.push("by " + ownerName);
+    const nList = Array.isArray(s.listings) ? s.listings.length : 0;
+    const bits: string[] = [];
+    if (ownerName) bits.push("Owner: " + ownerName);
     if (place) bits.push(place);
     if (s.x != null && s.z != null) bits.push(s.x + ", " + s.z);
+    if (nList) bits.push(nList + " listing" + (nList === 1 ? "" : "s"));
+
     let desc = stripMc(s.description || "").replace(/\s+/g, " ").slice(0, 180);
     if (!desc) desc = bits.join(" · ") || "CivMC shop on CivMC Shops.";
     else if (bits.length) desc = desc + " · " + bits.join(" · ");
 
-    let listingBit = "";
     if (target.listing) {
       const { data: l } = await admin
         .from("listings")
@@ -204,18 +334,20 @@ Deno.serve(async (req) => {
         .eq("shop_id", id)
         .maybeSingle();
       if (l) {
-        listingBit = ` · ${l.sell_amount} ${l.sell_item} for ${l.want_amount} ${l.want_item}`;
-        if (l.in_stock === false) listingBit += " (out of stock)";
+        desc += ` · ${l.sell_amount} ${l.sell_item} for ${l.want_amount} ${l.want_item}`;
+        if (l.in_stock === false) desc += " (out of stock)";
       }
     }
 
     const image = s.icon_path ? storageUrl(s.icon_path) : itemImg(s.icon_item || "chest");
     const dest = SITE + "/shops/?id=" + id + (target.listing ? "&listing=" + encodeURIComponent(String(target.listing)) : "");
-    return htmlResponse({
-      title: name + " · CivMC Shops",
-      description: (desc + listingBit).slice(0, 220),
+    return respond({
+      title: name,
+      description: desc.slice(0, 300),
       url: dest,
       image,
+      authorName: ownerName || undefined,
+      authorUrl: ownerName ? SITE + "/profile/?id=" + s.owner_id : undefined,
     });
   }
 
@@ -247,7 +379,7 @@ Deno.serve(async (req) => {
     }
 
     if (!p || stillOut(p as { timed_out?: boolean; timed_out_until?: string | null })) {
-      return htmlResponse({
+      return respond({
         ...defaultEmbed(),
         title: "Profile not found · CivMC Shops",
         description: "That profile doesn't exist or isn't available.",
@@ -259,7 +391,7 @@ Deno.serve(async (req) => {
     const primary = (mc && login && mc.toLowerCase() === login.toLowerCase())
       ? mc
       : (login ? login.charAt(0).toUpperCase() + login.slice(1) : mc) || "Trader";
-    const bits = [];
+    const bits: string[] = [];
     if (mc && mc.toLowerCase() !== String(primary).toLowerCase()) bits.push("MC: " + mc);
     if (p.discord_username) bits.push("Discord: " + p.discord_username);
     if (p.is_nation) {
@@ -278,21 +410,23 @@ Deno.serve(async (req) => {
       ? storageUrl(String(p.avatar_path))
       : HEAD_URL + encodeURIComponent(mc || "steve") + "/128";
 
-    return htmlResponse({
-      title: primary + " · CivMC Shops",
-      description: desc.slice(0, 220),
-      url: SITE + "/profile/?id=" + p.id,
+    return respond({
+      title: primary,
+      description: desc.slice(0, 300),
+      url: SITE + "/profile/" + encodeURIComponent(login || String(p.id)) + "/",
       image,
+      authorName: primary,
+      authorUrl: SITE + "/profile/" + encodeURIComponent(login || String(p.id)) + "/",
     });
   }
 
   if (target.kind === "market") {
     const item = String(target.item || "").trim();
-    if (!item) return htmlResponse(defaultEmbed());
+    if (!item) return respond(defaultEmbed());
     const enchant = target.enchant && target.enchant !== "plain" ? String(target.enchant) : "";
-    const title = (enchant ? item + " (" + enchant + ")" : item) + " · Market · CivMC Shops";
+    const title = enchant ? item + " (" + enchant + ")" : item;
     const dest = SITE + "/market/?item=" + encodeURIComponent(item) + (enchant ? "&enchant=" + encodeURIComponent(enchant) : "");
-    return htmlResponse({
+    return respond({
       title,
       description: "Live diamond market rates for " + item + " on CivMC Shops.",
       url: dest,
@@ -313,8 +447,8 @@ Deno.serve(async (req) => {
         : (mode === "enchant" ? term + " enchants"
           : (mode === "buy" ? "Buying " : "Selling ") + term))
       : "Find a shop";
-    return htmlResponse({
-      title: label + " · CivMC Shops",
+    return respond({
+      title: label,
       description: term
         ? "Search results for " + term + " on CivMC Shops."
         : "Search CivMC shops by item, enchant, or name.",
@@ -323,5 +457,5 @@ Deno.serve(async (req) => {
     });
   }
 
-  return htmlResponse(defaultEmbed());
+  return respond(defaultEmbed());
 });

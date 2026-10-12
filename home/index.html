@@ -10,12 +10,12 @@
 <meta property="og:site_name" content="CivMC Shops">
 <meta property="og:title" content="CivMC Shops">
 <meta property="og:description" content="Find CivMC shops, compare diamond prices, and browse the live market.">
-<meta property="og:url" content="https://pengdigit.github.io/civmc-shops/home/">
-<meta property="og:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/chest.png">
+<meta property="og:url" content="https://civshops.pengworld.net/home/">
+<meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/chest.png">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="CivMC Shops">
 <meta name="twitter:description" content="Find CivMC shops, compare diamond prices, and browse the live market.">
-<meta name="twitter:image" content="https://pengdigit.github.io/civmc-shops/Minecraft_Items/chest.png">
+<meta name="twitter:image" content="https://civshops.pengworld.net/Minecraft_Items/chest.png">
 <link rel="stylesheet" href="../style.css?v=12">
 </head>
 <body class="find-page">
@@ -175,7 +175,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../items.js"></script>
-<script src="../app.js?v=19"></script>
+<script src="../app.js?v=22"></script>
 <script src="../place-picker.js"></script>
 <script>
 const q = document.getElementById("q");
@@ -1250,7 +1250,7 @@ document.getElementById("find-share").onclick = async () => {
   if (term) params.q = term;
   if (mode.value && mode.value !== "sell") params.mode = mode.value;
   const ok = await copyText(embedHref(params));
-  setMsg(msg, ok ? "Search link copied (Discord-friendly embed)." : "Couldn't copy.", ok ? "ok" : "err");
+  setMsg(msg, ok ? "Search link copied." : "Couldn't copy.", ok ? "ok" : "err");
 };
 </script>
 </body>
