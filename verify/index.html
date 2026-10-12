@@ -96,8 +96,6 @@ function paintLinked(profile) {
   if (mcOk) {
     let t = "Connected as " + (profile.mc_username || "Minecraft");
     if (profile.mc_link_method === "soft") t += " (temporary link)";
-    if (profile.civinfo_known === true) t += " · seen on CivInfo";
-    else if (profile.civinfo_known === false) t += " · not found on CivInfo (ok)";
     mcMeta.textContent = t + ".";
     btnMc.disabled = true;
     btnMc.textContent = "Minecraft connected";
