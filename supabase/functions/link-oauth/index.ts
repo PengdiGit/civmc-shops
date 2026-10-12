@@ -153,8 +153,10 @@ async function finishDiscord(code: string, redirectUri: string) {
   });
   const me = await meRes.json();
   if (!meRes.ok || !me.id) throw new Error("Could not read Discord profile.");
-  const username = me.global_name || me.username || String(me.id);
-  return { discord_id: String(me.id), discord_username: String(username).slice(0, 40) };
+  // Prefer Discord handle (username), not display name (global_name).
+  let username = String(me.username || me.id);
+  if (me.discriminator && me.discriminator !== "0") username += "#" + me.discriminator;
+  return { discord_id: String(me.id), discord_username: username.slice(0, 40) };
 }
 
 function xerrMessage(xerr: unknown): string | null {
