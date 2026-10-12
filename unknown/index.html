@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unknown listing - CivMC Shops</title>
+<meta name="description" content="Crowd-scanned exchange not yet claimed on CivMC Shops.">
+<meta name="theme-color" content="#7fb35a">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="../style.css?v=12">
+</head>
+<body>
+<nav id="nav"></nav>
+<main>
+  <header class="page-hero">
+    <a class="back" href="../home/">&larr; Back to search</a>
+    <div class="top" style="margin-top:12px">
+      <div class="shophead">
+        <span id="icon"></span>
+        <div>
+          <h1 id="title">Unknown listing</h1>
+          <div id="badges"></div>
+        </div>
+      </div>
+    </div>
+    <p class="sub" id="blurb" style="margin-top:8px">Crowd-scanned discovery. Not claimed on CivShops.</p>
+  </header>
+  <div class="msg" id="msg"></div>
+  <div id="body"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+<script src="../items.js"></script>
+<script src="../app.js?v=21"></script>
+<script>
+const msg = document.getElementById("msg");
+const body = document.getElementById("body");
+
+(async () => {
+  await renderNav();
+  const ctx = await requireLogin();
+  if (!ctx) return;
+  if (!(typeof UNKNOWN_LISTINGS_UI !== "undefined" && UNKNOWN_LISTINGS_UI && ctx.profile && ctx.profile.is_head)) {
+    setMsg(msg, "Unknown listings are head-admin only for now.", "err");
+    body.innerHTML = emptyState("This preview is not available on your account yet.", "../home/", "Back to Find");
+    return;
+  }
+
+  const id = Number(new URLSearchParams(location.search).get("id"));
+  if (!id) {
+    setMsg(msg, "Missing listing id.", "err");
+    body.innerHTML = emptyState("No unknown listing selected.", "../home/", "Back to Find");
+    return;
+  }
+
+  const { data: u, error } = await sb.from("unknown_listings")
+    .select("id, want_item, want_amount, want_unit, sell_item, sell_amount, sell_unit, stock, in_stock, enchants, notes, x, y, z, updated_at, created_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) { setMsg(msg, error.message, "err"); return; }
+  if (!u) {
+    setMsg(msg, "This unknown listing is gone (claimed or expired).", "err");
+    body.innerHTML = emptyState("Unknown listings disappear after 7 days without new scans, or when a real shop listing matches.", "../home/", "Back to Find");
+    return;
+  }
+
+  document.getElementById("icon").innerHTML = itemIcon(u.sell_item, true);
+  document.getElementById("badges").innerHTML =
+    '<span class="tag warn">unknown</span> <span class="tag">unclaimed</span> ' + stockHtml(u);
+  setPageMeta({
+    title: "Unknown: " + u.sell_item + " - CivMC Shops",
+    description: "Unclaimed crowd-scanned exchange on CivMC Shops.",
+    url: absPageHref("unknown", { id: String(u.id) }),
+    image: itemImg(u.sell_item)
+  });
+
+  const listing = {
+    want_item: u.want_item, want_amount: u.want_amount, want_unit: u.want_unit,
+    sell_item: u.sell_item, sell_amount: u.sell_amount, sell_unit: u.sell_unit,
+    stock: u.stock, in_stock: u.in_stock, enchants: u.enchants, notes: u.notes,
+    updated_at: u.updated_at
+  };
+
+  body.innerHTML = `
+    <div class="offers" style="margin-top:8px">
+      ${tradeRow(listing, { big: true, tags: stockHtml(u), meta: `${coordsHtml(u.x, u.z)} \u00b7 ${updatedHtml(u.updated_at)}` })}
+    </div>
+    <div class="panel" style="margin-top:16px;padding:14px">
+      <p class="meta" style="margin:0 0 8px">First seen ${updatedHtml(u.created_at)} \u00b7 Last scan ${updatedHtml(u.updated_at)}</p>
+      <p style="margin:0 0 8px">This exchange was found in-game by the CivMC Shop Scan mod but is not linked to a claimed shop on the site.</p>
+      <p class="meta" style="margin:0">It may disappear after 7 days without new scans. To claim it, list the same trade on your shop dashboard (with store coords). Matching scans then update your real listing instead.</p>
+      <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
+        <a class="primary small" href="../dashboard/" style="padding:8px 14px;text-decoration:none;border-radius:4px">Open dashboard</a>
+        <a class="small" href="${esc(mapUrl(u.x, u.z))}" target="_blank" rel="noopener">Open map</a>
+      </div>
+    </div>`;
+})();
+</script>
+</body>
+</html>
