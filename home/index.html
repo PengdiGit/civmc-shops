@@ -129,6 +129,7 @@
           <label class="find-filter-check"><input type="checkbox" id="f-updated-week"> Updated this week</label>
           <label class="find-filter-check"><input type="checkbox" id="f-has-loc"> Has location (X/Z)</label>
           <label class="find-filter-check"><input type="checkbox" id="f-directions"> Has directions</label>
+          <label class="find-filter-check" id="fg-exclude-unknown" hidden><input type="checkbox" id="f-exclude-unknown"> Exclude unknown listings</label>
         </div>
       </div>
       <div class="filter-group" id="fg-deal">
@@ -206,6 +207,7 @@ const fMaxRate = document.getElementById("f-max-rate");
 const fUnit = document.getElementById("f-unit");
 const fEnchant = document.getElementById("f-enchant");
 const fHasEnchants = document.getElementById("f-has-enchants");
+const fExcludeUnknown = document.getElementById("f-exclude-unknown");
 const resultCountEl = document.getElementById("result-count");
 const findBoard = document.querySelector(".find-board");
 let cityFilter = "";
@@ -221,6 +223,13 @@ let maxDealRate = null;
 let unitFilter = ""; // "" | each | ci | cs
 let enchantFilter = ""; // substring match on listings.enchants (sell/want filters)
 let hasEnchantsOnly = false;
+let excludeUnknown = false;
+let findMe = null; // { session, profile } when logged in
+
+function unknownListingsUi() {
+  return typeof UNKNOWN_LISTINGS_UI !== "undefined" && !!UNKNOWN_LISTINGS_UI &&
+    !!(findMe && findMe.profile && findMe.profile.is_head);
+}
 let lastItemRows = [];
 let lastShopRows = [];
 let lastResultFocus = -1;
@@ -354,7 +363,7 @@ function defaultFindFilters() {
     trusted: false, minRating: 0,
     inStock: true, updatedWeek: false, hasLocation: false, directions: false,
     minRate: null, maxRate: null, unit: "",
-    enchant: "", hasEnchants: false
+    enchant: "", hasEnchants: false, excludeUnknown: false
   };
 }
 function loadFilterDefaults() {
@@ -376,7 +385,8 @@ function loadFilterDefaults() {
       maxRate: numOrNull(o.maxRate),
       unit: ["each", "ci", "cs"].includes(o.unit) ? o.unit : "",
       enchant: typeof o.enchant === "string" ? o.enchant : "",
-      hasEnchants: !!o.hasEnchants
+      hasEnchants: !!o.hasEnchants,
+      excludeUnknown: !!o.excludeUnknown
     };
   } catch (e) {
     return base;
@@ -397,7 +407,8 @@ function saveFilterDefaults() {
       maxRate: maxDealRate,
       unit: unitFilter || "",
       enchant: enchantFilter || "",
-      hasEnchants: !!hasEnchantsOnly
+      hasEnchants: !!hasEnchantsOnly,
+      excludeUnknown: !!excludeUnknown
     }));
   } catch (e) {}
 }
@@ -408,6 +419,7 @@ function syncFilterControls() {
   fUpdatedWeek.checked = !!updatedThisWeek;
   fHasLoc.checked = !!hasLocationOnly;
   fDirections.checked = !!hasDirectionsOnly;
+  fExcludeUnknown.checked = !!excludeUnknown;
   fMinRate.value = minDealRate != null ? String(minDealRate) : "";
   fMaxRate.value = maxDealRate != null ? String(maxDealRate) : "";
   fUnit.value = unitFilter || "";
@@ -423,6 +435,8 @@ function syncFilterControls() {
   const enchantHint = document.getElementById("fg-enchant-hint");
   if (containsRow) containsRow.hidden = true; // prefer Enchants mode picker
   if (enchantHint) enchantHint.hidden = !sellWant;
+  const unkRow = document.getElementById("fg-exclude-unknown");
+  if (unkRow) unkRow.hidden = !unknownListingsUi() || !itemMode;
 }
 function activeFilterCount() {
   const listingMode = isItemMode();
@@ -435,7 +449,8 @@ function activeFilterCount() {
     + (listingMode && maxDealRate != null ? 1 : 0)
     + (listingMode && unitFilter ? 1 : 0)
     + (sellWant && enchantFilter ? 1 : 0)
-    + (sellWant && hasEnchantsOnly ? 1 : 0);
+    + (sellWant && hasEnchantsOnly ? 1 : 0)
+    + (unknownListingsUi() && listingMode && excludeUnknown ? 1 : 0);
 }
 function updateFilterChrome() {
   syncFilterControls();
@@ -462,6 +477,7 @@ function updateFilterChrome() {
   if (isItemMode() && unitFilter) bits.push("Unit: " + (unitFilter === "each" ? "each" : unitFilter.toUpperCase()));
   if ((mode.value === "sell" || mode.value === "want") && enchantFilter) bits.push("Enchant: " + enchantFilter);
   if ((mode.value === "sell" || mode.value === "want") && hasEnchantsOnly) bits.push("Enchanted only");
+  if (unknownListingsUi() && isItemMode() && excludeUnknown) bits.push("No unknowns");
   if (bits.length) {
     activeFiltersEl.hidden = false;
     activeFiltersEl.textContent = bits.join(" \u00b7 ") + " \u00b7 edit in Filters";
@@ -545,6 +561,7 @@ function syncUrl() {
     if (unitFilter) sp.set("unit", unitFilter);
     if ((mode.value === "sell" || mode.value === "want") && enchantFilter) sp.set("enchant", enchantFilter);
     if ((mode.value === "sell" || mode.value === "want") && hasEnchantsOnly) sp.set("has_enchants", "1");
+    if (unknownListingsUi() && excludeUnknown) sp.set("no_unknown", "1");
   }
   const qs = sp.toString();
   history.replaceState(null, "", u.pathname + (qs ? "?" + qs : "") + u.hash);
@@ -706,6 +723,10 @@ fEnchant.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); enchantFilter = norm(fEnchant.value); reapplyFindFilters(); }
 });
 fHasEnchants.addEventListener("change", () => { hasEnchantsOnly = fHasEnchants.checked; reapplyFindFilters(); });
+fExcludeUnknown.addEventListener("change", () => {
+  excludeUnknown = fExcludeUnknown.checked;
+  reapplyFindFilters({ refetchItems: true });
+});
 
 document.getElementById("filter-open").addEventListener("click", openFilters);
 filterOverlay.addEventListener("click", e => {
@@ -725,6 +746,7 @@ document.getElementById("clear-filters").addEventListener("click", () => {
   unitFilter = "";
   enchantFilter = "";
   hasEnchantsOnly = false;
+  excludeUnknown = false;
   reapplyFindFilters({ refetchItems: true });
 });
 document.getElementById("save-filter-defaults").addEventListener("click", () => {
@@ -1027,20 +1049,26 @@ function paintItemResults(data) {
   results.className = "offers";
   results.innerHTML = rows.map(l => {
     const s = l.shops;
+    const unknown = !!l.is_unknown;
     const stale = daysAgo(l.updated_at) >= STALE_DAYS;
     let tags = stockHtml(l);
+    if (unknown) tags += ' <span class="tag warn">unknown</span>';
     if (stale) tags += ' <span class="tag warn">might be out of date</span>';
-    tags += medianTip(l, buying);
-    if (shopSaleActive(s)) tags += " " + saleBadgeHtml(s);
-    const pinned = comparePins.some(p => p.listing.id === l.id);
+    if (!unknown) tags += medianTip(l, buying);
+    if (!unknown && shopSaleActive(s)) tags += " " + saleBadgeHtml(s);
+    const pinned = !unknown && comparePins.some(p => p.listing.id === l.id);
     const place = placeHtml(s);
+    const href = unknown
+      ? "../unknown/?id=" + l.id
+      : "../shops/?id=" + l.shop_id + "&listing=" + l.id + (qTerm ? "&q=" + encodeURIComponent(qTerm) : "");
+    const who = unknown ? "Unknown \u00b7 Unclaimed" : shopName(s);
     return tradeRow(l, {
       buying,
       stale,
-      href: "../shops/?id=" + l.shop_id + "&listing=" + l.id + (qTerm ? "&q=" + encodeURIComponent(qTerm) : ""),
+      href,
       tags,
-      meta: `${shopName(s)}${place ? " \u00b7 " + place : ""} \u00b7 ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} \u00b7 ${updatedHtml(l.updated_at)}`,
-      btns: iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` })
+      meta: `${who}${place ? " \u00b7 " + place : ""} \u00b7 ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} \u00b7 ${updatedHtml(l.updated_at)}`,
+      btns: unknown ? "" : iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` })
     });
   }).join("");
 }
@@ -1052,10 +1080,45 @@ results.addEventListener("click", e => {
   e.stopPropagation();
   const id = Number(b.dataset.compare);
   const l = lastItemRows.find(x => x.id === id);
-  if (!l || !l.shops) return;
+  if (!l || !l.shops || l.is_unknown) return;
   toggleCompare(l, l.shops, mode.value === "want");
   paintItemResults(lastItemRows);
 });
+
+function mapUnknownListing(u) {
+  return {
+    id: u.id,
+    is_unknown: true,
+    shop_id: null,
+    want_item: u.want_item,
+    want_amount: u.want_amount,
+    want_unit: u.want_unit,
+    sell_item: u.sell_item,
+    sell_amount: u.sell_amount,
+    sell_unit: u.sell_unit,
+    stock: u.stock,
+    in_stock: u.in_stock,
+    timed_out: false,
+    enchants: u.enchants,
+    notes: u.notes,
+    updated_at: u.updated_at,
+    shops: {
+      name: "Unknown",
+      styled_name: null,
+      city: null,
+      nation: null,
+      x: u.x,
+      z: u.z,
+      timed_out: false,
+      archived: false,
+      is_open: true,
+      find_note: null,
+      transit_note: null,
+      reviews: [],
+      profiles: null
+    }
+  };
+}
 
 async function showItems(term) {
   const enchantMode = isEnchantMode();
@@ -1104,10 +1167,33 @@ async function showItems(term) {
   const { data: all, error } = await query;
 
   if (error) { setMsg(msg, "Search failed: " + error.message, "err"); return; }
-  const data = (all || []).filter(l => {
+  let data = (all || []).filter(l => {
     const sh = l.shops;
     return sh && !l.timed_out && shopListedPublicly(sh, sh.profiles);
   });
+
+  if (unknownListingsUi() && !excludeUnknown) {
+    try {
+      let uq = sb.from("unknown_listings")
+        .select("id, want_item, want_amount, want_unit, sell_item, sell_amount, sell_unit, stock, in_stock, enchants, notes, x, z, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(100);
+      if (enchantMode) {
+        uq = uq.ilike("enchants", "%" + safeTerm + "%");
+      } else {
+        const col = mode.value === "sell" ? "sell_item" : "want_item";
+        uq = uq.or(`${col}.ilike.%${safeTerm}%,enchants.ilike.%${safeTerm}%`);
+      }
+      if (inStockOnly) uq = uq.eq("in_stock", true);
+      if (!enchantMode && enchantFilter) {
+        const safeEnch = String(enchantFilter).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
+        if (safeEnch) uq = uq.ilike("enchants", "%" + safeEnch + "%");
+      }
+      const { data: unknowns } = await uq;
+      data = data.concat((unknowns || []).map(mapUnknownListing));
+    } catch (e) { /* head-only soft fail */ }
+  }
+
   lastItemRows = data;
   await ensureMarketMedians();
   if (!data.length) {
@@ -1187,6 +1273,13 @@ syncModeUi();
   loadHere();
   const preferClose = !!getHere();
   fillSorts(preferClose);
+  try {
+    const session = await getSession();
+    if (session) {
+      const profile = await getProfile(session.user.id);
+      findMe = { session, profile };
+    }
+  } catch (e) {}
   // Prefetch shop names + enchant catalog for autocomplete
   try {
     const { data } = await sb.from("shops").select("name").order("name").limit(500);
@@ -1207,6 +1300,7 @@ syncModeUi();
   updatedThisWeek = ps.has("updated_week") ? ps.get("updated_week") === "1" : !!defaults.updatedWeek;
   hasLocationOnly = ps.has("has_loc") ? ps.get("has_loc") === "1" : !!defaults.hasLocation;
   hasDirectionsOnly = ps.has("directions") ? ps.get("directions") === "1" : !!defaults.directions;
+  excludeUnknown = ps.has("no_unknown") ? ps.get("no_unknown") === "1" : !!defaults.excludeUnknown;
   {
     const mn = ps.has("min_rate") ? parseFloat(ps.get("min_rate")) : defaults.minRate;
     minDealRate = mn != null && !isNaN(mn) ? mn : null;

@@ -9,3 +9,6 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 // Auto stock dashboard UI (NL / toggle / listing coords). Shown only to head admins.
 const AUTO_STOCK_UI = true;
+
+// Unknown listings on Find + detail page. Shown only to head admins for now.
+const UNKNOWN_LISTINGS_UI = true;

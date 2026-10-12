@@ -134,7 +134,7 @@ function pickTimeoutDuration(opts) {
 /** Clean folder URLs on GitHub Pages / custom domain (no *.html in the address bar). */
 const PAGE_SLUGS = new Set([
   "home", "market", "dashboard", "shops", "profile", "favourites",
-  "settings", "moderation", "admin", "login", "signup", "verify"
+  "settings", "moderation", "admin", "login", "signup", "verify", "unknown"
 ]);
 const LEGACY_PAGE = {
   "index.html": "home",
