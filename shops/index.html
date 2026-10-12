@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shop - CivMC Shops</title>
-<meta name="description" content="CivMC shop page — listings, reviews, and location.">
+<meta name="description" content="CivMC shop page - listings, reviews, and location.">
 <meta name="theme-color" content="#7fb35a">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="CivMC Shops">
 <meta property="og:title" content="Shop - CivMC Shops">
-<meta property="og:description" content="CivMC shop page — listings, reviews, and location.">
+<meta property="og:description" content="CivMC shop page - listings, reviews, and location.">
 <meta property="og:url" content="https://civshops.pengworld.net/shops/">
 <meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/chest.png">
 <meta name="twitter:card" content="summary">
@@ -89,7 +89,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=28"></script>
+<script src="../app.js?v=29"></script>
 <script>
 const params = new URLSearchParams(location.search);
 // /shops/?id=1 · /shops/1/ · /shops/pfa-exchange/ · /shops/?slug=pfa-exchange
@@ -127,7 +127,7 @@ const verifyHelp = () => `Connect Discord and Minecraft first. <a href="../verif
 function paintFavBtn() {
   const fb = document.getElementById("favbtn");
   if (!fb) return;
-  // Always show once a shop is loaded — owners can favourite their own shop too.
+  // Always show once a shop is loaded - owners can favourite their own shop too.
   fb.hidden = !shop;
   if (!shop) return;
   fb.className = "icon-btn" + (isFav ? " on" : "");

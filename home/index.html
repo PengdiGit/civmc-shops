@@ -176,7 +176,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../items.js"></script>
-<script src="../app.js?v=28"></script>
+<script src="../app.js?v=30"></script>
 <script src="../place-picker.js"></script>
 <script>
 const q = document.getElementById("q");
@@ -429,7 +429,7 @@ function syncFilterControls() {
   const sellWant = mode.value === "sell" || mode.value === "want";
   document.getElementById("fg-deal").hidden = !itemMode;
   document.getElementById("fg-unit").hidden = !itemMode;
-  // Enchants mode owns named enchant search — keep only "Enchanted only" for sell/want
+  // Enchants mode owns named enchant search - keep only "Enchanted only" for sell/want
   document.getElementById("fg-enchant").hidden = !sellWant;
   const containsRow = document.getElementById("fg-enchant-contains");
   const enchantHint = document.getElementById("fg-enchant-hint");
@@ -618,7 +618,7 @@ function applyFindFilters(rows, shopOf, kind) {
     const s = shopOf(r);
     const unknown = kind === "listing" && !!r.is_unknown;
     if (!s || !placeFilterMatch(s, cityFilter, nationFilter)) return false;
-    // Unknowns are unclaimed discoveries — shop trust/rating/directions do not apply.
+    // Unknowns are unclaimed discoveries - shop trust/rating/directions do not apply.
     if (!unknown && trustedOnly && !isTrustedTrader(s.reviews)) return false;
     if (!unknown && minRating) {
       const sum = ratingSummary(s.reviews);
@@ -1070,7 +1070,7 @@ function paintItemResults(data) {
       stale,
       href,
       tags,
-      meta: `${who}${place ? " \u00b7 " + place : ""} \u00b7 ${coordsHtml(s.x, s.z)}${sortSel.value === "close" ? distText(s, h) : ""} \u00b7 ${updatedHtml(l.updated_at)}`,
+      meta: `${who}${place ? " \u00b7 " + place : ""} \u00b7 ${coordsHtml(s.x, s.z, unknown ? { approx: true } : null)}${sortSel.value === "close" ? distText(s, h) : ""} \u00b7 ${updatedHtml(l.updated_at)}`,
       btns: unknown ? "" : iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` })
     });
   }).join("");
@@ -1187,7 +1187,7 @@ async function showItems(term) {
         const col = mode.value === "sell" ? "sell_item" : "want_item";
         uq = uq.or(`${col}.ilike.%${safeTerm}%,enchants.ilike.%${safeTerm}%`);
       }
-      // Unknowns are discoveries — show even when out of stock (common for /cti punches).
+      // Unknowns are discoveries - show even when out of stock (common for /cti punches).
       if (!enchantMode && enchantFilter) {
         const safeEnch = String(enchantFilter).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
         if (safeEnch) uq = uq.ilike("enchants", "%" + safeEnch + "%");

@@ -105,7 +105,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=28"></script>
+<script src="../app.js?v=29"></script>
 <script>
 const msg = document.getElementById("msg");
 const filter = document.getElementById("filter");
@@ -152,6 +152,9 @@ function targetInfo(r) {
     const v = data.reviews.find(x => same(x.id, r.target_id));
     return v && { label: `Review by ${v.profiles ? userName(v.profiles) : "?"} (${v.rating}/5)${v.body ? ": \"" + v.body.slice(0, 80) + "\"" : ""}`, href: "../shops/?id=" + v.shop_id + "#review-" + v.id, out: stillTimedOut(v), table: "reviews" };
   }
+  if (r.target_type === "unknown") {
+    return { label: "Unknown listing #" + r.target_id, href: "../unknown/?id=" + encodeURIComponent(r.target_id), out: false, noTimeout: true };
+  }
   const u = data.users.find(x => same(x.id, r.target_id));
   return u && { label: "User: " + userName(u), href: "../profile/?id=" + u.id, out: stillTimedOut(u), user: u, canTimeout: canTimeoutUser(u) };
 }
@@ -164,7 +167,7 @@ function render() {
   document.getElementById("reports").innerHTML = open.map(r => {
     const t = targetInfo(r);
     const who = data.users.find(u => u.id === r.reporter_id);
-    const canT = t && !t.out && (t.user ? t.canTimeout : true);
+    const canT = t && !t.noTimeout && !t.out && (t.user ? t.canTimeout : true);
     const href = t ? `href="${esc(t.href)}"` : "";
     const parsed = parseReportReason(r);
     return `<div class="card mod-report-card">

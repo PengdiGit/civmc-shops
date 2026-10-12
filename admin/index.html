@@ -41,7 +41,7 @@
             <span class="collapse-chevron" aria-hidden="true"></span>
             <span class="mod-section-head-text">
               <span class="mod-section-title">Ready for review</span>
-              <span class="meta">Both accounts linked — they already have full site access. Accept only adds the public verified badge; Deny deletes the account.</span>
+              <span class="meta">Both accounts linked - they already have full site access. Accept only adds the public verified badge; Deny deletes the account.</span>
             </span>
           </button>
         </h2>
@@ -256,7 +256,7 @@
 <script src="../config.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=28"></script>
+<script src="../app.js?v=30"></script>
 <script>
 const msg = document.getElementById("msg");
 const usermsg = document.getElementById("usermsg");
@@ -312,9 +312,9 @@ function syncCreateRole() {
   const pwLabel = document.getElementById("pw-label");
   if (note) {
     note.textContent = role === "business"
-      ? "Shared login. Username and password only — a place can go in the bio later. The password is not forced to change on first login."
+      ? "Shared login. Username and password only - a place can go in the bio later. The password is not forced to change on first login."
       : role === "nation"
-        ? "Shared login for one nation. The password you set is the one people use — it is not forced to change on first login."
+        ? "Shared login for one nation. The password you set is the one people use - it is not forced to change on first login."
         : "Starts verified. They get a prompt to set their own password.";
   }
   if (pwLabel) pwLabel.textContent = shared ? "Password" : "Temporary password";
@@ -453,7 +453,7 @@ function paintLists() {
       .filter(a => hit(userName(a), a.mc_username, a.discord_username, a.login_username, a.place_city, a.place_nation))
       .map(a => `<div class="listing">
         ${accountOpen(a, `${roleBadge(a)} ${statusBadge(a)}
-          <span class="meta">\u00b7 ${a.is_nation ? esc(a.place_nation || "no nation") : a.is_business ? "shared login" : "MC " + esc(a.mc_username || "—") + " \u00b7 " + esc(a.discord_username || "-")} \u00b7 made ${fmtDate(a.created_at)} \u00b7 last ${fmtDate(a.last_sign_in_at)}</span>`)}
+          <span class="meta">\u00b7 ${a.is_nation ? esc(a.place_nation || "no nation") : a.is_business ? "shared login" : "MC " + esc(a.mc_username || "-") + " \u00b7 " + esc(a.discord_username || "-")} \u00b7 made ${fmtDate(a.created_at)} \u00b7 last ${fmtDate(a.last_sign_in_at)}</span>`)}
         <div class="acct-actions">${roleButtons(a)}</div>
       </div>`).join("") || '<p class="meta">None.</p>';
   } else {
@@ -500,7 +500,7 @@ function paintUnknowns(hitFn) {
     return;
   }
   box.innerHTML = rows.map(u => {
-    const player = u.last_player ? esc(u.last_player) : "—";
+    const player = u.last_player ? esc(u.last_player) : "-";
     const ench = u.enchants ? ` \u00b7 ${esc(u.enchants)}` : "";
     const notes = u.notes ? ` \u00b7 ${esc(u.notes)}` : "";
     return `<div class="card admin-card listing" data-unknown-id="${u.id}">
@@ -509,7 +509,7 @@ function paintUnknowns(hitFn) {
           ${itemText(u.want_amount, u.want_item, u.want_unit)} <span class="arrow">&rarr;</span> ${itemText(u.sell_amount, u.sell_item, u.sell_unit)}
           ${stockHtml(u)}
           <span class="tag warn">unknown</span>
-          <div class="meta" style="margin-top:4px">${coordsHtml(u.x, u.z)}${u.y != null ? " y" + esc(u.y) : ""}
+          <div class="meta" style="margin-top:4px">${coordsHtml(u.x, u.z, { approx: true })}${u.y != null ? " y" + esc(u.y) : ""}
             \u00b7 last player ${player}${ench}${notes}
             \u00b7 first ${fmtDate(u.created_at)} \u00b7 scan ${updatedHtml(u.updated_at, { prefix: false })}
             \u00b7 <a href="${pageHref("unknown", { id: String(u.id) })}">open</a></div>
@@ -547,8 +547,8 @@ async function render() {
       !a.verified_at && !a.is_admin && !a.is_mod && !a.is_head && !a.is_business && !a.is_nation && a.discord_id && a.mc_uuid);
 
     function queueCard(a, opts) {
-      const dc = a.discord_username || (a.discord_id ? "linked" : "—");
-      const mc = a.mc_username || (a.mc_uuid ? "linked" : "—");
+      const dc = a.discord_username || (a.discord_id ? "linked" : "-");
+      const mc = a.mc_username || (a.mc_uuid ? "linked" : "-");
       const civ = a.civinfo_known === true ? " · CivInfo: yes" : a.civinfo_known === false ? " · CivInfo: no" : "";
       const actions = opts.accept
         ? `<button class="small primary" data-act="accept" data-id="${a.id}">Accept</button>

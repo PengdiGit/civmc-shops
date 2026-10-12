@@ -71,7 +71,7 @@
 <script src="../item-picker.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=28"></script>
+<script src="../app.js?v=29"></script>
 <script>
 let me = null;
 let shopsData = {};                 // shop id -> shop (with listings), from the last load
@@ -564,7 +564,7 @@ function dashListingRow(l) {
       <div class="dash-alt-wants">
         <div class="dash-alt-wants-list">${alts.map(dashAltWantRowHtml).join("")}</div>
         <button type="button" class="small" data-act="add-alt-want" ${alts.length >= 2 ? "hidden" : ""}>+ Alt price (up to 3 total)</button>
-        <p class="meta" style="margin:4px 0 0">Alt prices are OR options — buyers pay any one (shown as a fork into the item you sell).</p>
+        <p class="meta" style="margin:4px 0 0">Alt prices are OR options - buyers pay any one (shown as a fork into the item you sell).</p>
       </div>
       <div class="dash-listing-extra">
         <label class="dash-enchants-label" ${showEnchants ? "" : "hidden"}>Enchants

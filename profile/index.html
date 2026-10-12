@@ -110,7 +110,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=28"></script>
+<script src="../app.js?v=29"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let id = params.get("id");
@@ -375,14 +375,14 @@ async function load() {
   const pronouns = (p.pronouns || "").trim();
   const timezone = (p.timezone || "").trim();
   const nationLabel = p.is_nation ? placeHtml({ city: "", nation: p.place_nation }) : "";
-  const mcFact = `<dt>Minecraft</dt><dd${mcName ? ` class="fact-copy" data-copy="${esc(mcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${esc(mcName || "—")}</dd>`;
+  const mcFact = `<dt>Minecraft</dt><dd${mcName ? ` class="fact-copy" data-copy="${esc(mcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${esc(mcName || "-")}</dd>`;
   const dcFact = `<dt>Discord</dt><dd${dcName ? ` class="fact-copy" data-copy="${esc(dcName)}" title="Click to copy" role="button" tabindex="0"` : ""}>${dcName ? `<b>${esc(dcName)}</b>` : '<span class="meta">not set</span>'}</dd>`;
   const metaHtml =
     `<dt>${org ? "Since" : "Member since"}</dt><dd title="${esc(p.created_at ? new Date(p.created_at).toLocaleString() : "")}">${esc(since)}</dd>
      <dt>${org ? "Last active" : "Last seen"}</dt><dd>${org && !p.last_seen_at ? '<span class="meta">unknown</span>' : lastSeenHtml(p.last_seen_at)}</dd>`;
   const factsHtml = org
     ? [
-        p.is_nation ? `<dt>Nation</dt><dd>${nationLabel || "—"}</dd>` : "",
+        p.is_nation ? `<dt>Nation</dt><dd>${nationLabel || "-"}</dd>` : "",
         p.is_nation ? metaHtml : "",
         mcName ? mcFact : "",
         dcName ? dcFact : ""

@@ -32,7 +32,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../items.js"></script>
-<script src="../app.js?v=28"></script>
+<script src="../app.js?v=30"></script>
 <script>
 const msg = document.getElementById("msg");
 const body = document.getElementById("body");
@@ -85,16 +85,21 @@ const body = document.getElementById("body");
 
   body.innerHTML = `
     <div class="offers" style="margin-top:8px">
-      ${tradeRow(listing, { big: true, tags: stockHtml(u), meta: `${coordsHtml(u.x, u.z)} \u00b7 ${updatedHtml(u.updated_at)}` })}
+      ${tradeRow(listing, { big: true, tags: stockHtml(u), meta: `${coordsHtml(u.x, u.z, { approx: true })} \u00b7 ${updatedHtml(u.updated_at)}` })}
     </div>
     <div class="panel" style="margin-top:16px;padding:14px">
       <p class="meta" style="margin:0 0 8px">First seen ${updatedHtml(u.created_at)} \u00b7 Last scan ${updatedHtml(u.updated_at)}</p>
       <p style="margin:0 0 8px">This exchange was found in-game by the CivMC Shop Scan mod but is not linked to a claimed shop on the site.</p>
       <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
+        <button type="button" class="small ico-label" id="report-unk">${uiIcon("flag")} Report this scan</button>
         <a class="primary small" href="../dashboard/" style="padding:8px 14px;text-decoration:none;border-radius:4px">Open dashboard</a>
-        <a class="small" href="${esc(mapUrl(u.x, u.z))}" target="_blank" rel="noopener">Open map</a>
+        <a class="small ico-label" href="${esc(mapUrl(u.x, u.z))}" target="_blank" rel="noopener">${uiIcon("map")} Open map</a>
       </div>
     </div>`;
+  document.getElementById("report-unk").onclick = async () => {
+    const r = await sendReport("unknown", u.id, UNKNOWN_REPORT_REASONS);
+    if (r) setMsg(msg, r.text, r.kind);
+  };
 })();
 </script>
 </body>

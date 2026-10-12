@@ -249,7 +249,7 @@ function shopPath(shop, search, peers) {
     if (typeof search === "string") path += search.startsWith("?") ? search : "?" + search;
     else {
       const ps = search instanceof URLSearchParams ? search : new URLSearchParams(search);
-      // Never put id in query when using slug path — listing/q/invite still ok
+      // Never put id in query when using slug path - listing/q/invite still ok
       ps.delete("id");
       const str = ps.toString();
       if (str) path += "?" + str;
@@ -285,7 +285,7 @@ function embedHref(params) {
     return url;
   }
   if (p.shop != null && p.shop !== "") {
-    // Numeric id fallback (old callers) — prefer name when shopName is passed
+    // Numeric id fallback (old callers) - prefer name when shopName is passed
     const slug = shopSlugBase(p.shopName) || ("shop-" + p.shop);
     let url = SITE_PUBLIC + "/shops/" + encodeURIComponent(slug) + "/";
     if (p.listing != null && p.listing !== "") url += "?listing=" + encodeURIComponent(String(p.listing));
@@ -560,7 +560,7 @@ function isBundleItem(name) {
   return /\bbundle\b/i.test(String(name || ""));
 }
 
-/** Items that can carry listing-level enchants (not bundles — those use per-slot enchants). */
+/** Items that can carry listing-level enchants (not bundles - those use per-slot enchants). */
 function isEnchantableItem(name) {
   const n = String(name || "").toLowerCase().trim();
   if (!n || isBundleItem(n)) return false;
@@ -694,14 +694,14 @@ function itemEnchantKind(itemName) {
 
 /**
  * Enchant filter modes for a market item page.
- * Returns [{ id, label, match(listing) }, ...] — first is Unenchanted (default).
+ * Returns [{ id, label, match(listing) }, ...] - first is Unenchanted (default).
  *
  * Expected max sets (CivMC / site labels; "everything but X" = required max minus exclusions):
- * - Helmet: Prot IV, Unb III, Respiration III, Aqua Affinity — no Mending, no Thorns
- * - Chestplate: Prot IV, Unb III — no Mending, no Thorns
- * - Leggings: Prot IV, Unb III — no Mending, no Thorns, no Swift Sneak
- * - Boots: Prot IV, Unb III, Feather Falling IV, Depth Strider III — no Mending/Thorns/Frost Walker/Soul Speed
- * - Sword: Sharp V, Unb III, Looting III, Sweeping Edge III, Fire Aspect II — no Mending; KB mode adds Knockback II
+ * - Helmet: Prot IV, Unb III, Respiration III, Aqua Affinity - no Mending, no Thorns
+ * - Chestplate: Prot IV, Unb III - no Mending, no Thorns
+ * - Leggings: Prot IV, Unb III - no Mending, no Thorns, no Swift Sneak
+ * - Boots: Prot IV, Unb III, Feather Falling IV, Depth Strider III - no Mending/Thorns/Frost Walker/Soul Speed
+ * - Sword: Sharp V, Unb III, Looting III, Sweeping Edge III, Fire Aspect II - no Mending; KB mode adds Knockback II
  * - Pickaxe: Eff V + Unb III + Silk|Fortune III; debris = Eff III + Unb III (+ silk/fortune variants)
  * - Shovel/Axe: Eff V + Unb III + silk|fortune|neither; Hoe: Eff V + Unb III + Fortune III
  * - Else: sensible max without Mending; mace Density vs Breach; crossbow Multishot vs Piercing; etc.
@@ -913,7 +913,7 @@ function bundleContentsPreviewHtml(contents, opts) {
   return `<div class="bundle-gui${o.compact ? " compact" : ""}" title="Bundle contents">${cells}</div>`;
 }
 
-/** Extra payment options beyond primary want_* — max 2 → 3 prices total. */
+/** Extra payment options beyond primary want_* - max 2 → 3 prices total. */
 function normalizeAltWants(raw) {
   if (raw == null || raw === "") return null;
   let arr = raw;
@@ -1213,7 +1213,7 @@ function userName(p) {
   if (!p) return "?";
   return p.username || p.login_username || p.mc_username || "?";
 }
-/** Profile-hero display casing only — does not change stored login usernames. */
+/** Profile-hero display casing only - does not change stored login usernames. */
 function profileDisplayName(p) {
   if (!p) return "?";
   const login = String(p.username || p.login_username || "").trim();
@@ -1230,9 +1230,11 @@ function mapUrl(x, z) {
   // CivInfo map: https://map.civinfo.net/#c=x,z
   return MAP_BASE + "#c=" + encodeURIComponent(x) + "," + encodeURIComponent(z);
 }
-function coordsHtml(x, z) {
+/** @param {{ approx?: boolean }} [opts] Unknown listings: prefix label with ~ (player-approx coords). */
+function coordsHtml(x, z, opts) {
   if (x == null || z == null) return "no coords";
-  return `<a class="maplink" href="${esc(mapUrl(x, z))}" target="_blank" rel="noopener" title="Open on CivInfo map">${esc(x)}, ${esc(z)}</a>`;
+  const label = (opts && opts.approx ? "~" : "") + x + ", " + z;
+  return `<a class="maplink" href="${esc(mapUrl(x, z))}" target="_blank" rel="noopener" title="Open on CivInfo map">${esc(label)}</a>`;
 }
 function emptyState(text, actionHref, actionLabel) {
   const btn = actionHref
@@ -2481,8 +2483,17 @@ const REPORT_REASONS = [
   { id: "false_advertising", label: "False advertising" },
   { id: "other", label: "Other" }
 ];
+/** Crowd-scanned unknowns. Not the shop/listing reasons. */
+const UNKNOWN_REPORT_REASONS = [
+  { id: "unk_wrong_trade", label: "Wrong trade" },
+  { id: "unk_wrong_place", label: "Wrong location" },
+  { id: "unk_already_listed", label: "Already a shop" },
+  { id: "unk_gone", label: "Shop is gone" },
+  { id: "unk_not_shop", label: "Not a shop" },
+  { id: "other", label: "Other" }
+];
 function reportReasonLabel(id) {
-  const r = REPORT_REASONS.find(x => x.id === id);
+  const r = REPORT_REASONS.find(x => x.id === id) || UNKNOWN_REPORT_REASONS.find(x => x.id === id);
   return r ? r.label : (id || "Other");
 }
 function formatReportReason(category, details) {
@@ -2492,11 +2503,17 @@ function formatReportReason(category, details) {
 }
 function parseReportReason(r) {
   const cat = r && r.reason_category;
-  if (cat && REPORT_REASONS.some(x => x.id === cat)) {
-    return { category: cat, label: reportReasonLabel(cat), details: String(r.reason || "").trim() };
+  const known = REPORT_REASONS.concat(UNKNOWN_REPORT_REASONS);
+  if (cat && known.some(x => x.id === cat)) {
+    const label = reportReasonLabel(cat);
+    let details = String(r.reason || "").trim();
+    if (details === label) details = "";
+    const pref = label + ": ";
+    if (details.startsWith(pref)) details = details.slice(pref.length);
+    return { category: cat, label, details };
   }
   const raw = String((r && r.reason) || "").trim();
-  for (const opt of REPORT_REASONS) {
+  for (const opt of known) {
     if (raw === opt.label) return { category: opt.id, label: opt.label, details: "" };
     const pref = opt.label + ": ";
     if (raw.startsWith(pref)) return { category: opt.id, label: opt.label, details: raw.slice(pref.length) };
@@ -2607,19 +2624,21 @@ function promptModal(opts) {
 }
 
 /** Report dialog with reason chips + details. Returns {text, kind} or null if cancelled. */
-async function sendReport(type, id) {
+async function sendReport(type, id, reasons) {
   const session = await getSession();
   if (!session) { location.href = loginHref(); return null; }
   closeUiModal();
+  const list = (reasons && reasons.length) ? reasons : REPORT_REASONS;
+  const title = type === "unknown" ? "Report this scan" : ("Report " + type);
   const picked = await new Promise(resolve => {
     const root = document.createElement("div");
     root.id = "ui-modal-root";
     root.className = "modal-overlay ui-modal-overlay";
     root.innerHTML = `<div class="modal ui-modal ui-modal-report" role="dialog" aria-modal="true" aria-labelledby="ui-modal-title">
-      <h2 id="ui-modal-title">Report ${esc(type)}</h2>
+      <h2 id="ui-modal-title">${esc(title)}</h2>
       <p class="meta" style="margin:0 0 8px">Pick a reason. A mod or admin will look at it.</p>
       <div class="report-reason-chips" id="report-chips">
-        ${REPORT_REASONS.map((r, i) => `<button type="button" class="small report-chip${i === 0 ? " on" : ""}" data-reason="${r.id}">${esc(r.label)}</button>`).join("")}
+        ${list.map((r, i) => `<button type="button" class="small report-chip${i === 0 ? " on" : ""}" data-reason="${r.id}">${esc(r.label)}</button>`).join("")}
       </div>
       <label class="meta" for="report-details">Details (optional, required for Other)</label>
       <textarea id="report-details" maxlength="500" rows="3" placeholder="Anything mods should know…"></textarea>
@@ -2631,7 +2650,7 @@ async function sendReport(type, id) {
     </div>`;
     document.body.appendChild(root);
     document.body.classList.add("ui-modal-open");
-    let category = "inappropriate";
+    let category = list[0].id;
     const chips = root.querySelector("#report-chips");
     const details = root.querySelector("#report-details");
     const errEl = root.querySelector("#report-modal-msg");
