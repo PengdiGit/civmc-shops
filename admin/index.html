@@ -25,14 +25,12 @@
             <span class="collapse-chevron" aria-hidden="true"></span>
             <span class="mod-section-head-text">
               <span class="mod-section-title">Awaiting links</span>
-              <span class="meta">New accounts that have not connected Discord + Minecraft yet. Deny deletes them. Incomplete accounts expire after 24 hours.</span>
+              <span class="meta">New accounts that have not connected Discord + Minecraft yet. Deny deletes them.</span>
             </span>
           </button>
         </h2>
       </div>
       <div class="collapse-body" id="collapse-awaiting">
-        <div class="msg" id="purgemsg"></div>
-        <button type="button" class="small btn-report" data-act="purge-unverified">Purge expired incomplete now</button>
         <div class="mod-stack" id="awaiting"></div>
       </div>
     </section>
@@ -238,12 +236,11 @@
 <script src="../config.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=27"></script>
+<script src="../app.js?v=28"></script>
 <script>
 const msg = document.getElementById("msg");
 const usermsg = document.getElementById("usermsg");
 const aliasmsg = document.getElementById("aliasmsg");
-const purgemsg = document.getElementById("purgemsg");
 const filter = document.getElementById("filter");
 let me = null;
 let accounts = [];
@@ -472,8 +469,6 @@ async function render() {
     if (!r.ok) { setMsg(usermsg, r.message, "err"); }
     else {
       accounts = r.data.accounts;
-      const ap = r.data.auto_purged || 0;
-      if (ap > 0) setMsg(purgemsg, "Auto-purged " + ap + " expired unverified account" + (ap === 1 ? "" : "s") + " on load.", "ok");
     }
 
     const awaiting = (r.ok && r.data.awaiting_links) || accounts.filter(a =>
@@ -485,14 +480,13 @@ async function render() {
       const dc = a.discord_username || (a.discord_id ? "linked" : "—");
       const mc = a.mc_username || (a.mc_uuid ? "linked" : "—");
       const civ = a.civinfo_known === true ? " · CivInfo: yes" : a.civinfo_known === false ? " · CivInfo: no" : "";
-      const left = !(a.discord_id && a.mc_uuid) ? ` · <b>${timeLeft(a.created_at)}</b> left` : "";
       const actions = opts.accept
         ? `<button class="small primary" data-act="accept" data-id="${a.id}">Accept</button>
            <button class="small btn-report" data-act="deny" data-id="${a.id}">Deny</button>`
         : `<button class="small btn-report" data-act="deny" data-id="${a.id}">Deny</button>`;
       return `<div class="card admin-card">
         <div class="top">
-          <div><b>${esc(userName(a))}</b> <span class="meta">MC ${esc(mc)} \u00b7 Discord: ${esc(dc)}${civ} \u00b7 signed up ${fmtDate(a.created_at)}${left}</span></div>
+          <div><b>${esc(userName(a))}</b> <span class="meta">MC ${esc(mc)} \u00b7 Discord: ${esc(dc)}${civ} \u00b7 signed up ${fmtDate(a.created_at)}</span></div>
           <div class="inline-actions">${actions}</div>
         </div>
       </div>`;
@@ -648,27 +642,6 @@ document.querySelector("main").addEventListener("click", async e => {
     return;
   }
   const act = btn.dataset.act;
-
-  if (act === "purge-unverified") {
-    if (!me.is_head) { setMsg(purgemsg, "Only the head admin can purge.", "err"); return; }
-    if (!await confirmModal({
-      title: "Purge unverified",
-      body: "Delete every unverified non-staff account older than 24 hours? Pending signups under 24 hours are left alone. This can't be undone.",
-      confirmLabel: "Purge now",
-      danger: true
-    })) return;
-    setMsg(purgemsg, "Purging...");
-    const r = await callFn("review-signup", { action: "purge_unverified" });
-    if (!r.ok) { setMsg(purgemsg, r.message, "err"); return; }
-    const n = (r.data && r.data.purged) || 0;
-    if (n === 0) {
-      setMsg(purgemsg, "No unverified accounts older than 24 hours to purge.", "ok");
-    } else {
-      setMsg(purgemsg, "Purged " + n + " account" + (n === 1 ? "" : "s") + ".", "ok");
-    }
-    render();
-    return;
-  }
 
   if (act === "alias-preview" || act === "alias-apply") {
     const from = document.getElementById("alias-from").value.trim();

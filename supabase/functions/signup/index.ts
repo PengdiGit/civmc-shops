@@ -1,7 +1,6 @@
 // PUBLIC self-signup. Username + password only.
 // Account stays guest-level until Discord + Minecraft are linked via link-oauth.
 // Public verified badge still requires head admin Accept.
-// Also deletes incomplete (unlinked, non-staff) accounts older than 24h.
 // Deploy: supabase functions deploy signup
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -12,26 +11,10 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-async function purgeExpired(admin: ReturnType<typeof createClient>) {
-  const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const { data: old, error } = await admin.from("profiles").select("id, discord_id, mc_uuid")
-    .is("verified_at", null)
-    .eq("is_admin", false).eq("is_mod", false).eq("is_head", false)
-    .eq("is_business", false).eq("is_nation", false)
-    .lt("created_at", cutoff);
-  if (error) return;
-  for (const o of old || []) {
-    // Keep accounts that finished linking (awaiting Accept badge)
-    if (o.discord_id && o.mc_uuid) continue;
-    await admin.auth.admin.deleteUser(o.id);
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  await purgeExpired(admin);
   const body = await req.json();
   const username = String(body.username || "").trim().toLowerCase();
   const password = String(body.password || "");

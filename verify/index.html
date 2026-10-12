@@ -14,7 +14,6 @@
     <h1>Connect your accounts</h1>
     <p class="sub" id="verify-intro">Connect Discord and Minecraft to unlock shops, comments, reviews, and uploads. Until then you can browse, favourite, and report.</p>
     <div class="msg" id="verify-status" hidden></div>
-    <div id="verify-countdown" class="verify-countdown" hidden></div>
 
     <ol class="verify-steps" id="verify-steps">
       <li class="verify-step" id="step-discord">
@@ -55,7 +54,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=27"></script>
+<script src="../app.js?v=28"></script>
 <script>
 (function () {
   const login = document.getElementById("verify-login");
@@ -75,7 +74,6 @@ function showSoftMc(reason) {
 
 function paintLinked(profile) {
   const status = document.getElementById("verify-status");
-  const countdown = document.getElementById("verify-countdown");
   const intro = document.getElementById("verify-intro");
   const foot = document.getElementById("verify-foot");
   const dcMeta = document.getElementById("discord-meta");
@@ -112,7 +110,6 @@ function paintLinked(profile) {
   if (profile && profile.verified_at && linked) {
     intro.hidden = true;
     document.getElementById("verify-steps").hidden = true;
-    countdown.hidden = true;
     status.hidden = false;
     status.className = "msg ok";
     status.innerHTML = `<b>You're verified.</b> Public badge is on. <a href="../home/">Go to Find</a> · <a href="../dashboard/">My shops</a>`;
@@ -124,14 +121,7 @@ function paintLinked(profile) {
     status.hidden = false;
     status.className = "msg ok";
     status.innerHTML = `<b>Accounts connected.</b> You can use shops, comments, and reviews. A head admin may add the public verified badge later.`;
-    countdown.hidden = true;
     if (stepDone) stepDone.classList.add("verify-step-done");
-    return;
-  }
-
-  if (needsVerification(profile)) {
-    countdown.hidden = false;
-    countdown.innerHTML = `<b>${esc(deleteCountdownText(profile.created_at))}</b>.`;
   }
 }
 

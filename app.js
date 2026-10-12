@@ -1818,13 +1818,6 @@ async function uploadImage(file, folder, uid) {
   return error ? { ok: false, message: error.message } : { ok: true, path };
 }
 
-// unverified accounts are deleted 24h after signup: "5h 12m" / "under a minute" / "expired"
-function timeLeft(createdAt) {
-  const ms = new Date(createdAt).getTime() + 24 * 3600000 - Date.now();
-  if (ms <= 0) return "expired";
-  const m = Math.floor(ms / 60000);
-  return m < 1 ? "under a minute" : Math.floor(m / 60) + "h " + (m % 60) + "m";
-}
 /** Discord + Minecraft OAuth both linked. */
 function isLinked(p) {
   return !!(p && p.discord_id && p.mc_uuid);
@@ -1843,12 +1836,6 @@ function hasAccountAccess(p) {
 /** Banner: signed up but not yet linked (and not staff/shared/admin-created). */
 function needsVerification(p) {
   return !!(p && !isLinked(p) && !p.verified_at && !p.is_admin && !p.is_mod && !p.is_head && !p.is_business && !p.is_nation);
-}
-function deleteCountdownText(createdAt) {
-  const left = timeLeft(createdAt);
-  return left === "expired"
-    ? "your account is past the linking window and may be deleted soon"
-    : "connect Discord + Minecraft within " + left + " or the account may be deleted";
 }
 
 // ------------------------------------------------------------ Minecraft-style text + shop icons
@@ -2362,9 +2349,8 @@ function renderVerifyBanner(profile) {
     else document.body.insertBefore(bar, document.body.firstChild);
   }
   document.body.classList.add("has-verify-banner");
-  const countdown = deleteCountdownText(profile.created_at);
   bar.innerHTML =
-    `<span class="verify-banner-text">Connect Discord + Minecraft - <b>${esc(countdown)}</b>.</span>` +
+    `<span class="verify-banner-text">Connect Discord + Minecraft to unlock shops, comments, and reviews.</span>` +
     `<a class="primary small verify-banner-cta" href="${pageHref("verify")}">verify here</a>`;
   syncTopChromeOffset();
   observeTopChrome();

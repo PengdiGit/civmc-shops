@@ -3,7 +3,6 @@
 //   accept : set public verified badge (verified_at) — only when Discord+MC linked
 //   deny   : delete account and everything it made
 //   delete : delete ANY account except the head's own
-//   purge_unverified : delete incomplete (unlinked) non-staff accounts older than 24h
 // Deploy: supabase functions deploy review-signup
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -14,8 +13,6 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-const CUTOFF_MS = 24 * 3600 * 1000;
-
 type Admin = ReturnType<typeof createClient>;
 
 function isStaffish(p: { is_admin?: boolean; is_mod?: boolean; is_head?: boolean; is_business?: boolean; is_nation?: boolean }) {
@@ -24,31 +21,6 @@ function isStaffish(p: { is_admin?: boolean; is_mod?: boolean; is_head?: boolean
 
 function isLinked(p: { discord_id?: string | null; mc_uuid?: string | null }) {
   return !!(p.discord_id && p.mc_uuid);
-}
-
-/** Incomplete linkers older than 24h (not staff, no public badge yet). */
-async function listExpiredIncomplete(admin: Admin) {
-  const cutoff = new Date(Date.now() - CUTOFF_MS).toISOString();
-  const { data, error } = await admin.from("profiles").select("id, username, mc_username, discord_id, mc_uuid")
-    .is("verified_at", null)
-    .eq("is_admin", false).eq("is_mod", false).eq("is_head", false)
-    .eq("is_business", false).eq("is_nation", false)
-    .lt("created_at", cutoff);
-  if (error) throw new Error(error.message);
-  return (data || []).filter((o) => !isLinked(o));
-}
-
-async function purgeExpired(admin: Admin) {
-  const old = await listExpiredIncomplete(admin);
-  let purged = 0;
-  const errors: string[] = [];
-  for (const o of old) {
-    await removeFiles(admin, o.id);
-    const { error } = await admin.auth.admin.deleteUser(o.id);
-    if (error) errors.push(`${o.username || o.mc_username || o.id}: ${error.message}`);
-    else purged++;
-  }
-  return { purged, errors, found: old.length };
 }
 
 async function removeFiles(admin: Admin, uid: string) {
@@ -71,23 +43,7 @@ Deno.serve(async (req) => {
 
   const { action, user_id } = await req.json();
 
-  if (action === "purge_unverified") {
-    try {
-      const { purged, errors, found } = await purgeExpired(admin);
-      if (errors.length && purged === 0) {
-        return json({ error: "Purge failed: " + errors[0] }, 400);
-      }
-      return json({ ok: true, purged, found, errors: errors.length ? errors : undefined });
-    } catch (e) {
-      return json({ error: e instanceof Error ? e.message : "Purge failed." }, 400);
-    }
-  }
-
   if (action === "list") {
-    let auto_purged = 0;
-    try {
-      auto_purged = (await purgeExpired(admin)).purged;
-    } catch (_) { /* listing still useful if cleanup fails */ }
     const { data: profiles, error } = await admin.from("profiles").select("*");
     if (error) return json({ error: error.message }, 400);
     const { data: list, error: lErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
@@ -108,7 +64,7 @@ Deno.serve(async (req) => {
     const awaiting_links = queue.filter((a) => !isLinked(a));
     const ready_for_review = queue.filter((a) => isLinked(a));
 
-    return json({ accounts, awaiting_links, ready_for_review, auto_purged });
+    return json({ accounts, awaiting_links, ready_for_review });
   }
 
   if (action === "delete") {
