@@ -217,7 +217,7 @@
   <div id="ads-wrap" style="display:none">
     <section class="mod-section mod-section--ads collapse-section admin-collapse" id="directory-ads" data-collapse="directory-ads" aria-labelledby="admin-ads-h">
       <div class="mod-section-head">
-        <h2 id="admin-ads-h"><button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-directory-ads"><span class="collapse-chevron" aria-hidden="true"></span><span class="mod-section-head-text"><span class="mod-section-title">Directory ads</span><span class="meta">Head admin only. In-game shop and event promotions shown in the Find Directory board.</span></span></button></h2>
+        <h2 id="admin-ads-h"><button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-directory-ads"><span class="collapse-chevron" aria-hidden="true"></span><span class="mod-section-head-text"><span class="mod-section-title">Directory ads</span><span class="meta">pengdi only. Promotions in the Find Directory board (web + in-game).</span></span></button></h2>
       </div>
       <div class="collapse-body directory-ad-admin" id="collapse-directory-ads">
         <div class="directory-ad-admin-grid">
@@ -296,6 +296,12 @@ function profileIsHead(p) {
   return !!(p && (p.is_head === true || p.is_head === "true" || p.is_head === 1));
 }
 
+/** Directory ads editor: pengdi only (RLS still requires head on save). */
+function canEditDirectoryAds(p) {
+  const u = String((p && (p.username || p.login_username)) || "").trim().toLowerCase();
+  return u === "pengdi";
+}
+
 async function resolveIsHead(profile) {
   if (profileIsHead(profile)) return true;
   try {
@@ -312,9 +318,14 @@ function showHeadAdminPanels() {
   if (typeof bindPlaceFieldsIn === "function") bindPlaceFieldsIn(document.getElementById("form"));
   document.getElementById("pending-wrap").style.display = "block";
   document.getElementById("sales-wrap").style.display = "block";
-  document.getElementById("ads-wrap").style.display = "block";
   document.getElementById("unknowns-wrap").style.display = "block";
   setupSalesUi();
+}
+
+function showDirectoryAdsPanel() {
+  const wrap = document.getElementById("ads-wrap");
+  if (!wrap) return;
+  wrap.style.display = "block";
   try {
     setupDirectoryAdsUi();
   } catch (e) {
@@ -332,11 +343,13 @@ async function load() {
   if (head) {
     me.is_head = true;
     showHeadAdminPanels();
-  } else {
+  }
+  if (canEditDirectoryAds(me)) {
+    showDirectoryAdsPanel();
+  } else if (!head) {
     document.getElementById("headnote").textContent =
-      "Directory ads and signup tools are head-admin only. You are on Admin as "
-      + (me && me.username ? me.username : "this account")
-      + " — log in as pengdi (head) or exit impersonation.";
+      "Head-admin tools need the head account. You are signed in as "
+      + (me && me.username ? me.username : "this account") + ".";
   }
   const dl = document.getElementById("alias-from-list");
   if (dl) dl.innerHTML = Object.keys(PLACE_ALIASES).map(k => `<option value="${esc(k)}">`).join("");
