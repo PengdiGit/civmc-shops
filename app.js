@@ -618,7 +618,12 @@ async function loadDirectoryAdSlot(slot, kind = "web") {
     const ad = ads.length === 1 ? ads[0] : ads[Math.floor(Date.now() / 15000) % ads.length];
     slot.hidden = false;
     slot.title = ad.title || "Directory ad";
-    renderDirectoryAdCanvas(slot, kind === "mod" ? ad.layout_mod : ad.layout_web, { kind });
+    const canvasOpts = { kind };
+    if (slot.classList.contains("find-directory-ad")) {
+      canvasOpts.fitHeight = 110;
+      canvasOpts.maxScale = 1;
+    }
+    renderDirectoryAdCanvas(slot, kind === "mod" ? ad.layout_mod : ad.layout_web, canvasOpts);
   } catch (e) { console.warn("directory ads", e); slot.hidden = true; }
 }
 
