@@ -499,6 +499,129 @@ function esc(s) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 function norm(s) { return s.trim().toLowerCase().replace(/\s+/g, " "); }
+
+function directoryAdDefaultDoc(kind) {
+  const mod = kind === "mod";
+  return {
+    w: mod ? 280 : 420,
+    h: mod ? 70 : 110,
+    bg: "#1E211C",
+    elements: [
+      { id: "bg", type: "box", x: 0, y: 0, w: mod ? 280 : 420, h: mod ? 70 : 110, fill: "#242722", stroke: "#4A5A3E" },
+      { id: "title", type: "text", x: 10, y: 10, w: mod ? 190 : 280, h: 18, text: "Advertise your shop", color: "#E6E4DA", size: mod ? 1 : 1.25 },
+      { id: "body", type: "text", x: 10, y: 30, w: mod ? 210 : 320, h: 18, text: "Server events, markets, and shop specials.", color: "#AEB7A5", size: 1 },
+      { id: "cta", type: "button", x: 10, y: mod ? 50 : 78, w: 82, h: 18, label: "Visit", href: "/home/", style: "primary" }
+    ]
+  };
+}
+
+function directoryAdColor(value, fallback) {
+  const s = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(s) ? s : fallback;
+}
+
+function normalizeDirectoryAdDoc(raw, kind) {
+  const base = directoryAdDefaultDoc(kind);
+  const src = raw && typeof raw === "object" ? raw : {};
+  const doc = {
+    w: Math.max(80, Math.min(900, Number(src.w) || base.w)),
+    h: Math.max(40, Math.min(500, Number(src.h) || base.h)),
+    bg: directoryAdColor(src.bg, base.bg),
+    elements: []
+  };
+  const els = Array.isArray(src.elements) ? src.elements : [];
+  doc.elements = els.slice(0, 40).map((el, i) => {
+    const type = ["text", "box", "button", "image"].includes(el && el.type) ? el.type : "text";
+    return {
+      id: String((el && el.id) || (type + "-" + i)), type,
+      x: Number(el && el.x) || 0, y: Number(el && el.y) || 0,
+      w: Math.max(4, Number(el && el.w) || (type === "button" ? 80 : 120)),
+      h: Math.max(4, Number(el && el.h) || (type === "text" ? 16 : 24)),
+      text: String((el && el.text) || ""), label: String((el && el.label) || "Button"),
+      href: String((el && el.href) || ""), src: String((el && el.src) || ""),
+      color: directoryAdColor(el && el.color, "#E6E4DA"),
+      fill: directoryAdColor(el && el.fill, "#242722"),
+      stroke: directoryAdColor(el && el.stroke, "#4A5A3E"),
+      size: Math.max(.7, Math.min(3, Number(el && el.size) || 1)),
+      style: (el && el.style) === "ghost" ? "ghost" : "primary"
+    };
+  });
+  return doc;
+}
+
+function directoryAdHref(href) {
+  const h = String(href || "").trim();
+  if (!h) return "";
+  try { const u = new URL(h, location.origin); return /^https?:$/.test(u.protocol) ? u.href : ""; }
+  catch (e) { return ""; }
+}
+
+function directoryAdImageSrc(src) {
+  const s = String(src || "").trim();
+  if (!s) return "";
+  try { const u = new URL(s, location.origin); return /^https?:$/.test(u.protocol) ? u.href : ""; }
+  catch (e) { return ""; }
+}
+
+function renderDirectoryAdCanvas(target, rawDoc, opts = {}) {
+  if (!target) return null;
+  const doc = normalizeDirectoryAdDoc(rawDoc, opts.kind || "web");
+  target.innerHTML = "";
+  target.classList.add("directory-ad-slot-ready");
+  const fitW = Math.max(1, opts.fitWidth || target.clientWidth || doc.w);
+  const fitH = Math.max(1, opts.fitHeight || target.clientHeight || doc.h);
+  const scale = Math.min(fitW / doc.w, fitH / doc.h, opts.maxScale || 1.6);
+  const outer = document.createElement("div");
+  outer.className = "directory-ad-canvas";
+  outer.style.width = doc.w + "px";
+  outer.style.height = doc.h + "px";
+  outer.style.background = doc.bg;
+  outer.style.transform = "scale(" + scale + ")";
+  outer.style.transformOrigin = "top left";
+  target.style.minHeight = Math.ceil(doc.h * scale) + "px";
+  target.style.height = Math.ceil(doc.h * scale) + "px";
+  target.appendChild(outer);
+  for (const el of doc.elements) {
+    const node = el.type === "button" ? document.createElement("a") : document.createElement("div");
+    node.className = "directory-ad-el directory-ad-el-" + el.type + (el.style === "ghost" ? " is-ghost" : "");
+    node.style.left = el.x + "px"; node.style.top = el.y + "px";
+    node.style.width = el.w + "px"; node.style.height = el.h + "px";
+    node.style.color = el.color; node.style.fontSize = (10 * el.size) + "px";
+    if (el.type === "box") { node.style.background = el.fill; node.style.borderColor = el.stroke; }
+    else if (el.type === "button") {
+      node.textContent = el.label; node.href = directoryAdHref(el.href) || "#"; node.target = "_blank"; node.rel = "noopener noreferrer";
+      if (!directoryAdHref(el.href)) node.setAttribute("aria-disabled", "true");
+    } else if (el.type === "image") {
+      const img = document.createElement("img"); img.alt = ""; img.src = directoryAdImageSrc(el.src); node.appendChild(img);
+    } else node.textContent = el.text;
+    if (opts.decorateElement) opts.decorateElement(node, el, doc);
+    outer.appendChild(node);
+  }
+  return { doc, scale, outer };
+}
+
+async function fetchActiveDirectoryAds(limit = 3) {
+  const now = new Date().toISOString();
+  const { data, error } = await sb.from("directory_ads")
+    .select("id,title,starts_at,ends_at,enabled,priority,layout_web,layout_mod,created_at,updated_at")
+    .eq("enabled", true).lte("starts_at", now).gt("ends_at", now)
+    .order("priority", { ascending: false }).order("created_at", { ascending: false }).limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+async function loadDirectoryAdSlot(slot, kind = "web") {
+  if (!slot) return;
+  try {
+    const ads = await fetchActiveDirectoryAds(3);
+    if (!ads.length) { slot.innerHTML = ""; slot.hidden = true; return; }
+    const ad = ads.length === 1 ? ads[0] : ads[Math.floor(Date.now() / 15000) % ads.length];
+    slot.hidden = false;
+    slot.title = ad.title || "Directory ad";
+    renderDirectoryAdCanvas(slot, kind === "mod" ? ad.layout_mod : ad.layout_web, { kind });
+  } catch (e) { console.warn("directory ads", e); slot.hidden = true; }
+}
+
 function daysAgo(ts) { return Math.floor((Date.now() - new Date(ts).getTime()) / 86400000); }
 function agoText(ts) {
   const d = daysAgo(ts);
@@ -2483,6 +2606,14 @@ const REPORT_REASONS = [
   { id: "false_advertising", label: "False advertising" },
   { id: "other", label: "Other" }
 ];
+const PLAYER_REPORT_REASONS = [
+  { id: "harassment", label: "Harassment / toxic behavior" },
+  { id: "impersonation", label: "Impersonation" },
+  { id: "scam", label: "Scam / bad faith trading" },
+  { id: "inappropriate_content", label: "Inappropriate content" },
+  { id: "spam", label: "Spam" },
+  { id: "other", label: "Other" }
+];
 /** Crowd-scanned unknowns. Not the shop/listing reasons. */
 const UNKNOWN_REPORT_REASONS = [
   { id: "unk_wrong_trade", label: "Wrong trade" },
@@ -2493,7 +2624,9 @@ const UNKNOWN_REPORT_REASONS = [
   { id: "other", label: "Other" }
 ];
 function reportReasonLabel(id) {
-  const r = REPORT_REASONS.find(x => x.id === id) || UNKNOWN_REPORT_REASONS.find(x => x.id === id);
+  const r = REPORT_REASONS.find(x => x.id === id)
+    || PLAYER_REPORT_REASONS.find(x => x.id === id)
+    || UNKNOWN_REPORT_REASONS.find(x => x.id === id);
   return r ? r.label : (id || "Other");
 }
 function formatReportReason(category, details) {
@@ -2503,7 +2636,7 @@ function formatReportReason(category, details) {
 }
 function parseReportReason(r) {
   const cat = r && r.reason_category;
-  const known = REPORT_REASONS.concat(UNKNOWN_REPORT_REASONS);
+  const known = REPORT_REASONS.concat(PLAYER_REPORT_REASONS, UNKNOWN_REPORT_REASONS);
   if (cat && known.some(x => x.id === cat)) {
     const label = reportReasonLabel(cat);
     let details = String(r.reason || "").trim();
@@ -2628,8 +2761,10 @@ async function sendReport(type, id, reasons) {
   const session = await getSession();
   if (!session) { location.href = loginHref(); return null; }
   closeUiModal();
-  const list = (reasons && reasons.length) ? reasons : REPORT_REASONS;
-  const title = type === "unknown" ? "Report this scan" : ("Report " + type);
+  const list = (reasons && reasons.length) ? reasons
+    : type === "user" ? PLAYER_REPORT_REASONS
+    : REPORT_REASONS;
+  const title = type === "unknown" ? "Report this scan" : type === "user" ? "Report this user" : ("Report " + type);
   const picked = await new Promise(resolve => {
     const root = document.createElement("div");
     root.id = "ui-modal-root";

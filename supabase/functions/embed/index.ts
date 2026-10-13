@@ -1,5 +1,5 @@
 // Per-shop / per-profile Open Graph HTML for Discord/Slack (and oEmbed JSON).
-// Called by the civshops bot proxy (Cloudflare Worker or nginx) — crawlers never need this URL in chat.
+// Called by the civshops bot proxy (Cloudflare Worker or nginx) - crawlers never need this URL in chat.
 // Deploy: supabase functions deploy embed --no-verify-jwt
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -61,7 +61,7 @@ type Embed = {
 
 function pageHtml(e: Embed) {
   const title = e.title || "CivMC Shops";
-  const desc = e.description || "CivMC shop directory — find shops, compare prices, browse the diamond market.";
+  const desc = e.description || "CivMC shop directory - find shops, compare prices, browse the diamond market.";
   const url = e.url || SITE + "/home/";
   const image = e.image || itemImg("chest");
   const site = e.siteName || "CivMC Shops";

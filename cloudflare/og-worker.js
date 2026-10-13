@@ -1,11 +1,11 @@
 /**
- * CivMC Shops — Discord/Slack Open Graph proxy
+ * CivMC Shops - Discord/Slack Open Graph proxy
  *
  * Humans: pass through to GitHub Pages.
  * Crawlers: call the Supabase embed function so previews show shop name, icon, description, owner.
  *
  * Setup (Cloudflare, ~5 min):
- * 1. Add pengworld.net to Cloudflare (free) — or only proxy the civshops CNAME (orange cloud).
+ * 1. Add pengworld.net to Cloudflare (free) - or only proxy the civshops CNAME (orange cloud).
  * 2. Workers → Create → paste this file.
  * 3. Settings → Triggers → Add route: civshops.pengworld.net/*
  * 4. Keep DNS: civshops CNAME → pengdigit.github.io (proxied / orange cloud).

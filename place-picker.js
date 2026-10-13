@@ -82,7 +82,7 @@
     if (!items.length) {
       const empty = document.createElement("div");
       empty.className = "place-combo-empty meta";
-      empty.textContent = "No matches — you can still type a custom name";
+      empty.textContent = "No matches - you can still type a custom name";
       box.appendChild(empty);
       box.hidden = false;
       input.setAttribute("aria-expanded", "true");
