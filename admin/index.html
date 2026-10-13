@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin - CivMC Shops</title>
-<link rel="stylesheet" href="../style.css?v=12">
+<link rel="stylesheet" href="../style.css?v=13">
 </head>
 <body class="admin-page">
 <nav id="nav"></nav>
@@ -214,10 +214,10 @@
     </section>
   </div>
 
-  <div id="ads-wrap" style="display:none">
+  <div id="ads-wrap" class="admin-ads-panel" hidden>
     <section class="mod-section mod-section--ads collapse-section admin-collapse" id="directory-ads" data-collapse="directory-ads" aria-labelledby="admin-ads-h">
       <div class="mod-section-head">
-        <h2 id="admin-ads-h"><button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-directory-ads"><span class="collapse-chevron" aria-hidden="true"></span><span class="mod-section-head-text"><span class="mod-section-title">Directory ads</span><span class="meta">pengdi only. Promotions in the Find Directory board (web + in-game).</span></span></button></h2>
+        <h2 id="admin-ads-h"><button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-directory-ads"><span class="collapse-chevron" aria-hidden="true"></span><span class="mod-section-head-text"><span class="mod-section-title">Directory ads</span><span class="meta">Head admin. Promotions in the Find Directory board (web + in-game).</span></span></button></h2>
       </div>
       <div class="collapse-body directory-ad-admin" id="collapse-directory-ads">
         <div class="directory-ad-admin-grid">
@@ -296,10 +296,48 @@ function profileIsHead(p) {
   return !!(p && (p.is_head === true || p.is_head === "true" || p.is_head === 1));
 }
 
-/** Directory ads editor: pengdi only (RLS still requires head on save). */
-function canEditDirectoryAds(p) {
-  const u = String((p && (p.username || p.login_username)) || "").trim().toLowerCase();
-  return u === "pengdi";
+function profileIdentity(p) {
+  if (!p) return { username: "", login: "", mc: "", display: "", email: "" };
+  const username = String(p.username || "").trim();
+  const login = String(p.login_username || p.username || "").trim();
+  const mc = String(p.mc_username || "").trim();
+  const email = String(p.email || "").trim();
+  let display = username;
+  if (typeof userName === "function") {
+    try { display = userName(p) || username; } catch (e) { /* ignore */ }
+  }
+  return { username, login, mc, display, email };
+}
+
+/** Directory ads: anyone who gets head tools, plus pengdi on any identity field. */
+function canEditDirectoryAds(p, head) {
+  if (head) return true;
+  if (p && (p.is_admin || p.is_head)) return true;
+  const id = profileIdentity(p);
+  const blob = [id.username, id.login, id.mc, id.display, id.email, p && p.discord_username]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return blob.includes("pengdi");
+}
+
+function updateAdsDebugNote(p, head, adsOn) {
+  const el = document.getElementById("headnote");
+  if (!el) return;
+  const id = profileIdentity(p);
+  const salesVisible = !!document.getElementById("sales-wrap") && document.getElementById("sales-wrap").style.display === "block";
+  const bits = [
+    "Signed in as " + (id.display || id.username || "?"),
+    id.login && id.login !== id.username ? "login " + id.login : null,
+    id.username ? "user " + id.username : null,
+    id.mc ? "mc " + id.mc : null,
+    "head " + (head ? "yes" : "no"),
+    "ads " + (adsOn ? "on" : "off")
+  ].filter(Boolean);
+  if (!adsOn && salesVisible) {
+    bits.push("sales visible but ads hidden — hard refresh");
+  }
+  el.textContent = bits.join(" · ");
 }
 
 async function resolveIsHead(profile) {
@@ -320,12 +358,21 @@ function showHeadAdminPanels() {
   document.getElementById("sales-wrap").style.display = "block";
   document.getElementById("unknowns-wrap").style.display = "block";
   setupSalesUi();
+  showDirectoryAdsPanel();
 }
+
+let directoryAdsUiReady = false;
 
 function showDirectoryAdsPanel() {
   const wrap = document.getElementById("ads-wrap");
   if (!wrap) return;
+  wrap.hidden = false;
+  wrap.classList.add("ads-visible");
   wrap.style.display = "block";
+  const section = document.getElementById("directory-ads");
+  if (section && typeof setCollapseOpen === "function") {
+    setCollapseOpen(section, true);
+  }
   try {
     setupDirectoryAdsUi();
   } catch (e) {
@@ -340,17 +387,14 @@ async function load() {
   if (!ctx) return;
   me = ctx.profile;
   const head = await resolveIsHead(me);
+  const adsOk = canEditDirectoryAds(me, head);
   if (head) {
     me.is_head = true;
     showHeadAdminPanels();
-  }
-  if (canEditDirectoryAds(me)) {
+  } else if (adsOk) {
     showDirectoryAdsPanel();
-  } else if (!head) {
-    document.getElementById("headnote").textContent =
-      "Head-admin tools need the head account. You are signed in as "
-      + (me && me.username ? me.username : "this account") + ".";
   }
+  updateAdsDebugNote(me, head, adsOk || head);
   const dl = document.getElementById("alias-from-list");
   if (dl) dl.innerHTML = Object.keys(PLACE_ALIASES).map(k => `<option value="${esc(k)}">`).join("");
   document.getElementById("alias-from").addEventListener("change", () => {
@@ -432,7 +476,7 @@ function adDoc() { return adDocs[adView]; }
 function adEl() { return adDoc().elements.find(e => e.id === adSelectedId) || null; }
 function adLocalValue(ts) { const d = ts ? new Date(ts) : new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); }
 function adNewDoc() { adEditingId = null; adSelectedId = null; adDocs = { web: directoryAdDefaultDoc("web"), mod: directoryAdDefaultDoc("mod") }; document.getElementById("ad-title").value = ""; document.getElementById("ad-priority").value = "0"; document.getElementById("ad-enabled").checked = true; document.getElementById("ad-start").value = adLocalValue(new Date()); document.getElementById("ad-end").value = adLocalValue(new Date(Date.now() + 7 * 86400000)); renderAdEditor(); }
-function setupDirectoryAdsUi() { const wrap = document.getElementById("ads-wrap"); if (!wrap) return; wrap.addEventListener("click", onDirectoryAdClick); document.getElementById("ad-form").addEventListener("submit", saveDirectoryAd); document.getElementById("ad-new").onclick = adNewDoc; document.getElementById("ad-duplicate").onclick = duplicateAdElement; document.getElementById("ad-delete-el").onclick = deleteAdElement; document.querySelectorAll("[data-ad-view]").forEach(btn => btn.onclick = () => { adView = btn.dataset.adView; document.querySelectorAll("[data-ad-view]").forEach(b => b.classList.toggle("primary", b === btn)); adSelectedId = null; renderAdEditor(); }); document.querySelectorAll("[data-ad-add]").forEach(btn => btn.onclick = () => addAdElement(btn.dataset.adAdd)); adNewDoc(); paintDirectoryAds(); }
+function setupDirectoryAdsUi() { const wrap = document.getElementById("ads-wrap"); if (!wrap) return; if (directoryAdsUiReady) { paintDirectoryAds(); return; } directoryAdsUiReady = true; wrap.addEventListener("click", onDirectoryAdClick); document.getElementById("ad-form").addEventListener("submit", saveDirectoryAd); document.getElementById("ad-new").onclick = adNewDoc; document.getElementById("ad-duplicate").onclick = duplicateAdElement; document.getElementById("ad-delete-el").onclick = deleteAdElement; document.querySelectorAll("[data-ad-view]").forEach(btn => btn.onclick = () => { adView = btn.dataset.adView; document.querySelectorAll("[data-ad-view]").forEach(b => b.classList.toggle("primary", b === btn)); adSelectedId = null; renderAdEditor(); }); document.querySelectorAll("[data-ad-add]").forEach(btn => btn.onclick = () => addAdElement(btn.dataset.adAdd)); adNewDoc(); paintDirectoryAds(); }
 function onDirectoryAdClick(e) { const rowBtn = e.target.closest("button[data-ad-act]"); if (rowBtn) return handleDirectoryAdRow(rowBtn); }
 async function paintDirectoryAds() { const box = document.getElementById("ads-list"); if (!box) return; const { data, error } = await sb.from("directory_ads").select("*").order("created_at", { ascending: false }).limit(50); if (error) { box.innerHTML = `<p class="meta">${esc(error.message)}</p>`; return; } directoryAds = data || []; if (!directoryAds.length) { box.innerHTML = '<p class="meta">No directory ads yet.</p>'; return; } const now = Date.now(); box.innerHTML = directoryAds.map(a => { const active = a.enabled && new Date(a.starts_at).getTime() <= now && new Date(a.ends_at).getTime() > now; return `<div class="listing" data-ad-id="${a.id}"><div><b>${esc(a.title)}</b> ${active ? '<span class="tag sale">active</span>' : (a.enabled ? '<span class="tag">scheduled</span>' : '<span class="tag bad">disabled</span>')}<span class="meta"> · p${a.priority || 0} · ${esc(fmtDate(a.starts_at))} -> ${esc(fmtDate(a.ends_at))}</span></div><div class="row" style="gap:6px"><button type="button" class="small" data-ad-act="edit">Edit</button><button type="button" class="small" data-ad-act="toggle">${a.enabled ? "Disable" : "Enable"}</button><button type="button" class="small" data-ad-act="delete">Delete</button></div></div>`; }).join(""); }
 async function handleDirectoryAdRow(btn) { const id = btn.closest("[data-ad-id]").dataset.adId; const ad = directoryAds.find(a => String(a.id) === String(id)); if (!ad) return; if (btn.dataset.adAct === "edit") { adEditingId = ad.id; adDocs = { web: normalizeDirectoryAdDoc(ad.layout_web, "web"), mod: normalizeDirectoryAdDoc(ad.layout_mod, "mod") }; adSelectedId = null; document.getElementById("ad-title").value = ad.title || ""; document.getElementById("ad-start").value = adLocalValue(ad.starts_at); document.getElementById("ad-end").value = adLocalValue(ad.ends_at); document.getElementById("ad-priority").value = ad.priority || 0; document.getElementById("ad-enabled").checked = !!ad.enabled; renderAdEditor(); } else if (btn.dataset.adAct === "toggle") { const { error } = await sb.from("directory_ads").update({ enabled: !ad.enabled }).eq("id", ad.id); if (error) setMsg(document.getElementById("admsg"), error.message, "err"); await paintDirectoryAds(); } else if (btn.dataset.adAct === "delete" && confirm("Delete this directory ad?")) { const { error } = await sb.from("directory_ads").delete().eq("id", ad.id); if (error) setMsg(document.getElementById("admsg"), error.message, "err"); await paintDirectoryAds(); if (String(adEditingId) === String(ad.id)) adNewDoc(); } }
