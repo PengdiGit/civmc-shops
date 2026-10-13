@@ -49,6 +49,134 @@ let adView = "web";
 let adDocs = { web: directoryAdDefaultDoc("web"), mod: directoryAdDefaultDoc("mod") };
 let adSelectedId = null;
 let directoryAdsUiReady = false;
+let adPropsPanelKey = null;
+let adPreviewTimer = null;
+
+const AD_RESIZE_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+
+function adPropsKey() {
+  const el = adEl();
+  return el ? "el:" + el.id : "doc:" + adView;
+}
+
+function scheduleAdPreview() {
+  const preview = document.getElementById("ad-preview");
+  if (!preview) return;
+  clearTimeout(adPreviewTimer);
+  adPreviewTimer = setTimeout(() => {
+    renderDirectoryAdCanvas(preview, adDoc(), { kind: adView });
+  }, 150);
+}
+
+function syncAdGeomInputs() {
+  const el = adEl();
+  if (!el) return;
+  for (const k of ["x", "y", "w", "h", "size"]) {
+    const inp = document.querySelector("#ad-props [data-ad-prop=\"" + k + "\"]");
+    if (inp && document.activeElement !== inp) inp.value = String(el[k] ?? "");
+  }
+}
+
+function paintAdEditorNode(el, selected) {
+  const node = document.createElement("div");
+  node.className = "ad-edit-el ad-edit-" + el.type + (selected ? " selected" : "");
+  applyAdEditNodeStyles(node, el);
+  node.dataset.id = el.id;
+  node.onpointerdown = startAdDrag;
+  if (selected) appendAdResizeHandles(node);
+  return node;
+}
+
+function applyAdEditNodeStyles(node, el) {
+  node.style.left = el.x + "px";
+  node.style.top = el.y + "px";
+  node.style.width = el.w + "px";
+  node.style.height = el.h + "px";
+  node.style.color = el.color;
+  node.style.fontSize = (10 * (el.size || 1)) + "px";
+  if (el.type === "box") {
+    node.style.background = el.fill;
+    node.style.borderColor = el.stroke;
+  } else if (el.type === "button") {
+    node.style.background = el.style === "ghost"
+      ? "color-mix(in srgb, var(--bg) 55%, transparent)"
+      : "";
+  }
+  node.textContent = el.type === "button" ? el.label : (el.type === "image" ? "image" : el.text);
+}
+
+function appendAdResizeHandles(node) {
+  for (const dir of AD_RESIZE_HANDLES) {
+    const r = document.createElement("span");
+    r.className = "ad-resize";
+    r.dataset.dir = dir;
+    r.onpointerdown = startAdResize;
+    node.appendChild(r);
+  }
+}
+
+function updateAdEditorSelection() {
+  const stage = document.getElementById("ad-editor");
+  if (!stage) return;
+  stage.querySelectorAll(".ad-edit-el").forEach(node => {
+    const id = node.dataset.id;
+    const el = adDoc().elements.find(x => x.id === id);
+    const selected = id === adSelectedId;
+    node.classList.toggle("selected", selected);
+    node.querySelectorAll(".ad-resize").forEach(h => h.remove());
+    if (selected) appendAdResizeHandles(node);
+    if (el) applyAdEditNodeStyles(node, el);
+  });
+}
+
+function syncAdEditorFromModel() {
+  const stage = document.getElementById("ad-editor");
+  if (!stage) return;
+  const doc = adDoc();
+  stage.style.width = doc.w + "px";
+  stage.style.height = doc.h + "px";
+  stage.style.background = doc.bg;
+  const ids = new Set(doc.elements.map(e => e.id));
+  stage.querySelectorAll(".ad-edit-el").forEach(node => {
+    if (!ids.has(node.dataset.id)) node.remove();
+  });
+  for (const el of doc.elements) {
+    let node = stage.querySelector(".ad-edit-el[data-id=\"" + el.id + "\"]");
+    if (!node) {
+      node = paintAdEditorNode(el, el.id === adSelectedId);
+      stage.appendChild(node);
+    } else {
+      applyAdEditNodeStyles(node, el);
+      node.classList.toggle("selected", el.id === adSelectedId);
+    }
+  }
+  updateAdEditorSelection();
+  scheduleAdPreview();
+}
+
+function onAdPropsPanelInput(e) {
+  const inp = e.target.closest("[data-ad-doc], [data-ad-prop]");
+  if (!inp) return;
+  if (inp.dataset.adDoc) {
+    adDoc()[inp.dataset.adDoc] = inp.value;
+    const stage = document.getElementById("ad-editor");
+    if (stage) stage.style.background = adDoc().bg;
+    scheduleAdPreview();
+    return;
+  }
+  const el = adEl();
+  if (!el) return;
+  const k = inp.dataset.adProp;
+  if (["x", "y", "w", "h", "size"].includes(k)) el[k] = Number(inp.value) || 0;
+  else if (k === "text") {
+    if (el.type === "button") el.label = inp.value;
+    else el.text = inp.value;
+  } else if (k === "href") {
+    if (el.type === "image") el.src = inp.value;
+    else el.href = inp.value;
+  } else el[k] = inp.value;
+  syncAdEditorFromModel();
+}
 
 function adDoc() { return adDocs[adView]; }
 function adEl() { return adDoc().elements.find(e => e.id === adSelectedId) || null; }
@@ -61,6 +189,7 @@ function adLocalValue(ts) {
 function adNewDoc() {
   adEditingId = null;
   adSelectedId = null;
+  adPropsPanelKey = null;
   adDocs = { web: directoryAdDefaultDoc("web"), mod: directoryAdDefaultDoc("mod") };
   const title = document.getElementById("ad-title");
   const priority = document.getElementById("ad-priority");
@@ -97,12 +226,19 @@ function setupDirectoryAdsUi() {
       adView = btn.dataset.adView;
       document.querySelectorAll("[data-ad-view]").forEach(b => b.classList.toggle("primary", b === btn));
       adSelectedId = null;
+      adPropsPanelKey = null;
       renderAdEditor();
     };
   });
   document.querySelectorAll("[data-ad-add]").forEach(btn => {
     btn.onclick = () => addAdElement(btn.dataset.adAdd);
   });
+  const propsHost = document.getElementById("ad-props");
+  if (propsHost && !propsHost.dataset.adPropsBound) {
+    propsHost.dataset.adPropsBound = "1";
+    propsHost.addEventListener("input", onAdPropsPanelInput);
+    propsHost.addEventListener("change", onAdPropsPanelInput);
+  }
   adNewDoc();
   paintDirectoryAds();
 }
@@ -208,106 +344,111 @@ function renderAdEditor() {
   stage.style.background = doc.bg;
   stage.innerHTML = "";
   for (const el of doc.elements) {
-    const node = document.createElement("div");
-    node.className = "ad-edit-el ad-edit-" + el.type + (el.id === adSelectedId ? " selected" : "");
-    node.style.left = el.x + "px";
-    node.style.top = el.y + "px";
-    node.style.width = el.w + "px";
-    node.style.height = el.h + "px";
-    node.style.color = el.color;
-    node.style.fontSize = (10 * (el.size || 1)) + "px";
-    if (el.type === "box") {
-      node.style.background = el.fill;
-      node.style.borderColor = el.stroke;
-    }
-    node.textContent = el.type === "button" ? el.label : (el.type === "image" ? "image" : el.text);
-    node.dataset.id = el.id;
-    node.onpointerdown = startAdDrag;
-    if (el.id === adSelectedId) {
-      const r = document.createElement("span");
-      r.className = "ad-resize";
-      r.onpointerdown = startAdResize;
-      node.appendChild(r);
-    }
-    stage.appendChild(node);
+    stage.appendChild(paintAdEditorNode(el, el.id === adSelectedId));
   }
-  renderAdProps();
+  renderAdProps(true);
   if (preview) renderDirectoryAdCanvas(preview, doc, { kind: adView });
 }
 
+function clampAdRect(el) {
+  const doc = adDoc();
+  const min = 8;
+  el.w = Math.max(min, Math.min(el.w, doc.w));
+  el.h = Math.max(min, Math.min(el.h, doc.h));
+  el.x = Math.max(0, Math.min(el.x, doc.w - el.w));
+  el.y = Math.max(0, Math.min(el.y, doc.h - el.h));
+}
+
+function applyAdResize(el, dir, dx, dy, start) {
+  let x = start.x, y = start.y, w = start.w, h = start.h;
+  const min = 8;
+  if (dir.includes("e")) w = Math.max(min, start.w + dx);
+  if (dir.includes("w")) {
+    w = Math.max(min, start.w - dx);
+    x = start.x + start.w - w;
+  }
+  if (dir.includes("s")) h = Math.max(min, start.h + dy);
+  if (dir.includes("n")) {
+    h = Math.max(min, start.h - dy);
+    y = start.y + start.h - h;
+  }
+  el.x = Math.round(x);
+  el.y = Math.round(y);
+  el.w = Math.round(w);
+  el.h = Math.round(h);
+  clampAdRect(el);
+}
+
+function patchAdEditorNode(el) {
+  const stage = document.getElementById("ad-editor");
+  if (!stage) return;
+  const node = stage.querySelector(".ad-edit-el[data-id=\"" + el.id + "\"]");
+  if (node) applyAdEditNodeStyles(node, el);
+}
+
 function startAdDrag(e) {
-  if (e.target.classList.contains("ad-resize")) return;
+  if (e.target.closest(".ad-resize")) return;
   const el = adDoc().elements.find(x => x.id === e.currentTarget.dataset.id);
   if (!el) return;
+  const selectionChanged = adSelectedId !== el.id;
   adSelectedId = el.id;
+  if (selectionChanged) {
+    updateAdEditorSelection();
+    renderAdProps(true);
+  }
+  const doc = adDoc();
   const sx = e.clientX, sy = e.clientY, ox = el.x, oy = el.y;
-  e.currentTarget.setPointerCapture(e.pointerId);
-  e.currentTarget.onpointermove = ev => {
-    el.x = Math.max(0, Math.round(ox + ev.clientX - sx));
-    el.y = Math.max(0, Math.round(oy + ev.clientY - sy));
-    renderAdEditor();
+  const node = e.currentTarget;
+  node.setPointerCapture(e.pointerId);
+  node.onpointermove = ev => {
+    el.x = Math.max(0, Math.min(Math.round(ox + ev.clientX - sx), doc.w - el.w));
+    el.y = Math.max(0, Math.min(Math.round(oy + ev.clientY - sy), doc.h - el.h));
+    patchAdEditorNode(el);
   };
-  e.currentTarget.onpointerup = ev => {
-    e.currentTarget.onpointermove = null;
-    e.currentTarget.releasePointerCapture(ev.pointerId);
+  node.onpointerup = ev => {
+    node.onpointermove = null;
+    node.releasePointerCapture(ev.pointerId);
+    syncAdGeomInputs();
+    scheduleAdPreview();
   };
-  renderAdEditor();
 }
 
 function startAdResize(e) {
   e.stopPropagation();
-  const host = e.currentTarget.parentElement;
+  e.preventDefault();
+  const handle = e.currentTarget;
+  const host = handle.parentElement;
+  const dir = handle.dataset.dir || "se";
   const el = adDoc().elements.find(x => x.id === host.dataset.id);
   if (!el) return;
-  const sx = e.clientX, sy = e.clientY, ow = el.w, oh = el.h;
+  adSelectedId = el.id;
+  const sx = e.clientX, sy = e.clientY;
+  const start = { x: el.x, y: el.y, w: el.w, h: el.h };
   host.setPointerCapture(e.pointerId);
   host.onpointermove = ev => {
-    el.w = Math.max(8, Math.round(ow + ev.clientX - sx));
-    el.h = Math.max(8, Math.round(oh + ev.clientY - sy));
-    renderAdEditor();
+    applyAdResize(el, dir, ev.clientX - sx, ev.clientY - sy, start);
+    patchAdEditorNode(el);
   };
   host.onpointerup = ev => {
     host.onpointermove = null;
     host.releasePointerCapture(ev.pointerId);
+    syncAdGeomInputs();
+    scheduleAdPreview();
   };
 }
 
-function renderAdProps() {
+function renderAdProps(force) {
   const p = document.getElementById("ad-props");
   if (!p) return;
+  const key = adPropsKey();
+  if (!force && adPropsPanelKey === key) return;
+  adPropsPanelKey = key;
   const el = adEl();
   if (!el) {
     p.innerHTML = '<p class="meta">Select an element to edit its text, colors, link, and size.</p><label>Background</label><input data-ad-doc="bg" value="' + esc(adDoc().bg) + '">';
-    bindAdProps();
     return;
   }
   p.innerHTML = `<div class="ad-prop-grid"><label>Text / label<input data-ad-prop="text" value="${esc(el.type === "button" ? el.label : el.text)}"></label><label>Href / image src<input data-ad-prop="href" value="${esc(el.type === "image" ? el.src : el.href)}"></label><label>Color<input data-ad-prop="color" value="${esc(el.color)}"></label><label>Fill<input data-ad-prop="fill" value="${esc(el.fill)}"></label><label>Stroke<input data-ad-prop="stroke" value="${esc(el.stroke)}"></label><label>Size<input data-ad-prop="size" type="number" step="0.1" min="0.7" max="3" value="${esc(el.size || 1)}"></label><label>X<input data-ad-prop="x" type="number" value="${esc(el.x)}"></label><label>Y<input data-ad-prop="y" type="number" value="${esc(el.y)}"></label><label>W<input data-ad-prop="w" type="number" value="${esc(el.w)}"></label><label>H<input data-ad-prop="h" type="number" value="${esc(el.h)}"></label><label>Style<select data-ad-prop="style"><option value="primary"${el.style !== "ghost" ? " selected" : ""}>Primary</option><option value="ghost"${el.style === "ghost" ? " selected" : ""}>Ghost</option></select></label></div>`;
-  bindAdProps();
-}
-
-function bindAdProps() {
-  document.querySelectorAll("[data-ad-doc]").forEach(inp => {
-    inp.oninput = () => {
-      adDoc()[inp.dataset.adDoc] = inp.value;
-      renderAdEditor();
-    };
-  });
-  document.querySelectorAll("[data-ad-prop]").forEach(inp => {
-    inp.oninput = () => {
-      const el = adEl();
-      if (!el) return;
-      const k = inp.dataset.adProp;
-      if (["x", "y", "w", "h", "size"].includes(k)) el[k] = Number(inp.value) || 0;
-      else if (k === "text") {
-        if (el.type === "button") el.label = inp.value;
-        else el.text = inp.value;
-      } else if (k === "href") {
-        if (el.type === "image") el.src = inp.value;
-        else el.href = inp.value;
-      } else el[k] = inp.value;
-      renderAdEditor();
-    };
-  });
 }
 
 async function saveDirectoryAd(e) {

@@ -1536,7 +1536,7 @@ body.find-page > main {
 
 .find-board-side {
   display: flex; flex-direction: column; align-items: stretch; gap: 10px;
-  grid-column: 2;
+  grid-column: 3;
   justify-self: end;
   width: min(100%, 220px);
 }
@@ -3835,8 +3835,8 @@ body.admin-page #ads-wrap.admin-ads-panel .collapse-body { min-height: 0; overfl
 body.ads-page .directory-ad-admin,
 body.ads-page .directory-ad-admin .collapse-body { min-height: 0; overflow: visible; display: block; }
 body.ads-page #ad-form { display: block; }
-.directory-ad-slot { position: relative; min-width: 240px; border: 1px solid color-mix(in srgb, var(--line) 75%, var(--accent)); background: color-mix(in srgb, var(--bg) 62%, transparent); overflow: hidden; align-self: stretch; }
-.find-directory-ad { grid-column: 2; justify-self: stretch; width: min(100%, 430px); }
+.directory-ad-slot { position: relative; min-width: 240px; border: 1px solid color-mix(in srgb, var(--line) 75%, var(--accent)); background: color-mix(in srgb, var(--bg) 62%, transparent); overflow: hidden; align-self: center; }
+.find-directory-ad { grid-column: 2; justify-self: stretch; align-self: center; width: 100%; max-width: 430px; min-height: 110px; margin-inline: auto; }
 .directory-ad-canvas { position: relative; overflow: hidden; font-family: "Monocraft", ui-monospace, monospace; }
 .directory-ad-el { position: absolute; box-sizing: border-box; overflow: hidden; line-height: 1.15; white-space: pre-wrap; }
 .directory-ad-el-box { border: 1px solid var(--line); }
@@ -3853,7 +3853,15 @@ body.ads-page #ad-form { display: block; }
 .ad-edit-button { background: var(--accent); color: #11180d !important; display: flex; align-items: center; justify-content: center; font-weight: 700; }
 .ad-edit-image { background: repeating-linear-gradient(45deg, #20241f, #20241f 5px, #2e332b 5px, #2e332b 10px); color: var(--muted); }
 .ad-edit-el.selected { outline: 2px solid var(--accent); z-index: 5; }
-.ad-resize { position: absolute; right: 0; bottom: 0; width: 9px; height: 9px; background: var(--accent); cursor: nwse-resize; }
+.ad-resize { position: absolute; width: 8px; height: 8px; background: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 60%, #111); box-sizing: border-box; z-index: 6; touch-action: none; }
+.ad-resize[data-dir="nw"] { left: -4px; top: -4px; cursor: nwse-resize; }
+.ad-resize[data-dir="n"] { left: calc(50% - 5px); top: -4px; width: 10px; height: 6px; cursor: ns-resize; }
+.ad-resize[data-dir="ne"] { right: -4px; top: -4px; cursor: nesw-resize; }
+.ad-resize[data-dir="e"] { right: -4px; top: calc(50% - 5px); width: 6px; height: 10px; cursor: ew-resize; }
+.ad-resize[data-dir="se"] { right: -4px; bottom: -4px; cursor: nwse-resize; }
+.ad-resize[data-dir="s"] { left: calc(50% - 5px); bottom: -4px; width: 10px; height: 6px; cursor: ns-resize; }
+.ad-resize[data-dir="sw"] { left: -4px; bottom: -4px; cursor: nesw-resize; }
+.ad-resize[data-dir="w"] { left: -4px; top: calc(50% - 5px); width: 6px; height: 10px; cursor: ew-resize; }
 .directory-ad-props { border: 1px solid var(--line); padding: 10px; background: color-mix(in srgb, var(--panel) 85%, var(--bg)); }
 .ad-prop-grid { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 8px; }
 .ad-prop-grid label, .field-inline { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: .84rem; }
