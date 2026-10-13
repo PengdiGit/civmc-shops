@@ -40,7 +40,15 @@ const UI_ICONS = {
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  store: '<path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 7v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7"/><path d="M10 12h4"/>',
+  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>',
+  bookmark: '<path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  logIn: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>',
+  userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>'
 };
 function uiIcon(name) {
   const body = UI_ICONS[name];
@@ -56,6 +64,38 @@ function iconBtn(icon, opts) {
   const type = tag === "button" ? ' type="button"' : "";
   const extra = o.attrs ? " " + o.attrs : "";
   return `<${tag} class="${cls}"${type}${title}${extra}>${uiIcon(icon)}</${tag}>`;
+}
+function navDrawerLinkRow(icon, labelHtml) {
+  return `<span class="nav-drawer-link-row">${uiIcon(icon)}<span class="nav-drawer-link-label">${labelHtml}</span></span>`;
+}
+function navDrawerLink(href, label, icon, extraCls, labelHtml) {
+  const cls = ["nav-drawer-link", extraCls].filter(Boolean).join(" ");
+  const lab = labelHtml != null ? labelHtml : esc(label);
+  return `<a class="${cls}" href="${href}">${navDrawerLinkRow(icon, lab)}</a>`;
+}
+function navDrawerBtn(label, icon, extraCls, id) {
+  const cls = ["nav-drawer-link", extraCls].filter(Boolean).join(" ");
+  const idAttr = id ? ` id="${id}"` : "";
+  return `<button type="button" class="${cls}"${idAttr}>${navDrawerLinkRow(icon, esc(label))}</button>`;
+}
+function navDrawerSep() {
+  return '<div class="nav-drawer-sep" role="separator"></div>';
+}
+function navDrawerSection(title) {
+  return `<div class="nav-drawer-section">${esc(title)}</div>`;
+}
+function navDrawerUserCard(profile, displayNameHtml, signedIn) {
+  const avInner = profile
+    ? avatarImg(profile, 32).replace('class="avatar"', 'class="avatar nav-drawer-avatar-img"')
+    : '<span class="nav-drawer-avatar-fallback" aria-hidden="true">?</span>';
+  const status = signedIn ? "Signed in" : "Guest";
+  return `<div class="nav-drawer-card">
+    <span class="slot md nav-drawer-avatar" aria-hidden="true">${avInner}</span>
+    <div class="nav-drawer-card-meta">
+      <span class="nav-drawer-card-label">${status}</span>
+      <strong class="nav-drawer-card-name">${displayNameHtml}</strong>
+    </div>
+  </div>`;
 }
 function hydrateIcons(root) {
   const scope = root && root.querySelectorAll ? root : document;
@@ -422,10 +462,10 @@ function navDiscordHtml() {
       '</button>' +
     '</span>';
   ensureNavChrome();
-  paintNavDrawer(`
-    <a class="nav-drawer-link" href="${pageHref("login")}">Log in</a>
-    <a class="nav-drawer-link nav-drawer-primary" href="${pageHref("signup")}">Sign up</a>
-  `);
+  paintNavDrawer(
+    navDrawerLink(pageHref("login"), "Log in", "logIn") +
+    navDrawerLink(pageHref("signup"), "Sign up", "userPlus", "nav-drawer-primary")
+  );
   wireNavMenu();
 })();
 
@@ -2457,42 +2497,43 @@ async function renderNav() {
 
     const name = profile ? esc(userName(profile)) : "Account";
     const dashHref = pageHref("dashboard");
-    drawer += `<div class="nav-drawer-user"><span class="nav-drawer-user-label">Signed in</span><strong>${name}</strong></div>`;
-    drawer += `<a class="nav-drawer-link" href="${dashHref}">My shops</a>`;
-    drawer += `<a class="nav-drawer-link" href="${pageHref("favourites")}">Favourites</a>`;
-    drawer += `<a class="nav-drawer-link" href="${pageHref("settings")}">Settings</a>`;
-    drawer += `<a class="nav-drawer-link" href="${profilePath(profile, session.user.id)}">My profile</a>`;
-    if (needsVerification(profile)) {
-      drawer += `<a class="nav-drawer-link nav-drawer-primary" href="${pageHref("verify")}">Verify account</a>`;
-    }
-    if (isStaff(profile) || (profile && (profile.is_admin || profile.is_head))) {
-      drawer += `<div class="nav-drawer-sep" role="separator"></div>`;
-      if (isStaff(profile)) drawer += `<a class="nav-drawer-link" href="${pageHref("moderation")}">Moderation</a>`;
-      if (profile && (profile.is_admin || profile.is_head)) {
-        drawer += `<a class="nav-drawer-link" href="${pageHref("admin")}">Admin</a>`;
-        drawer += `<a class="nav-drawer-link" href="${pageHref("ads")}">Directory ads</a>`;
-      }
-    }
-    drawer += `<div class="nav-drawer-sep" role="separator"></div>`;
-    if (isImpersonating()) {
-      drawer += `<button type="button" class="nav-drawer-link nav-drawer-action" id="logout">Exit impersonation</button>`;
-    } else {
-      drawer += `<button type="button" class="nav-drawer-link nav-drawer-action" id="logout">Log out</button>`;
-    }
+    let myShopsHref = dashHref;
+    let myShopsLabelHtml = esc("My shops");
+    drawer += navDrawerUserCard(profile, name, true);
     try {
       const unread = await countUnreadNotifications(session.user.id);
       if (unread > 0) {
         const dashNotes = pageHref("dashboard", "", "#notifications");
         rightExtra += `<a class="nav-note-badge" href="${dashNotes}" title="${unread} unread notification${unread === 1 ? "" : "s"}">${unread > 9 ? "9+" : unread}</a>`;
-        drawer = drawer.replace(
-          `href="${dashHref}">My shops</a>`,
-          `href="${dashNotes}">My shops <span class="tag warn">${unread}</span></a>`
-        );
+        myShopsHref = dashNotes;
+        myShopsLabelHtml = `My shops <span class="tag warn">${unread}</span>`;
       }
     } catch (e) {}
+    drawer += navDrawerLink(myShopsHref, "My shops", "store", "", myShopsLabelHtml);
+    drawer += navDrawerLink(pageHref("favourites"), "Favourites", "star");
+    drawer += navDrawerLink(pageHref("settings"), "Settings", "settings");
+    drawer += navDrawerLink(profilePath(profile, session.user.id), "My profile", "user");
+    if (needsVerification(profile)) {
+      drawer += navDrawerLink(pageHref("verify"), "Verify account", "link", "nav-drawer-primary");
+    }
+    if (isStaff(profile) || (profile && (profile.is_admin || profile.is_head))) {
+      drawer += navDrawerSep();
+      drawer += navDrawerSection("Staff");
+      if (isStaff(profile)) drawer += navDrawerLink(pageHref("moderation"), "Moderation", "shield");
+      if (profile && (profile.is_admin || profile.is_head)) {
+        drawer += navDrawerLink(pageHref("admin"), "Admin", "columns");
+        drawer += navDrawerLink(pageHref("ads"), "Directory ads", "bookmark");
+      }
+    }
+    drawer += navDrawerSep();
+    if (isImpersonating()) {
+      drawer += navDrawerBtn("Exit impersonation", "undo", "nav-drawer-danger", "logout");
+    } else {
+      drawer += navDrawerBtn("Log out", "logout", "nav-drawer-danger", "logout");
+    }
   } else {
-    drawer += `<a class="nav-drawer-link" href="${pageHref("login")}">Log in</a>`;
-    drawer += `<a class="nav-drawer-link nav-drawer-primary" href="${pageHref("signup")}">Sign up</a>`;
+    drawer += navDrawerLink(pageHref("login"), "Log in", "logIn");
+    drawer += navDrawerLink(pageHref("signup"), "Sign up", "userPlus", "nav-drawer-primary");
   }
 
   if (USE_MOCK) {
