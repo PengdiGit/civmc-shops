@@ -272,32 +272,80 @@ a.nav-discord-btn:focus-visible {
   padding: 12px 10px 24px; overflow-y: auto;
   display: flex; flex-direction: column; gap: 4px;
 }
-.nav-drawer-user {
-  display: flex; flex-direction: column; gap: 2px;
-  padding: 10px 12px 14px; margin-bottom: 4px;
-  border-bottom: 1px solid var(--line);
+.nav-drawer-card {
+  display: flex; align-items: center; gap: 12px;
+  margin: 2px 4px 10px; padding: 10px 10px;
+  background: color-mix(in srgb, var(--slot) 88%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--line) 70%, var(--accent) 30%);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
 }
-.nav-drawer-user-label { font-size: .75rem; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
-.nav-drawer-user strong { font-size: 1.05rem; font-weight: 650; }
+.nav-drawer-avatar { padding: 4px; }
+.nav-drawer-avatar-img {
+  width: var(--icon-lg); height: var(--icon-lg);
+  image-rendering: pixelated; object-fit: cover; border-radius: 2px; display: block;
+}
+.nav-drawer-avatar-fallback {
+  display: flex; align-items: center; justify-content: center;
+  width: var(--icon-lg); height: var(--icon-lg);
+  font-size: .95rem; font-weight: 700; color: var(--dim);
+}
+.nav-drawer-card-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nav-drawer-card-label {
+  font-size: .72rem; color: var(--dim); text-transform: uppercase; letter-spacing: .05em;
+}
+.nav-drawer-card-name {
+  font-size: 1.02rem; font-weight: 650; line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nav-drawer-section {
+  padding: 6px 12px 2px; margin-top: 2px;
+  font-size: .72rem; font-weight: 650; letter-spacing: .06em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--dim) 85%, var(--accent));
+}
 .nav-drawer-sep { height: 1px; background: var(--line); margin: 8px 6px; }
 a.nav-drawer-link, button.nav-drawer-link {
   display: block; width: 100%; text-align: left;
-  color: var(--text); text-decoration: none; background: transparent;
-  border: 1px solid transparent; border-radius: 8px;
-  padding: 11px 12px; font: inherit; cursor: pointer;
+  color: var(--text); text-decoration: none; background: var(--slot);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 10px; font: inherit; cursor: pointer;
+}
+.nav-drawer-link-row {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+}
+.nav-drawer-link-label { flex: 1; min-width: 0; line-height: 1.25; }
+a.nav-drawer-link .ui-ico, button.nav-drawer-link .ui-ico {
+  width: 18px; height: 18px; flex-shrink: 0; color: var(--dim);
 }
 a.nav-drawer-link:hover, button.nav-drawer-link:hover {
-  background: rgba(230, 228, 218, .06); border-color: var(--line); color: var(--text);
+  background: color-mix(in srgb, var(--panel) 82%, var(--accent) 18%);
+  border-color: color-mix(in srgb, var(--line) 55%, var(--accent) 45%);
+  color: var(--text);
 }
+a.nav-drawer-link:hover .ui-ico, button.nav-drawer-link:hover .ui-ico { color: var(--accent); }
 a.nav-drawer-primary {
-  background: var(--accent); border-color: var(--accent); color: var(--btn-on-accent); font-weight: 600;
-  text-align: center; margin-top: 4px;
+  background: color-mix(in srgb, var(--accent) 92%, var(--panel));
+  border-color: var(--accent); color: var(--btn-on-accent); font-weight: 600;
+  margin-top: 4px;
 }
+a.nav-drawer-primary .ui-ico { color: color-mix(in srgb, var(--btn-on-accent) 70%, var(--accent)); }
 a.nav-drawer-primary:hover {
-  background: color-mix(in srgb, var(--accent) 85%, #fff); border-color: color-mix(in srgb, var(--accent) 85%, #fff); color: var(--btn-on-accent);
+  background: color-mix(in srgb, var(--accent) 85%, #fff);
+  border-color: color-mix(in srgb, var(--accent) 85%, #fff);
+  color: var(--btn-on-accent);
 }
-button.nav-drawer-action { color: var(--dim); }
-button.nav-drawer-action:hover { color: var(--bad); border-color: var(--bad); }
+a.nav-drawer-primary:hover .ui-ico { color: var(--btn-on-accent); }
+button.nav-drawer-danger, a.nav-drawer-danger {
+  color: var(--bad); background: color-mix(in srgb, var(--slot) 90%, var(--bad) 10%);
+  border-color: color-mix(in srgb, var(--line) 60%, var(--bad) 40%);
+}
+button.nav-drawer-danger .ui-ico, a.nav-drawer-danger .ui-ico { color: var(--bad); }
+button.nav-drawer-danger:hover, a.nav-drawer-danger:hover {
+  color: #fff;
+  background: color-mix(in srgb, var(--bad) 78%, #000);
+  border-color: var(--bad);
+}
+button.nav-drawer-danger:hover .ui-ico, a.nav-drawer-danger:hover .ui-ico { color: #fff; }
 body.nav-menu-open { overflow: hidden; }
 
 @media (prefers-reduced-motion: no-preference) {
