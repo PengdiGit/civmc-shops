@@ -214,9 +214,8 @@
     </section>
   </div>
 
-
   <div id="ads-wrap" style="display:none">
-    <section class="mod-section mod-section--ads collapse-section admin-collapse" data-collapse="directory-ads" aria-labelledby="admin-ads-h">
+    <section class="mod-section mod-section--ads collapse-section admin-collapse" id="directory-ads" data-collapse="directory-ads" aria-labelledby="admin-ads-h">
       <div class="mod-section-head">
         <h2 id="admin-ads-h"><button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-directory-ads"><span class="collapse-chevron" aria-hidden="true"></span><span class="mod-section-head-text"><span class="mod-section-title">Directory ads</span><span class="meta">Head admin only. In-game shop and event promotions shown in the Find Directory board.</span></span></button></h2>
       </div>
@@ -293,23 +292,51 @@ let listingRows = [];
 let unknownRows = [];
 let aliasPreviewRows = [];
 
+function profileIsHead(p) {
+  return !!(p && (p.is_head === true || p.is_head === "true" || p.is_head === 1));
+}
+
+async function resolveIsHead(profile) {
+  if (profileIsHead(profile)) return true;
+  try {
+    const { data, error } = await sb.rpc("is_head");
+    if (!error && data === true) return true;
+  } catch (e) { /* rpc missing on old deploy */ }
+  return false;
+}
+
+function showHeadAdminPanels() {
+  document.getElementById("role").innerHTML += '<option value="business">Business</option><option value="nation">Nation</option><option value="mod">Mod</option><option value="admin">Admin</option>';
+  syncCreateRole();
+  document.getElementById("role").addEventListener("change", syncCreateRole);
+  if (typeof bindPlaceFieldsIn === "function") bindPlaceFieldsIn(document.getElementById("form"));
+  document.getElementById("pending-wrap").style.display = "block";
+  document.getElementById("sales-wrap").style.display = "block";
+  document.getElementById("ads-wrap").style.display = "block";
+  document.getElementById("unknowns-wrap").style.display = "block";
+  setupSalesUi();
+  try {
+    setupDirectoryAdsUi();
+  } catch (e) {
+    console.error("Directory ads UI failed", e);
+    const admsg = document.getElementById("admsg");
+    if (admsg) setMsg(admsg, "Ads editor failed to start — hard refresh (Ctrl+F5). " + (e.message || e), "err");
+  }
+}
+
 async function load() {
   const ctx = await requireLogin("admin");
   if (!ctx) return;
   me = ctx.profile;
-  if (me.is_head) {
-    document.getElementById("role").innerHTML += '<option value="business">Business</option><option value="nation">Nation</option><option value="mod">Mod</option><option value="admin">Admin</option>';
-    syncCreateRole();
-    document.getElementById("role").addEventListener("change", syncCreateRole);
-    if (typeof bindPlaceFieldsIn === "function") bindPlaceFieldsIn(document.getElementById("form"));
-    document.getElementById("pending-wrap").style.display = "block";
-    document.getElementById("sales-wrap").style.display = "block";
-    document.getElementById("unknowns-wrap").style.display = "block";
-    document.getElementById("ads-wrap").style.display = "block";
-    setupSalesUi();
-    setupDirectoryAdsUi();
+  const head = await resolveIsHead(me);
+  if (head) {
+    me.is_head = true;
+    showHeadAdminPanels();
   } else {
-    document.getElementById("headnote").textContent = "Only the head admin can review signups and make or remove mods and admins.";
+    document.getElementById("headnote").textContent =
+      "Directory ads and signup tools are head-admin only. You are on Admin as "
+      + (me && me.username ? me.username : "this account")
+      + " — log in as pengdi (head) or exit impersonation.";
   }
   const dl = document.getElementById("alias-from-list");
   if (dl) dl.innerHTML = Object.keys(PLACE_ALIASES).map(k => `<option value="${esc(k)}">`).join("");
