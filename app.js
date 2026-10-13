@@ -563,6 +563,9 @@ function directoryAdHref(href) {
 function directoryAdImageSrc(src) {
   const s = String(src || "").trim();
   if (!s) return "";
+  if (!/^https?:\/\//i.test(s) && s.includes("/")) {
+    try { return publicUrl(s.replace(/^uploads\//, "")); } catch (e) { /* fall through */ }
+  }
   try { const u = new URL(s, location.origin); return /^https?:$/.test(u.protocol) ? u.href : ""; }
   catch (e) { return ""; }
 }
@@ -1960,7 +1963,8 @@ async function uploadImage(file, folder, uid) {
   if (!file.type.startsWith("image/")) return { ok: false, message: "Pick an image file (jpg, png or webp)." };
   let blob;
   try {
-    const max = folder === "avatars" || folder === "shops" ? 256 : 900;
+    const max = folder === "avatars" || folder === "shops" ? 256
+      : folder === "directory-ads" ? 1200 : 900;
     blob = await resizeImage(file, max);
   } catch (e) { return { ok: false, message: e.message }; }
   const path = folder + "/" + uid + "/" + Date.now() + ".jpg";

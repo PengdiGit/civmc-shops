@@ -169,6 +169,45 @@ function syncAdEditorFromModel() {
   scheduleAdPreview();
 }
 
+function mirrorDirectoryAdImageSrc(src, fromId) {
+  for (const kind of ["web", "mod"]) {
+    const doc = adDocs[kind];
+    if (!doc || !Array.isArray(doc.elements)) continue;
+    for (const im of doc.elements) {
+      if (im.type !== "image") continue;
+      if (im.id === fromId || im.id === "hero") im.src = src;
+    }
+  }
+}
+
+async function onAdImageUpload(e) {
+  const inp = e.target.closest("[data-ad-upload]");
+  if (!inp || !inp.files || !inp.files[0]) return;
+  const el = adEl();
+  if (!el || el.type !== "image") return;
+  const admsg = document.getElementById("admsg");
+  const session = await getSession();
+  if (!session) {
+    setMsg(admsg, "Sign in again to upload images.", "err");
+    return;
+  }
+  inp.disabled = true;
+  setMsg(admsg, "Uploading image…", "ok");
+  const up = await uploadImage(inp.files[0], "directory-ads", session.user.id);
+  inp.disabled = false;
+  inp.value = "";
+  if (!up.ok) {
+    setMsg(admsg, up.message || "Upload failed.", "err");
+    return;
+  }
+  const url = publicUrl(up.path);
+  el.src = url;
+  mirrorDirectoryAdImageSrc(url, el.id);
+  syncAdEditorFromModel();
+  renderAdProps(true);
+  setMsg(admsg, "Image uploaded. Save the ad to publish.", "ok");
+}
+
 function onAdPropsPanelInput(e) {
   const inp = e.target.closest("[data-ad-doc], [data-ad-prop]");
   if (!inp) return;
@@ -187,8 +226,10 @@ function onAdPropsPanelInput(e) {
     if (el.type === "button") el.label = inp.value;
     else el.text = inp.value;
   } else if (k === "href") {
-    if (el.type === "image") el.src = inp.value;
-    else el.href = inp.value;
+    if (el.type === "image") {
+      el.src = inp.value.trim();
+      mirrorDirectoryAdImageSrc(el.src, el.id);
+    } else el.href = inp.value;
   } else el[k] = inp.value;
   syncAdEditorFromModel();
 }
@@ -253,6 +294,7 @@ function setupDirectoryAdsUi() {
     propsHost.dataset.adPropsBound = "1";
     propsHost.addEventListener("input", onAdPropsPanelInput);
     propsHost.addEventListener("change", onAdPropsPanelInput);
+    propsHost.addEventListener("change", onAdImageUpload);
   }
   adNewDoc();
   paintDirectoryAds();
@@ -467,7 +509,22 @@ function renderAdProps(force) {
     p.innerHTML = '<p class="meta">Select an element to edit its text, colors, link, and size.</p><label>Background</label><input data-ad-doc="bg" value="' + esc(adDoc().bg) + '">';
     return;
   }
-  p.innerHTML = `<div class="ad-prop-grid"><label>Text / label<input data-ad-prop="text" value="${esc(el.type === "button" ? el.label : el.text)}"></label><label>Href / image src<input data-ad-prop="href" value="${esc(el.type === "image" ? el.src : el.href)}"></label><label>Color<input data-ad-prop="color" value="${esc(el.color)}"></label><label>Fill<input data-ad-prop="fill" value="${esc(el.fill)}"></label><label>Stroke<input data-ad-prop="stroke" value="${esc(el.stroke)}"></label><label>Size<input data-ad-prop="size" type="number" step="0.1" min="0.7" max="3" value="${esc(el.size || 1)}"></label><label>X<input data-ad-prop="x" type="number" value="${esc(el.x)}"></label><label>Y<input data-ad-prop="y" type="number" value="${esc(el.y)}"></label><label>W<input data-ad-prop="w" type="number" value="${esc(el.w)}"></label><label>H<input data-ad-prop="h" type="number" value="${esc(el.h)}"></label><label>Style<select data-ad-prop="style"><option value="primary"${el.style !== "ghost" ? " selected" : ""}>Primary</option><option value="ghost"${el.style === "ghost" ? " selected" : ""}>Ghost</option></select></label></div>`;
+  if (el.type === "image") {
+    const preview = directoryAdImageSrc(el.src);
+    p.innerHTML = `<div class="ad-prop-grid ad-prop-grid-image">
+      <label class="ad-prop-span2">Upload image (required)<input type="file" accept="image/*" data-ad-upload="1"></label>
+      <label class="ad-prop-span2">Or paste image URL<input data-ad-prop="href" value="${esc(el.src || "")}" placeholder="https://…"></label>
+      ${preview ? `<p class="meta ad-prop-span2">Current: <a href="${esc(preview)}" target="_blank" rel="noopener noreferrer">preview</a></p>` : `<p class="meta ad-prop-span2">No image yet — upload a JPG/PNG/WebP for the right side of the ad.</p>`}
+      <label>Fill<input data-ad-prop="fill" value="${esc(el.fill)}"></label>
+      <label>Stroke<input data-ad-prop="stroke" value="${esc(el.stroke)}"></label>
+      <label>X<input data-ad-prop="x" type="number" value="${esc(el.x)}"></label>
+      <label>Y<input data-ad-prop="y" type="number" value="${esc(el.y)}"></label>
+      <label>W<input data-ad-prop="w" type="number" value="${esc(el.w)}"></label>
+      <label>H<input data-ad-prop="h" type="number" value="${esc(el.h)}"></label>
+    </div>`;
+    return;
+  }
+  p.innerHTML = `<div class="ad-prop-grid"><label>Text / label<input data-ad-prop="text" value="${esc(el.type === "button" ? el.label : el.text)}"></label><label>Href<input data-ad-prop="href" value="${esc(el.href)}"></label><label>Color<input data-ad-prop="color" value="${esc(el.color)}"></label><label>Fill<input data-ad-prop="fill" value="${esc(el.fill)}"></label><label>Stroke<input data-ad-prop="stroke" value="${esc(el.stroke)}"></label><label>Size<input data-ad-prop="size" type="number" step="0.1" min="0.7" max="3" value="${esc(el.size || 1)}"></label><label>X<input data-ad-prop="x" type="number" value="${esc(el.x)}"></label><label>Y<input data-ad-prop="y" type="number" value="${esc(el.y)}"></label><label>W<input data-ad-prop="w" type="number" value="${esc(el.w)}"></label><label>H<input data-ad-prop="h" type="number" value="${esc(el.h)}"></label><label>Style<select data-ad-prop="style"><option value="primary"${el.style !== "ghost" ? " selected" : ""}>Primary</option><option value="ghost"${el.style === "ghost" ? " selected" : ""}>Ghost</option></select></label></div>`;
 }
 
 async function saveDirectoryAd(e) {

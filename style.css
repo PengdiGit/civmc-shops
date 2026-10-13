@@ -3867,6 +3867,8 @@ body.ads-page #ad-form { display: block; }
 .ad-resize[data-dir="w"] { left: -4px; top: calc(50% - 5px); width: 6px; height: 10px; cursor: ew-resize; }
 .directory-ad-props { border: 1px solid var(--line); padding: 10px; background: color-mix(in srgb, var(--panel) 85%, var(--bg)); }
 .ad-prop-grid { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 8px; }
+.ad-prop-grid .ad-prop-span2 { grid-column: 1 / -1; }
+.ad-prop-grid-image input[type="file"] { font-size: .84rem; }
 .ad-prop-grid label, .field-inline { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: .84rem; }
 .ad-prop-grid input, .ad-prop-grid select { width: 100%; }
 .directory-ad-preview { min-height: 110px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 70%, transparent); overflow: hidden; }
