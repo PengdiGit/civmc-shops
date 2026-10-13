@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin - CivMC Shops</title>
-<link rel="stylesheet" href="../style.css?v=35">
+<link rel="stylesheet" href="../style.css?v=36">
 </head>
 <body class="admin-page">
 <nav id="nav"></nav>
@@ -226,7 +226,7 @@
             <label for="ad-title">Title</label><input id="ad-title" type="text" maxlength="80" required placeholder="Brunswick market weekend">
             <div class="row" style="gap:10px;flex-wrap:wrap"><label class="field-inline" for="ad-start">Starts<input id="ad-start" type="datetime-local" required></label><label class="field-inline" for="ad-end">Ends<input id="ad-end" type="datetime-local" required></label><label class="field-inline" for="ad-priority">Priority<input id="ad-priority" type="number" step="1" value="0"></label><label class="find-filter-check"><input id="ad-enabled" type="checkbox" checked> Enabled</label></div>
             <div class="directory-ad-tabs" role="tablist"><button type="button" class="small primary" data-ad-view="web">Web layout</button><button type="button" class="small" data-ad-view="mod">In-game layout</button></div>
-            <div class="directory-ad-tools"><button type="button" class="small" data-ad-add="text">Text</button><button type="button" class="small" data-ad-add="box">Box</button><button type="button" class="small" data-ad-add="button">Button</button><button type="button" class="small" data-ad-add="image">Image</button><button type="button" class="small" id="ad-duplicate">Duplicate</button><button type="button" class="small" id="ad-delete-el">Delete element</button></div>
+            <div class="directory-ad-tools"><button type="button" class="small" data-ad-add="bg">Background</button><button type="button" class="small" data-ad-add="text">Text</button><button type="button" class="small" data-ad-add="box">Box</button><button type="button" class="small" data-ad-add="button">Button</button><button type="button" class="small" data-ad-add="image">Image</button><button type="button" class="small" id="ad-duplicate">Duplicate</button><button type="button" class="small" id="ad-delete-el">Delete element</button></div>
             <div class="directory-ad-editor-wrap"><div id="ad-editor" class="directory-ad-editor" aria-label="Visual ad editor"></div></div>
             <div class="directory-ad-props" id="ad-props"><p class="meta">Select an element to edit its text, colors, link, and size.</p></div>
             <div class="msg" id="admsg"></div><div class="row" style="gap:8px;flex-wrap:wrap"><button class="primary" type="submit" id="ad-save">Save ad</button><button class="small" type="button" id="ad-new">New</button></div>
@@ -279,8 +279,8 @@
 <script src="../config.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=36"></script>
-<script src="../directory-ads-admin.js?v=35"></script>
+<script src="../app.js?v=37"></script>
+<script src="../directory-ads-admin.js?v=36"></script>
 <script>
 const msg = document.getElementById("msg");
 const usermsg = document.getElementById("usermsg");

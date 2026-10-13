@@ -534,11 +534,13 @@ function directoryAdDefaultDoc(kind) {
   const h = mod ? 70 : 110;
   const imgW = mod ? 70 : 110;
   const contentW = w - imgW - 12;
+  const pad = mod ? 2 : 4;
   return {
     w,
     h,
-    bg: mod ? "#1E211C" : "transparent",
+    bg: "transparent",
     elements: [
+      { id: "bg", type: "box", x: pad, y: pad, w: w - pad * 2, h: h - pad * 2, fill: "#1E211C", stroke: "#4A5A3E" },
       { id: "hero", type: "image", x: w - imgW, y: 0, w: imgW, h, src: "", fill: "#242722", stroke: "#4A5A3E" },
       { id: "title", type: "text", x: 10, y: 10, w: contentW - 10, h: 18, text: "Advertise your shop", color: "#E6E4DA", size: mod ? 1 : 1.25 },
       { id: "body", type: "text", x: 10, y: 30, w: contentW - 10, h: 18, text: "Server events, markets, and shop specials.", color: "#AEB7A5", size: 1 },
@@ -578,7 +580,34 @@ function normalizeDirectoryAdDoc(raw, kind) {
       style: (el && el.style) === "ghost" ? "ghost" : "primary"
     };
   });
+  migrateDirectoryAdDocBg(doc);
   return doc;
+}
+
+/** Older layouts used doc.bg / full-bleed boxes; map to a resizable bg element. */
+function migrateDirectoryAdDocBg(doc) {
+  const hasBgEl = doc.elements.some(e => e && e.id === "bg" && e.type === "box");
+  if (!hasBgEl && !directoryAdBgIsTransparent(doc.bg)) {
+    doc.elements.unshift({
+      id: "bg", type: "box", x: 0, y: 0, w: doc.w, h: doc.h,
+      text: "", label: "Button", href: "", src: "",
+      color: "#E6E4DA", fill: doc.bg, stroke: "#4A5A3E", size: 1, style: "primary"
+    });
+  }
+  if (hasBgEl || !directoryAdBgIsTransparent(doc.bg)) doc.bg = "transparent";
+}
+
+function directoryAdElementPaintRank(el) {
+  if (!el) return 3;
+  if (el.id === "bg") return 0;
+  if (el.type === "box") return 1;
+  return 2;
+}
+
+function directoryAdElementsInPaintOrder(elements) {
+  const list = Array.isArray(elements) ? elements.slice() : [];
+  list.sort((a, b) => directoryAdElementPaintRank(a) - directoryAdElementPaintRank(b));
+  return list;
 }
 
 function directoryAdHref(href) {
@@ -603,17 +632,10 @@ function directoryAdBgIsTransparent(bg) {
   return !s || s === "transparent" || s === "none";
 }
 
-/** Legacy template full-bleed frame box (not user content). */
-function directoryAdIsFrameElement(el, doc) {
-  if (!el || el.type !== "box") return false;
-  if (el.id === "bg") return true;
-  return el.x <= 1 && el.y <= 1 && el.w >= doc.w - 2 && el.h >= doc.h - 2;
-}
-
 function renderDirectoryAdCanvas(target, rawDoc, opts = {}) {
   if (!target) return null;
   const doc = normalizeDirectoryAdDoc(rawDoc, opts.kind || "web");
-  const onFind = !!(opts.stripFrame || target.classList.contains("find-directory-ad"));
+  const onFind = target.classList.contains("find-directory-ad");
   target.innerHTML = "";
   target.classList.add("directory-ad-slot-ready");
   const fitW = Math.max(1, opts.fitWidth || target.clientWidth || doc.w);
@@ -623,14 +645,13 @@ function renderDirectoryAdCanvas(target, rawDoc, opts = {}) {
   outer.className = "directory-ad-canvas";
   outer.style.width = doc.w + "px";
   outer.style.height = doc.h + "px";
-  outer.style.background = (onFind || directoryAdBgIsTransparent(doc.bg)) ? "transparent" : doc.bg;
+  outer.style.background = directoryAdBgIsTransparent(doc.bg) ? "transparent" : doc.bg;
   outer.style.transform = "scale(" + scale + ")";
   outer.style.transformOrigin = "top left";
   target.style.minHeight = Math.ceil(doc.h * scale) + "px";
   target.style.height = Math.ceil(doc.h * scale) + "px";
   target.appendChild(outer);
-  for (const el of doc.elements) {
-    if (onFind && directoryAdIsFrameElement(el, doc)) continue;
+  for (const el of directoryAdElementsInPaintOrder(doc.elements)) {
     if (onFind && el.type === "image" && !directoryAdImageSrc(el.src)) continue;
     const node = el.type === "button" ? document.createElement("a") : document.createElement("div");
     node.className = "directory-ad-el directory-ad-el-" + el.type + (el.style === "ghost" ? " is-ghost" : "");
@@ -672,7 +693,6 @@ async function loadDirectoryAdSlot(slot, kind = "web") {
     if (slot.classList.contains("find-directory-ad")) {
       canvasOpts.fitHeight = 110;
       canvasOpts.maxScale = 1;
-      canvasOpts.stripFrame = true;
     }
     renderDirectoryAdCanvas(slot, kind === "mod" ? ad.layout_mod : ad.layout_web, canvasOpts);
   } catch (e) { console.warn("directory ads", e); slot.hidden = true; }
