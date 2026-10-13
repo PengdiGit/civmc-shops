@@ -269,26 +269,33 @@ Deno.serve(async (req) => {
     let id = Number(target.id);
     if (!Number.isFinite(id) && target.slug) {
       const slug = String(target.slug).toLowerCase();
-      const { data: rows } = await admin
-        .from("shops")
-        .select("id, name")
-        .eq("archived", false)
-        .limit(500);
       const strip = (n: string) =>
         String(n || "").replace(/[&§][0-9a-fk-or]/gi, "").toLowerCase()
           .replace(/[''"`]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
-      const list = rows || [];
-      const bases = list.map((s) => ({ s, base: strip(s.name) || ("shop-" + s.id) }));
-      const counts: Record<string, number> = {};
-      for (const { base } of bases) counts[base] = (counts[base] || 0) + 1;
-      let hit = bases.find(({ s, base }) =>
-        (counts[base] > 1 ? base + "-" + s.id : base) === slug
-      );
-      if (!hit) {
-        const m = slug.match(/-(\d+)$/);
-        if (m) hit = bases.find(({ s }) => String(s.id) === m[1]);
+      const m = slug.match(/-(\d+)$/);
+      if (m) {
+        const { data: row } = await admin.from("shops").select("id").eq("id", m[1]).eq("archived", false).maybeSingle();
+        if (row) id = Number(row.id);
       }
-      if (hit) id = Number(hit.s.id);
+      if (!Number.isFinite(id)) {
+        const list: { id: number; name: string }[] = [];
+        const pageSize = 1000;
+        for (let from = 0; ; from += pageSize) {
+          const { data: rows } = await admin.from("shops").select("id, name").eq("archived", false).order("id").range(from, from + pageSize - 1);
+          const batch = rows || [];
+          list.push(...batch);
+          if (batch.length < pageSize) break;
+        }
+        let hit = list.find((s) => {
+          const base = strip(s.name) || ("shop-" + s.id);
+          return base + "-" + s.id === slug;
+        });
+        if (!hit) {
+          const baseHits = list.filter((s) => (strip(s.name) || ("shop-" + s.id)) === slug);
+          if (baseHits.length === 1) hit = baseHits[0];
+        }
+        if (hit) id = Number(hit.id);
+      }
     }
     if (!Number.isFinite(id)) return respond({ ...defaultEmbed(), title: "Shop not found · CivMC Shops" }, 404);
 

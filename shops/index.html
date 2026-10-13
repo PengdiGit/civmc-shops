@@ -89,10 +89,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=31"></script>
+<script src="../app.js?v=36"></script>
 <script>
 const params = new URLSearchParams(location.search);
-// /shops/?id=1 · /shops/1/ · /shops/pfa-exchange/ · /shops/?slug=pfa-exchange
+// /shops/?id=1 · /shops/pfa-exchange-42/ · legacy /shops/pfa-exchange/ (disambiguate if needed)
 let shopId = params.get("id");
 let shopSlugParam = (params.get("slug") || "").trim().toLowerCase() || null;
 {
@@ -302,16 +302,6 @@ async function castTip(listingId, vote) {
   paintListings(isStaff(me), viewerOwnsShop());
 }
 
-let shopSlugPeers = null;
-async function loadShopSlugPeers() {
-  if (shopSlugPeers) return shopSlugPeers;
-  const { data: rows } = await sb.from("shops")
-    .select("id, name, city, nation, profiles!shops_owner_id_fkey(username, mc_username)")
-    .eq("archived", false).limit(500);
-  shopSlugPeers = rows || [];
-  return shopSlugPeers;
-}
-
 function shopChoicePlace(s) {
   const place = [canonicalPlace(s.city), canonicalPlace(s.nation)]
     .filter(Boolean)
@@ -343,15 +333,16 @@ async function resolveShopIdFromSlug(slug) {
   if (!slug) return null;
   if (/^\d+$/.test(slug)) return slug;
   const m = slug.match(/-(\d+)$/);
+  if (m) {
+    const { data } = await sb.from("shops").select("id").eq("id", m[1]).eq("archived", false).maybeSingle();
+    if (data) return String(data.id);
+  }
   const list = await loadShopSlugPeers();
-  // Collision links are base-id; bare base should ask the visitor to choose.
-  let hit = list.find(s => shopSlug(s, list) === slug);
-  if (!hit) hit = list.find(s => (shopSlugBase(s.name) + "-" + s.id) === slug);
-  if (!hit && m) hit = list.find(s => String(s.id) === m[1]);
+  let hit = list.find(s => shopSlug(s) === slug);
   if (hit) return String(hit.id);
-  const baseHits = list.filter(s => (shopSlugBase(s.name) || ("shop-" + s.id)) === slug);
+  const baseHits = list.filter(s => shopSlugLegacyBase(s) === slug);
   if (baseHits.length === 1) return String(baseHits[0].id);
-  if (baseHits.length > 1 && !m) shopSlugChoices = baseHits;
+  if (baseHits.length > 1) shopSlugChoices = baseHits;
   return null;
 }
 
