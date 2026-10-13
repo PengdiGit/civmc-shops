@@ -279,7 +279,7 @@
 <script src="../config.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=39"></script>
+<script src="../app.js?v=41"></script>
 <script src="../directory-ads-admin.js?v=36"></script>
 <script>
 const msg = document.getElementById("msg");
@@ -584,7 +584,7 @@ function paintUnknowns(hitFn) {
           ${itemText(u.want_amount, u.want_item, u.want_unit)} <span class="arrow">&rarr;</span> ${itemText(u.sell_amount, u.sell_item, u.sell_unit)}
           ${stockHtml(u)}
           <span class="tag warn">unknown</span>
-          <div class="meta" style="margin-top:4px">${coordsHtml(u.x, u.z, { approx: true })}${u.y != null ? " y" + esc(u.y) : ""}
+          <div class="meta" style="margin-top:4px">${coordsHtml(u.x, u.z, { approx: true })}
             \u00b7 last player ${player}${ench}${notes}
             \u00b7 first ${fmtDate(u.created_at)} \u00b7 scan ${updatedHtml(u.updated_at, { prefix: false })}
             \u00b7 <a href="${pageHref("unknown", { id: String(u.id) })}">open</a></div>
