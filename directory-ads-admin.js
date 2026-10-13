@@ -77,9 +77,17 @@ function syncAdGeomInputs() {
   }
 }
 
+function adEditorElements(doc) {
+  return typeof directoryAdElementsInPaintOrder === "function"
+    ? directoryAdElementsInPaintOrder(doc.elements)
+    : doc.elements;
+}
+
 function paintAdEditorNode(el, selected) {
   const node = document.createElement("div");
-  node.className = "ad-edit-el ad-edit-" + el.type + (selected ? " selected" : "");
+  node.className = "ad-edit-el ad-edit-" + el.type
+    + (el.id === "bg" ? " ad-edit-bg" : "")
+    + (selected ? " selected" : "");
   applyAdEditNodeStyles(node, el);
   node.dataset.id = el.id;
   node.onpointerdown = startAdDrag;
@@ -115,6 +123,8 @@ function applyAdEditNodeStyles(node, el) {
     } else {
       node.textContent = "Image";
     }
+  } else if (el.type === "box") {
+    node.textContent = el.id === "bg" ? "Background" : "";
   } else {
     node.textContent = el.type === "button" ? el.label : el.text;
   }
@@ -155,7 +165,7 @@ function syncAdEditorFromModel() {
   stage.querySelectorAll(".ad-edit-el").forEach(node => {
     if (!ids.has(node.dataset.id)) node.remove();
   });
-  for (const el of doc.elements) {
+  for (const el of adEditorElements(doc)) {
     let node = stage.querySelector(".ad-edit-el[data-id=\"" + el.id + "\"]");
     if (!node) {
       node = paintAdEditorNode(el, el.id === adSelectedId);
@@ -163,6 +173,7 @@ function syncAdEditorFromModel() {
     } else {
       applyAdEditNodeStyles(node, el);
       node.classList.toggle("selected", el.id === adSelectedId);
+      stage.appendChild(node);
     }
   }
   updateAdEditorSelection();
@@ -362,8 +373,26 @@ function setDirectoryAdSaveError(el, message) {
 }
 
 function addAdElement(type) {
-  const id = type + "-" + Math.random().toString(36).slice(2, 8);
   const doc = adDoc();
+  if (type === "bg") {
+    let bg = doc.elements.find(e => e.id === "bg");
+    if (bg) {
+      adSelectedId = bg.id;
+      renderAdEditor();
+      return;
+    }
+    const pad = adView === "mod" ? 2 : 4;
+    bg = {
+      id: "bg", type: "box", x: pad, y: pad, w: doc.w - pad * 2, h: doc.h - pad * 2,
+      text: "", label: "Visit", href: "", src: "",
+      color: "#E6E4DA", fill: "#1E211C", stroke: "#4A5A3E", size: 1, style: "primary"
+    };
+    doc.elements.push(bg);
+    adSelectedId = bg.id;
+    renderAdEditor();
+    return;
+  }
+  const id = type + "-" + Math.random().toString(36).slice(2, 8);
   const imgW = adView === "mod" ? 70 : 110;
   const el = {
     id, type,
@@ -404,7 +433,7 @@ function renderAdEditor() {
   stage.style.height = doc.h + "px";
   stage.style.background = doc.bg;
   stage.innerHTML = "";
-  for (const el of doc.elements) {
+  for (const el of adEditorElements(doc)) {
     stage.appendChild(paintAdEditorNode(el, el.id === adSelectedId));
   }
   renderAdProps(true);
@@ -506,7 +535,12 @@ function renderAdProps(force) {
   adPropsPanelKey = key;
   const el = adEl();
   if (!el) {
-    p.innerHTML = '<p class="meta">Select an element to edit its text, colors, link, and size.</p><label>Background</label><input data-ad-doc="bg" value="' + esc(adDoc().bg) + '">';
+    p.innerHTML = '<p class="meta">Add <b>Background</b> for the dark panel (drag/resize like other elements). Canvas fill below is optional.</p><label>Canvas fill (optional)</label><input data-ad-doc="bg" value="' + esc(adDoc().bg) + '">';
+    return;
+  }
+  if (el.type === "box") {
+    const title = el.id === "bg" ? "Background panel" : "Box";
+    p.innerHTML = `<div class="ad-prop-grid"><p class="meta ad-prop-span2">${title} — drag to move; handles to resize.</p><label>Fill<input data-ad-prop="fill" value="${esc(el.fill)}"></label><label>Stroke<input data-ad-prop="stroke" value="${esc(el.stroke)}"></label><label>X<input data-ad-prop="x" type="number" value="${esc(el.x)}"></label><label>Y<input data-ad-prop="y" type="number" value="${esc(el.y)}"></label><label>W<input data-ad-prop="w" type="number" value="${esc(el.w)}"></label><label>H<input data-ad-prop="h" type="number" value="${esc(el.h)}"></label></div>`;
     return;
   }
   if (el.type === "image") {
