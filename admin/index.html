@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin - CivMC Shops</title>
-<link rel="stylesheet" href="../style.css?v=37">
+<link rel="stylesheet" href="../style.css?v=38">
 </head>
 <body class="admin-page">
 <nav id="nav"></nav>
@@ -273,14 +273,47 @@
       <div class="mod-stack" id="stale"></div>
     </div>
   </section>
+
+  <div id="scan-players-wrap" style="display:none">
+    <section class="mod-section mod-section--list collapse-section admin-collapse" data-collapse="scan-players" aria-labelledby="admin-scan-players-h">
+      <div class="mod-section-head">
+        <h2 id="admin-scan-players-h">
+          <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-scan-players">
+            <span class="collapse-chevron" aria-hidden="true"></span>
+            <span class="mod-section-head-text">
+              <span class="mod-section-title">Scan contributors</span>
+              <span class="meta">Head admin only. Minecraft players who triggered an accepted shop scan (mod ingest).</span>
+            </span>
+          </button>
+        </h2>
+      </div>
+      <div class="collapse-body" id="collapse-scan-players">
+        <p class="meta" id="scan-players-summary">Loading…</p>
+        <div class="msg" id="scan-players-msg"></div>
+        <div class="bulk-table-wrap">
+          <table class="bulk-table" id="scan-players-table">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Scans</th>
+                <th>First seen</th>
+                <th>Last seen</th>
+              </tr>
+            </thead>
+            <tbody id="scan-players-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=39"></script>
-<script src="../directory-ads-admin.js?v=36"></script>
+<script src="../app.js?v=40"></script>
+<script src="../directory-ads-admin.js?v=37"></script>
 <script>
 const msg = document.getElementById("msg");
 const usermsg = document.getElementById("usermsg");
@@ -292,6 +325,8 @@ let viewUsers = [];
 let shopRows = [];
 let listingRows = [];
 let unknownRows = [];
+let scanPlayerRows = [];
+let scanPlayerTotal = 0;
 let aliasPreviewRows = [];
 
 function updateAdsDebugNote(p, head, adsOn) {
@@ -321,6 +356,7 @@ function showHeadAdminPanels() {
   document.getElementById("pending-wrap").style.display = "block";
   document.getElementById("sales-wrap").style.display = "block";
   document.getElementById("unknowns-wrap").style.display = "block";
+  document.getElementById("scan-players-wrap").style.display = "block";
   setupSalesUi();
   showDirectoryAdsPanel();
 }
@@ -560,6 +596,56 @@ function paintLists() {
     </div>`).join("") || '<p class="meta">None.</p>';
 
   paintUnknowns(hit);
+  paintScanPlayers(hit);
+}
+
+function paintScanPlayers(hitFn) {
+  const body = document.getElementById("scan-players-body");
+  const summary = document.getElementById("scan-players-summary");
+  const msgEl = document.getElementById("scan-players-msg");
+  if (!body || !me || !me.is_head) return;
+  const hit = hitFn || (() => true);
+  const rows = scanPlayerRows.filter(r => hit(r.player));
+  if (summary) {
+    const n = scanPlayerTotal || scanPlayerRows.length;
+    summary.textContent = n
+      ? `${n} unique player${n === 1 ? "" : "s"}${rows.length !== n ? ` · ${rows.length} shown (filter)` : ""} · newest last seen first`
+      : "No scan contributors yet.";
+  }
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="4" class="meta">${scanPlayerRows.length ? "No players match this filter." : "No rows yet."}</td></tr>`;
+    return;
+  }
+  if (msgEl) setMsg(msgEl, "");
+  body.innerHTML = rows.map(r => `<tr>
+    <td>${esc(r.player)}</td>
+    <td>${esc(String(r.scan_count ?? 0))}</td>
+    <td class="meta">${fmtDate(r.first_seen_at)}</td>
+    <td class="meta">${fmtDate(r.last_seen_at)}</td>
+  </tr>`).join("");
+}
+
+async function loadScanPlayers() {
+  const msgEl = document.getElementById("scan-players-msg");
+  if (!me || !me.is_head) {
+    scanPlayerRows = [];
+    scanPlayerTotal = 0;
+    return;
+  }
+  const { data, error, count } = await sb
+    .from("scan_players")
+    .select("player, scan_count, first_seen_at, last_seen_at", { count: "exact" })
+    .order("last_seen_at", { ascending: false })
+    .limit(2000);
+  if (error) {
+    scanPlayerRows = [];
+    scanPlayerTotal = 0;
+    if (msgEl) setMsg(msgEl, error.message, "err");
+    return;
+  }
+  scanPlayerRows = data || [];
+  scanPlayerTotal = count != null ? count : scanPlayerRows.length;
+  if (msgEl) setMsg(msgEl, "");
 }
 
 function paintUnknowns(hitFn) {
@@ -671,6 +757,7 @@ async function render() {
       </div>`).join("")
     : '<p class="meta">Nothing stale right now.</p>';
 
+  await loadScanPlayers();
   paintLists();
 }
 

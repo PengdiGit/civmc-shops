@@ -314,6 +314,13 @@ async function pruneUnknowns(admin: Admin) {
   await admin.from("unknown_listings").delete().lt("updated_at", before);
 }
 
+/** Permanent contributor list (scan_ingest_log is pruned ~24h). */
+async function recordScanPlayer(admin: Admin, player: string) {
+  const now = new Date().toISOString();
+  const { error } = await admin.rpc("upsert_scan_player", { p_player: player, p_at: now });
+  if (error) console.error("scan_players upsert failed", error.message);
+}
+
 async function deleteMatchingUnknowns(
   admin: Admin,
   inAmt: number,
@@ -593,6 +600,7 @@ Deno.serve(async (req) => {
     return json({ updated: false, reason: "rate_limited" }, 429);
   }
   await admin.from("scan_ingest_log").insert({ player, ip_hash: ipHash });
+  await recordScanPlayer(admin, player);
   const pruneBefore = new Date(Date.now() - LOG_PRUNE_HOURS * 3600_000).toISOString();
   void admin.from("scan_ingest_log").delete().lt("created_at", pruneBefore);
 
