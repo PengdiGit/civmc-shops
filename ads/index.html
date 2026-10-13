@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Directory ads - CivMC Shops</title>
+<link rel="stylesheet" href="../style.css?v=32">
+</head>
+<body class="ads-page admin-page">
+<nav id="nav"></nav>
+<main>
+  <header class="mod-hero">
+    <div class="mod-hero-copy">
+      <span class="mod-eyebrow">Promotions</span>
+      <h1>Directory ads</h1>
+      <p class="sub">Create and edit ads shown on the Find Directory board (web + in-game). <a href="../admin/" style="color:var(--accent)">Back to Admin</a></p>
+      <p class="meta" id="ads-access-note"></p>
+    </div>
+  </header>
+
+  <section class="mod-section mod-section--ads" id="directory-ads" aria-labelledby="ads-page-h">
+    <div class="mod-section-head">
+      <h2 id="ads-page-h"><span class="mod-section-title">Ad editor</span></h2>
+    </div>
+    <div class="collapse-body directory-ad-admin is-open">
+      <div class="directory-ad-admin-grid">
+        <form class="stack directory-ad-form" id="ad-form">
+          <label for="ad-title">Title</label>
+          <input id="ad-title" type="text" maxlength="80" required placeholder="Brunswick market weekend">
+          <div class="row" style="gap:10px;flex-wrap:wrap">
+            <label class="field-inline" for="ad-start">Starts<input id="ad-start" type="datetime-local" required></label>
+            <label class="field-inline" for="ad-end">Ends<input id="ad-end" type="datetime-local" required></label>
+            <label class="field-inline" for="ad-priority">Priority<input id="ad-priority" type="number" step="1" value="0"></label>
+            <label class="find-filter-check"><input id="ad-enabled" type="checkbox" checked> Enabled</label>
+          </div>
+          <div class="directory-ad-tabs" role="tablist">
+            <button type="button" class="small primary" data-ad-view="web">Web layout</button>
+            <button type="button" class="small" data-ad-view="mod">In-game layout</button>
+          </div>
+          <div class="directory-ad-tools">
+            <button type="button" class="small" data-ad-add="text">Text</button>
+            <button type="button" class="small" data-ad-add="box">Box</button>
+            <button type="button" class="small" data-ad-add="button">Button</button>
+            <button type="button" class="small" data-ad-add="image">Image</button>
+            <button type="button" class="small" id="ad-duplicate">Duplicate</button>
+            <button type="button" class="small" id="ad-delete-el">Delete element</button>
+          </div>
+          <div class="directory-ad-editor-wrap">
+            <div id="ad-editor" class="directory-ad-editor" aria-label="Visual ad editor"></div>
+          </div>
+          <div class="directory-ad-props" id="ad-props">
+            <p class="meta">Select an element to edit its text, colors, link, and size.</p>
+          </div>
+          <div class="msg" id="admsg"></div>
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            <button class="primary" type="submit" id="ad-save">Save ad</button>
+            <button class="small" type="button" id="ad-new">New</button>
+          </div>
+        </form>
+        <div>
+          <h3 style="margin-top:0">Preview</h3>
+          <div class="directory-ad-preview" id="ad-preview"></div>
+          <h3>Existing ads</h3>
+          <div class="mod-stack" id="ads-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+<script src="../app.js?v=32"></script>
+<script src="../directory-ads-admin.js?v=32"></script>
+<script>
+bootDirectoryAdsPage();
+</script>
+</body>
+</html>
