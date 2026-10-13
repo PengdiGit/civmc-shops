@@ -568,7 +568,7 @@ function paintUnknowns(hitFn) {
   const hit = hitFn || (() => true);
   const rows = unknownRows.filter(u => hit(
     u.sell_item, u.want_item, u.last_player, u.notes, u.enchants,
-    u.x, u.z, u.nl
+    u.x, u.z
   ));
   if (!rows.length) {
     box.innerHTML = '<p class="meta">' + (unknownRows.length ? "No unknowns match this filter." : "No unknown listings right now.") + "</p>";

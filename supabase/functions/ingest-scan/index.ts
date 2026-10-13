@@ -45,7 +45,6 @@ type ScanBody = {
   output_item?: string;
   output_unit?: string | null;
   stock?: number;
-  nl?: string;
   enchants?: string | null;
   notes?: string | null;
 };
@@ -54,7 +53,6 @@ type ShopRow = {
   id: number;
   x: number | null;
   z: number | null;
-  stock_nl: string | null;
   auto_stock_enabled: boolean;
   listings: ListingRow[] | null;
 };
@@ -93,7 +91,6 @@ type UnknownRow = {
   x: number;
   y: number | null;
   z: number;
-  nl: string | null;
   fingerprint: string;
 };
 
@@ -110,10 +107,6 @@ function normUnit(s: unknown): string {
 
 function normText(s: unknown): string {
   return String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function normNl(s: unknown): string {
-  return String(s ?? "").trim().toLowerCase();
 }
 
 function enchantKey(s: unknown): string {
@@ -224,7 +217,7 @@ async function findNearbyKnownListing(
   const { data: shops, error } = await admin
     .from("shops")
     .select(
-      "id, x, z, stock_nl, auto_stock_enabled, listings(id, shop_id, want_item, want_amount, want_unit, sell_item, sell_amount, sell_unit, stock, in_stock, timed_out, enchants, notes, bundle_contents, x, z)",
+      "id, x, z, auto_stock_enabled, listings(id, shop_id, want_item, want_amount, want_unit, sell_item, sell_amount, sell_unit, stock, in_stock, timed_out, enchants, notes, bundle_contents, x, z)",
     )
     .eq("archived", false)
     .eq("timed_out", false)
@@ -252,7 +245,6 @@ async function findNearbyKnownListing(
 }
 
 function makeFingerprint(
-  nl: string,
   inAmt: number,
   inItem: string,
   inUnit: string,
@@ -264,7 +256,6 @@ function makeFingerprint(
   ench: string,
 ): string {
   return [
-    normNl(nl),
     inItem,
     String(inAmt),
     inUnit,
@@ -358,7 +349,6 @@ async function handleUnknown(
   admin: Admin,
   opts: {
     player: string;
-    nl: string;
     stock: number;
     blockX: number;
     blockY: number | null;
@@ -413,7 +403,6 @@ async function handleUnknown(
   const in_stock = opts.stock > 0;
   const now = new Date().toISOString();
   const fp = makeFingerprint(
-    opts.nl,
     opts.inAmt,
     opts.inItem,
     opts.inUnit,
@@ -427,7 +416,7 @@ async function handleUnknown(
 
   const { data: nearRows, error: nearErr } = await admin
     .from("unknown_listings")
-    .select("id, stock, in_stock, x, y, z, want_item, want_amount, want_unit, sell_item, sell_amount, sell_unit, enchants, notes, nl, fingerprint")
+    .select("id, stock, in_stock, x, y, z, want_item, want_amount, want_unit, sell_item, sell_amount, sell_unit, enchants, notes, fingerprint")
     .gte("x", opts.blockX - AUTO_STOCK_XZ)
     .lte("x", opts.blockX + AUTO_STOCK_XZ)
     .gte("z", opts.blockZ - AUTO_STOCK_XZ)
@@ -478,7 +467,6 @@ async function handleUnknown(
       z: opts.blockZ,
       enchants: opts.enchantsRaw,
       notes: opts.notesRaw,
-      nl: opts.nl || null,
       last_player: opts.player,
       fingerprint: fp,
       updated_at: now,
@@ -509,7 +497,6 @@ async function handleUnknown(
     x: opts.blockX,
     y: opts.blockY,
     z: opts.blockZ,
-    nl: opts.nl || null,
     last_player: opts.player,
     fingerprint: fp,
     updated_at: now,
@@ -552,7 +539,6 @@ Deno.serve(async (req) => {
   }
 
   const player = String(body.player || "").trim();
-  const nl = String(body.nl || "").trim();
   const stock = asInt(body.stock);
   const blockX = scanCoord(body, "block_x", "x");
   const blockY = scanCoord(body, "block_y", "y");
@@ -574,7 +560,6 @@ Deno.serve(async (req) => {
 
   if (!player || player.length > 32) return json({ error: "Need player name." }, 400);
   if (!/^[A-Za-z0-9_]{1,32}$/.test(player)) return json({ error: "Bad player name." }, 400);
-  if (nl.length > 64) return json({ error: "nl too long." }, 400);
   if (stock == null || stock < 0 || stock > 1_000_000) {
     return json({ error: "Need stock >= 0." }, 400);
   }
@@ -613,7 +598,6 @@ Deno.serve(async (req) => {
 
   const unknownOpts = {
     player,
-    nl,
     stock,
     blockX,
     blockY,
@@ -634,7 +618,7 @@ Deno.serve(async (req) => {
   const { data: shops, error: sErr } = await admin
     .from("shops")
     .select(
-      "id, x, z, stock_nl, auto_stock_enabled, listings(id, shop_id, want_item, want_amount, want_unit, sell_item, sell_amount, sell_unit, stock, in_stock, timed_out, enchants, notes, bundle_contents, x, z)",
+      "id, x, z, auto_stock_enabled, listings(id, shop_id, want_item, want_amount, want_unit, sell_item, sell_amount, sell_unit, stock, in_stock, timed_out, enchants, notes, bundle_contents, x, z)",
     )
     .eq("auto_stock_enabled", true)
     .eq("archived", false)
@@ -648,14 +632,10 @@ Deno.serve(async (req) => {
 
   if (sErr) return json({ error: sErr.message }, 400);
   const shopRows = (shops || []) as ShopRow[];
-  const nlKey = normNl(nl);
-  const scopedShops = nlKey
-    ? shopRows.filter((s) => !s.stock_nl || normNl(s.stock_nl) === nlKey)
-    : shopRows;
 
   type Cand = { listing: ListingRow; shop: ShopRow; d2: number };
   let cands: Cand[] = [];
-  for (const shop of scopedShops) {
+  for (const shop of shopRows) {
     for (const l of shop.listings || []) {
       if (l.timed_out) continue;
       if (!listingContentMatch(l, inItem, inAmt, inUnit, outItem, outAmt, outUnit, scanEnchants, scanNotes)) {

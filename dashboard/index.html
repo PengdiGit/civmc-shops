@@ -66,12 +66,12 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="../config.js"></script>
+<script src="../config.js?v=2"></script>
 <script src="../items.js"></script>
 <script src="../item-picker.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=37"></script>
+<script src="../app.js?v=38"></script>
 <script>
 let me = null;
 let shopsData = {};                 // shop id -> shop (with listings), from the last load
@@ -85,9 +85,9 @@ let myNotifications = [];
 let dashDirty = false;              // unsaved listing / shop-detail edits
 const msg = document.getElementById("msg");
 
-/** Head-admin-only gate for auto-stock opt-in UI (DB trigger also enforces is_head). */
+/** Auto-stock opt-in UI for shop owners (when AUTO_STOCK_UI is enabled). */
 function autoStockUi() {
-  return typeof AUTO_STOCK_UI !== "undefined" && !!AUTO_STOCK_UI && !!(me && me.profile && me.profile.is_head);
+  return typeof AUTO_STOCK_UI !== "undefined" && !!AUTO_STOCK_UI;
 }
 
 function markDashDirty() { dashDirty = true; }
@@ -338,13 +338,10 @@ function panelHtml(s) {
     ${autoStockUi() ? `
     <div class="dash-auto-stock" style="margin-top:10px">
       <label class="find-filter-check" style="display:flex;align-items:center;gap:8px">
-        <input type="checkbox" class="p-auto-stock" ${s.auto_stock_enabled ? "checked" : ""}>
+        <input type="checkbox" class="p-auto-stock" ${s.auto_stock_enabled !== false ? "checked" : ""}>
         Auto stock updates (CivMC Shop Scan mod)
       </label>
-      <label style="display:block;margin-top:6px">Stock NameLayer group
-        <input type="text" class="p-stock-nl" maxlength="64" value="${esc(s.stock_nl || "")}" placeholder="e.g. Pengdi_" style="width:100%;max-width:280px">
-      </label>
-      <p class="meta" style="margin:4px 0 0">Head admin only for now. Reinforce exchanges on this NL with public info. Needs shop X/Z. Crowd-sourced stock from the mod.</p>
+      <p class="meta" style="margin:4px 0 0">When enabled, trades near your shop X/Z update listing stock from the mod. Set shop coordinates below.</p>
     </div>` : ""}
 
     <label>Fancy name (optional). Minecraft colour codes: <b>&amp;6</b> gold, <b>&amp;l</b> bold, <b>&amp;r</b> reset...</label>
@@ -1668,15 +1665,12 @@ document.getElementById("shops").addEventListener("click", async e => {
     const x = panel.querySelector(".p-x").value, z = panel.querySelector(".p-z").value;
     const shopX = x === "" ? null : parseInt(x, 10);
     const shopZ = z === "" ? null : parseInt(z, 10);
-    let auto_stock_enabled = !!shop.auto_stock_enabled;
-    let stock_nl = shop.stock_nl || null;
+    let auto_stock_enabled = shop.auto_stock_enabled !== false;
     if (autoStockUi()) {
-      const nlEl = panel.querySelector(".p-stock-nl");
       const autoEl = panel.querySelector(".p-auto-stock");
-      stock_nl = (nlEl && nlEl.value.trim()) || null;
       auto_stock_enabled = !!(autoEl && autoEl.checked);
-      if (auto_stock_enabled && (shopX == null || shopZ == null || Number.isNaN(shopX) || Number.isNaN(shopZ) || !stock_nl)) {
-        setMsg(msg, "Auto stock needs shop X/Z and a Stock NameLayer group.", "err");
+      if (auto_stock_enabled && (shopX == null || shopZ == null || Number.isNaN(shopX) || Number.isNaN(shopZ))) {
+        setMsg(msg, "Auto stock needs shop X and Z coordinates.", "err");
         return;
       }
     }
@@ -1701,7 +1695,6 @@ document.getElementById("shops").addEventListener("click", async e => {
     };
     if (autoStockUi()) {
       shopPatch.auto_stock_enabled = auto_stock_enabled;
-      shopPatch.stock_nl = stock_nl;
     }
     const r = await sb.from("shops").update(shopPatch).eq("id", shopId);
     btn.disabled = false;
