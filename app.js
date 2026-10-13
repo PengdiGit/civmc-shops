@@ -2958,9 +2958,45 @@ function marketQuantile(sorted, q) {
   const pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
 }
+/** Map unknown_listings row for computeMarketNow (synthetic shop_id). */
+function mapUnknownListingForMarket(u) {
+  if (!u) return null;
+  return {
+    shop_id: "unk:" + u.id,
+    want_item: u.want_item,
+    want_amount: u.want_amount,
+    want_unit: u.want_unit,
+    sell_item: u.sell_item,
+    sell_amount: u.sell_amount,
+    sell_unit: u.sell_unit,
+    in_stock: u.in_stock !== false,
+    timed_out: false,
+    enchants: u.enchants
+  };
+}
+
+const MARKET_FILTERS_KEY = "civmc_market_filters";
+function loadMarketFilterPrefs() {
+  try {
+    const o = JSON.parse(localStorage.getItem(MARKET_FILTERS_KEY) || "null");
+    if (!o || typeof o !== "object") return { includeUnknown: false };
+    return { includeUnknown: !!o.includeUnknown };
+  } catch (e) {
+    return { includeUnknown: false };
+  }
+}
+function saveMarketFilterPrefs(p) {
+  try {
+    localStorage.setItem(MARKET_FILTERS_KEY, JSON.stringify({
+      includeUnknown: !!(p && p.includeUnknown)
+    }));
+  } catch (e) {}
+}
+
 /** Client-side market_now(). Default skips enchanted listings; pass { unenchantedOnly: false } when the caller already filtered by enchant mode. */
 function computeMarketNow(listings, shops, profiles, placeFilter, opts) {
   const unenchantedOnly = !(opts && opts.unenchantedOnly === false);
+  const unknownRows = (opts && opts.unknownListings) || [];
   let city = "";
   let nation = "";
   if (placeFilter && typeof placeFilter === "object") {
@@ -2991,6 +3027,19 @@ function computeMarketNow(listings, shops, profiles, placeFilter, opts) {
       push(l.sell_item, "sell", l.shop_id, rawCount(l.want_amount, l.want_unit) * CURRENCY[l.want_item] / rawCount(l.sell_amount, l.sell_unit));
     if (CURRENCY[l.sell_item] != null && CURRENCY[l.want_item] == null)
       push(l.want_item, "buy", l.shop_id, rawCount(l.sell_amount, l.sell_unit) * CURRENCY[l.sell_item] / rawCount(l.want_amount, l.want_unit));
+  }
+  const scoped = !!(city || nation);
+  if (!scoped && unknownRows.length) {
+    for (const l of unknownRows) {
+      if (!l || l.in_stock === false) continue;
+      if (isBundleItem(l.sell_item) || isBundleItem(l.want_item)) continue;
+      if (unenchantedOnly && String(l.enchants || "").trim()) continue;
+      const sid = l.shop_id || ("unk:" + l.id);
+      if (CURRENCY[l.want_item] != null && CURRENCY[l.sell_item] == null)
+        push(l.sell_item, "sell", sid, rawCount(l.want_amount, l.want_unit) * CURRENCY[l.want_item] / rawCount(l.sell_amount, l.sell_unit));
+      if (CURRENCY[l.sell_item] != null && CURRENCY[l.want_item] == null)
+        push(l.want_item, "buy", sid, rawCount(l.sell_amount, l.sell_unit) * CURRENCY[l.sell_item] / rawCount(l.want_amount, l.want_unit));
+    }
   }
   const groups = {};
   Object.values(per).forEach(g => {
