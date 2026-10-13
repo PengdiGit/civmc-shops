@@ -102,7 +102,22 @@ function applyAdEditNodeStyles(node, el) {
       ? "color-mix(in srgb, var(--bg) 55%, transparent)"
       : "";
   }
-  node.textContent = el.type === "button" ? el.label : (el.type === "image" ? "image" : el.text);
+  if (el.type === "image") {
+    node.textContent = "";
+    node.style.background = el.fill || "#242722";
+    node.style.borderColor = el.stroke || "#4A5A3E";
+    const src = typeof directoryAdImageSrc === "function" ? directoryAdImageSrc(el.src) : "";
+    if (src) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.src = src;
+      node.appendChild(img);
+    } else {
+      node.textContent = "Image";
+    }
+  } else {
+    node.textContent = el.type === "button" ? el.label : el.text;
+  }
 }
 
 function appendAdResizeHandles(node) {
@@ -306,10 +321,14 @@ function setDirectoryAdSaveError(el, message) {
 
 function addAdElement(type) {
   const id = type + "-" + Math.random().toString(36).slice(2, 8);
+  const doc = adDoc();
+  const imgW = adView === "mod" ? 70 : 110;
   const el = {
-    id, type, x: 12, y: 12,
-    w: type === "button" ? 82 : 130,
-    h: type === "text" ? 16 : 24,
+    id, type,
+    x: type === "image" ? doc.w - imgW : 12,
+    y: type === "image" ? 0 : 12,
+    w: type === "button" ? 82 : (type === "image" ? imgW : 130),
+    h: type === "text" ? 16 : (type === "image" ? doc.h : 24),
     text: "New text", label: "Visit", href: "/home/", src: "",
     color: "#E6E4DA", fill: "#242722", stroke: "#7FB069", size: 1, style: "primary"
   };
