@@ -134,7 +134,7 @@ function pickTimeoutDuration(opts) {
 /** Clean folder URLs on GitHub Pages / custom domain (no *.html in the address bar). */
 const PAGE_SLUGS = new Set([
   "home", "market", "dashboard", "shops", "profile", "favourites",
-  "settings", "moderation", "admin", "login", "signup", "verify", "unknown"
+  "settings", "moderation", "admin", "ads", "login", "signup", "verify", "unknown"
 ]);
 const LEGACY_PAGE = {
   "index.html": "home",
@@ -2391,7 +2391,10 @@ async function renderNav() {
     if (isStaff(profile) || (profile && (profile.is_admin || profile.is_head))) {
       drawer += `<div class="nav-drawer-sep" role="separator"></div>`;
       if (isStaff(profile)) drawer += `<a class="nav-drawer-link" href="${pageHref("moderation")}">Moderation</a>`;
-      if (profile && (profile.is_admin || profile.is_head)) drawer += `<a class="nav-drawer-link" href="${pageHref("admin")}">Admin</a>`;
+      if (profile && (profile.is_admin || profile.is_head)) {
+        drawer += `<a class="nav-drawer-link" href="${pageHref("admin")}">Admin</a>`;
+        drawer += `<a class="nav-drawer-link" href="${pageHref("ads")}">Directory ads</a>`;
+      }
     }
     drawer += `<div class="nav-drawer-sep" role="separator"></div>`;
     if (isImpersonating()) {

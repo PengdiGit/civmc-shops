@@ -3828,9 +3828,13 @@ body.admin-page #collapse-pending > [data-act="purge-unverified"] { margin: 2px 
 
 
 /* ---- directory ads ---- */
+body.admin-page #ads-wrap.admin-ads-panel:not([hidden]) { display: block !important; }
 body.admin-page #ads-wrap.admin-ads-panel.ads-visible { display: block !important; }
 body.admin-page #ads-wrap.admin-ads-panel .directory-ad-admin,
 body.admin-page #ads-wrap.admin-ads-panel .collapse-body { min-height: 0; overflow: visible; }
+body.ads-page .directory-ad-admin,
+body.ads-page .directory-ad-admin .collapse-body { min-height: 0; overflow: visible; display: block; }
+body.ads-page #ad-form { display: block; }
 .directory-ad-slot { position: relative; min-width: 240px; border: 1px solid color-mix(in srgb, var(--line) 75%, var(--accent)); background: color-mix(in srgb, var(--bg) 62%, transparent); overflow: hidden; align-self: stretch; }
 .find-directory-ad { grid-column: 2; justify-self: stretch; width: min(100%, 430px); }
 .directory-ad-canvas { position: relative; overflow: hidden; font-family: "Monocraft", ui-monospace, monospace; }
