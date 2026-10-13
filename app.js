@@ -502,14 +502,18 @@ function norm(s) { return s.trim().toLowerCase().replace(/\s+/g, " "); }
 
 function directoryAdDefaultDoc(kind) {
   const mod = kind === "mod";
+  const w = mod ? 280 : 420;
+  const h = mod ? 70 : 110;
+  const imgW = mod ? 70 : 110;
+  const contentW = w - imgW - 12;
   return {
-    w: mod ? 280 : 420,
-    h: mod ? 70 : 110,
-    bg: "#1E211C",
+    w,
+    h,
+    bg: mod ? "#1E211C" : "transparent",
     elements: [
-      { id: "bg", type: "box", x: 0, y: 0, w: mod ? 280 : 420, h: mod ? 70 : 110, fill: "#242722", stroke: "#4A5A3E" },
-      { id: "title", type: "text", x: 10, y: 10, w: mod ? 190 : 280, h: 18, text: "Advertise your shop", color: "#E6E4DA", size: mod ? 1 : 1.25 },
-      { id: "body", type: "text", x: 10, y: 30, w: mod ? 210 : 320, h: 18, text: "Server events, markets, and shop specials.", color: "#AEB7A5", size: 1 },
+      { id: "hero", type: "image", x: w - imgW, y: 0, w: imgW, h, src: "", fill: "#242722", stroke: "#4A5A3E" },
+      { id: "title", type: "text", x: 10, y: 10, w: contentW - 10, h: 18, text: "Advertise your shop", color: "#E6E4DA", size: mod ? 1 : 1.25 },
+      { id: "body", type: "text", x: 10, y: 30, w: contentW - 10, h: 18, text: "Server events, markets, and shop specials.", color: "#AEB7A5", size: 1 },
       { id: "cta", type: "button", x: 10, y: mod ? 50 : 78, w: 82, h: 18, label: "Visit", href: "/home/", style: "primary" }
     ]
   };
@@ -563,9 +567,22 @@ function directoryAdImageSrc(src) {
   catch (e) { return ""; }
 }
 
+function directoryAdBgIsTransparent(bg) {
+  const s = String(bg || "").trim().toLowerCase();
+  return !s || s === "transparent" || s === "none";
+}
+
+/** Legacy template full-bleed frame box (not user content). */
+function directoryAdIsFrameElement(el, doc) {
+  if (!el || el.type !== "box") return false;
+  if (el.id === "bg") return true;
+  return el.x <= 1 && el.y <= 1 && el.w >= doc.w - 2 && el.h >= doc.h - 2;
+}
+
 function renderDirectoryAdCanvas(target, rawDoc, opts = {}) {
   if (!target) return null;
   const doc = normalizeDirectoryAdDoc(rawDoc, opts.kind || "web");
+  const onFind = !!(opts.stripFrame || target.classList.contains("find-directory-ad"));
   target.innerHTML = "";
   target.classList.add("directory-ad-slot-ready");
   const fitW = Math.max(1, opts.fitWidth || target.clientWidth || doc.w);
@@ -575,13 +592,15 @@ function renderDirectoryAdCanvas(target, rawDoc, opts = {}) {
   outer.className = "directory-ad-canvas";
   outer.style.width = doc.w + "px";
   outer.style.height = doc.h + "px";
-  outer.style.background = doc.bg;
+  outer.style.background = (onFind || directoryAdBgIsTransparent(doc.bg)) ? "transparent" : doc.bg;
   outer.style.transform = "scale(" + scale + ")";
   outer.style.transformOrigin = "top left";
   target.style.minHeight = Math.ceil(doc.h * scale) + "px";
   target.style.height = Math.ceil(doc.h * scale) + "px";
   target.appendChild(outer);
   for (const el of doc.elements) {
+    if (onFind && directoryAdIsFrameElement(el, doc)) continue;
+    if (onFind && el.type === "image" && !directoryAdImageSrc(el.src)) continue;
     const node = el.type === "button" ? document.createElement("a") : document.createElement("div");
     node.className = "directory-ad-el directory-ad-el-" + el.type + (el.style === "ghost" ? " is-ghost" : "");
     node.style.left = el.x + "px"; node.style.top = el.y + "px";
@@ -622,6 +641,7 @@ async function loadDirectoryAdSlot(slot, kind = "web") {
     if (slot.classList.contains("find-directory-ad")) {
       canvasOpts.fitHeight = 110;
       canvasOpts.maxScale = 1;
+      canvasOpts.stripFrame = true;
     }
     renderDirectoryAdCanvas(slot, kind === "mod" ? ad.layout_mod : ad.layout_web, canvasOpts);
   } catch (e) { console.warn("directory ads", e); slot.hidden = true; }

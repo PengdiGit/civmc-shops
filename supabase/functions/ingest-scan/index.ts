@@ -27,8 +27,8 @@ const RATE_MAX_PLAYER = 40;
 const RATE_MAX_IP = 80;
 /** Known listing stock match: Euclidean XZ within this many blocks of player. */
 const KNOWN_MATCH_DIST = 5;
-/** Skip creating an unknown when a public known listing (same trade) is this close. */
-const NEARBY_KNOWN_RADIUS = 5;
+/** Skip creating an unknown when a public known listing (same trade) is this close (Chebyshev XZ; 15 ⇒ ~31×31). */
+const NEARBY_KNOWN_RADIUS = 15;
 /** Unknown replace/merge: nearest row within this Euclidean XZ radius. */
 const UNKNOWN_DEDUPE_DIST = 25;
 const LOG_PRUNE_HOURS = 24;
@@ -183,7 +183,7 @@ function chebyshev(ax: number, az: number, bx: number, bz: number): number {
 
 /**
  * If a public known listing already has the same trade within NEARBY_KNOWN_RADIUS
- * of the scan player coords, skip creating an unknown listing.
+ * (Chebyshev blocks on XZ, 30×30-style area) of the scan player coords, skip creating an unknown listing.
  * Does not require auto_stock_enabled - any live site listing counts.
  */
 async function findNearbyKnownListing(
