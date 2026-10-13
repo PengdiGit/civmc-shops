@@ -230,16 +230,38 @@ function shopSlugBase(name) {
   if (!s || s === "index" || /^\d+$/.test(s)) return "";
   return s.slice(0, 48);
 }
-/** Pretty slug for a shop row (name-based; falls back to shop-{id}). Pass peers to suffix -{id} on name clashes. */
+/** Public shop URL slug: always `{name-base}-{id}` so links never collide. */
 function shopSlug(shop, peers) {
   if (!shop || shop.id == null) return "";
   const base = shopSlugBase(shop.name) || ("shop-" + shop.id);
-  if (!peers || !peers.length) return base;
-  const clash = peers.some(o =>
-    String(o.id) !== String(shop.id) &&
-    (shopSlugBase(o.name) || ("shop-" + o.id)) === base
-  );
-  return clash ? base + "-" + shop.id : base;
+  return base + "-" + shop.id;
+}
+/** Legacy bare name slug (no id suffix) for resolving old bookmarks. */
+function shopSlugLegacyBase(shop) {
+  if (!shop || shop.id == null) return "";
+  return shopSlugBase(shop.name) || ("shop-" + shop.id);
+}
+let shopSlugPeerCache = null;
+/** All non-archived shops (paginated) for legacy slug disambiguation. */
+async function loadShopSlugPeers() {
+  if (shopSlugPeerCache) return shopSlugPeerCache;
+  const rows = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await sb.from("shops")
+      .select("id, name, city, nation, profiles!shops_owner_id_fkey(username, mc_username)")
+      .eq("archived", false)
+      .order("id")
+      .range(from, from + pageSize - 1);
+    if (error) break;
+    const batch = data || [];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+  shopSlugPeerCache = rows;
+  return shopSlugPeerCache;
 }
 /** Site-relative shop path: /shops/pfa-exchange/ */
 function shopPath(shop, search, peers) {
@@ -285,8 +307,14 @@ function embedHref(params) {
     return url;
   }
   if (p.shop != null && p.shop !== "") {
-    // Numeric id fallback (old callers) - prefer name when shopName is passed
-    const slug = shopSlugBase(p.shopName) || ("shop-" + p.shop);
+    const id = Number(p.shop);
+    if (Number.isFinite(id)) {
+      return shopShareUrl(
+        { id, name: p.shopName || "" },
+        p.listing != null ? { listing: p.listing } : null
+      );
+    }
+    const slug = shopSlugBase(p.shopName || p.shop) || String(p.shop);
     let url = SITE_PUBLIC + "/shops/" + encodeURIComponent(slug) + "/";
     if (p.listing != null && p.listing !== "") url += "?listing=" + encodeURIComponent(String(p.listing));
     return url;

@@ -57,17 +57,12 @@ function shopSlugBase(name) {
   return s.slice(0, 48);
 }
 
-/** Unique name slugs; name clashes get -{id} suffix. */
+/** Unique public slugs: always `{name-base}-{id}`. */
 function assignShopSlugs(shops) {
-  const bases = (shops || []).map(s => ({
-    s,
-    base: shopSlugBase(s.name) || ("shop-" + s.id),
-  }));
-  const counts = {};
-  for (const { base } of bases) counts[base] = (counts[base] || 0) + 1;
   const map = new Map();
-  for (const { s, base } of bases) {
-    map.set(s.id, counts[base] > 1 ? base + "-" + s.id : base);
+  for (const s of shops || []) {
+    const base = shopSlugBase(s.name) || ("shop-" + s.id);
+    map.set(s.id, base + "-" + s.id);
   }
   return map;
 }
