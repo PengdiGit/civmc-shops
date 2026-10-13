@@ -34,8 +34,13 @@
         <option value="">All cities</option>
       </select>
     </div>
-    <div class="row">
+    <div class="row market-toolbar-row">
       <input type="search" id="filter" placeholder="Filter items (bread, blaze rod...)">
+      <button type="button" class="find-filter-btn" id="market-filter-open" aria-haspopup="dialog" aria-controls="market-filter-overlay" title="Market filters">
+        <svg class="find-filter-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        <span>Filters</span>
+        <span class="find-filter-badge" id="market-filter-badge" hidden>0</span>
+      </button>
       <span class="meta">Show</span>
       <select id="unit"><option value="1">diamonds per item</option><option value="64">diamonds per stack (64)</option></select>
     </div>
@@ -80,9 +85,32 @@
   <div id="list"></div>
 </main>
 
+<div class="find-overlay" id="market-filter-overlay" hidden>
+  <div class="find-overlay-backdrop" data-close-market-filters tabindex="-1"></div>
+  <div class="find-overlay-panel" role="dialog" aria-modal="true" aria-labelledby="market-filter-title">
+    <div class="find-overlay-head">
+      <h2 id="market-filter-title">Market filters</h2>
+      <button type="button" data-ico="x" data-close-market-filters title="Close filters" aria-label="Close filters"></button>
+    </div>
+    <div class="filterbar">
+      <div class="filter-group">
+        <span class="meta">Data sources</span>
+        <div class="find-filter-toggles">
+          <label class="find-filter-check"><input type="checkbox" id="m-include-unknown"> include unknown listings (may skew data!)</label>
+        </div>
+        <p class="meta" style="margin:8px 0 0">Off by default: rates use public shop listings only. Unknowns apply server-wide (not nation/city scoped). Daily history charts stay shop-only.</p>
+      </div>
+    </div>
+    <div class="find-overlay-actions">
+      <button type="button" class="primary" id="market-save-filter-defaults">Save as default</button>
+      <button type="button" class="small" data-close-market-filters>Done</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=39"></script>
+<script src="../app.js?v=40"></script>
 <script>
 const msg = document.getElementById("msg");
 const unitSel = document.getElementById("unit");
@@ -98,7 +126,12 @@ let itemHistory = { sell: [], buy: [] };
 let rangeDays = 30;
 let allShops = [];
 let allListings = [];
+let allUnknown = [];
 let allProfiles = [];
+let includeUnknownMarket = false;
+const marketFilterOverlay = document.getElementById("market-filter-overlay");
+const marketFilterBadge = document.getElementById("market-filter-badge");
+const mIncludeUnknown = document.getElementById("m-include-unknown");
 let enchantModeId = "plain"; // URL ?enchant=… for enchantable items
 let enchantModes = [];       // modes for selected item
 
@@ -164,10 +197,13 @@ function paintMarketScopeNote() {
   if (city) bits.push(city);
   if (nation && (!city || !placeEquals(nation, city))) bits.push(nation);
   if (!bits.length) {
-    note.textContent = "Unenchanted rates from all public shops server-wide. Pick a nation or city to see local market prices.";
+    note.textContent = "Unenchanted rates from all public shops server-wide"
+      + (includeUnknownMarket ? " (includes unknown listings)." : ".")
+      + " Pick a nation or city to see local market prices.";
     return;
   }
-  note.textContent = "Unenchanted rates from shops in " + bits.join(" \u00b7 ") + ". Item filter below only hides rows in this table.";
+  note.textContent = "Unenchanted rates from shops in " + bits.join(" \u00b7 ") + ". Item filter below only hides rows in this table."
+    + (includeUnknownMarket ? " Unknown listings are hidden while a place filter is active." : "");
 }
 
 function marketScopeQuery() {
@@ -220,7 +256,7 @@ function itemListingsForMode(item) {
 function itemRatesForMode(item) {
   const filtered = itemListingsForMode(item);
   // Caller already applied enchant mode (plain/max/silk/…); do not re-drop enchanted
-  const rows = computeMarketNow(filtered, allShops, allProfiles, marketPlaceFilter(), { unenchantedOnly: false });
+  const rows = computeMarketNow(filtered, allShops, allProfiles, marketPlaceFilter(), { unenchantedOnly: false, ...marketComputeOpts() });
   const out = { sell: null, buy: null };
   (rows || []).forEach(m => { if (m.item === item) out[m.side] = m; });
   return out;
@@ -283,14 +319,64 @@ async function loadSparks() {
   });
 }
 
+function marketComputeOpts() {
+  const { nation, city } = marketPlaceFilter();
+  const scoped = !!(nation || city);
+  const unk = includeUnknownMarket && !scoped
+    ? (allUnknown || []).map(mapUnknownListingForMarket).filter(Boolean)
+    : [];
+  return { unknownListings: unk };
+}
+
 async function recompute() {
-  applyMarketRows(computeMarketNow(allListings, allShops, allProfiles, marketPlaceFilter()));
+  applyMarketRows(computeMarketNow(allListings, allShops, allProfiles, marketPlaceFilter(), marketComputeOpts()));
   paintMarketScopeNote();
   renderList();
   await renderIntel();
 }
 
+function updateMarketFilterChrome() {
+  if (mIncludeUnknown) mIncludeUnknown.checked = !!includeUnknownMarket;
+  const n = includeUnknownMarket ? 1 : 0;
+  if (marketFilterBadge) {
+    marketFilterBadge.hidden = !n;
+    marketFilterBadge.textContent = String(n);
+  }
+  const btn = document.getElementById("market-filter-open");
+  if (btn) btn.classList.toggle("has-filters", n > 0);
+}
+
+function openMarketFilters() {
+  if (!marketFilterOverlay) return;
+  updateMarketFilterChrome();
+  marketFilterOverlay.hidden = false;
+  document.body.classList.add("ui-modal-open");
+}
+function closeMarketFilters() {
+  if (!marketFilterOverlay) return;
+  marketFilterOverlay.hidden = true;
+  document.body.classList.remove("ui-modal-open");
+}
+
+async function loadUnknownListings() {
+  if (!includeUnknownMarket) { allUnknown = []; return; }
+  try {
+    const { data, error } = await sb.from("unknown_listings")
+      .select("id, want_item, want_amount, want_unit, sell_item, sell_amount, sell_unit, stock, in_stock, enchants, notes, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(500);
+    if (error) console.warn("unknown_listings market", error);
+    allUnknown = data || [];
+  } catch (e) {
+    console.warn("unknown_listings market", e);
+    allUnknown = [];
+  }
+}
+
 async function load() {
+  const prefs = loadMarketFilterPrefs();
+  includeUnknownMarket = !!prefs.includeUnknown;
+  updateMarketFilterChrome();
   try { await sb.rpc("take_market_snapshot"); } catch (e) {}
   const [{ data: shops }, { data: listings }, { data: profiles }] = await Promise.all([
     sb.from("shops").select("id, nation, city, timed_out, archived, is_open, owner_id"),
@@ -300,6 +386,7 @@ async function load() {
   allShops = shops || [];
   allListings = listings || [];
   allProfiles = profiles || [];
+  await loadUnknownListings();
   const ps = new URLSearchParams(location.search);
   const urlNation = ps.get("nation") || "";
   const urlCity = ps.get("city") || "";
@@ -481,9 +568,12 @@ function renderDetail() {
   const enchNote = enchantModes.length
     ? ` Live rates and listing chips use the “${(currentEnchantMode() || {}).label || enchantModeId}” enchant filter; history is all enchants.`
     : "";
+  const unkNote = includeUnknownMarket
+    ? " Live table includes unknown listings; history chart is still shop listings only."
+    : "";
   document.getElementById("d-note").textContent = (days < 7
     ? `Only ${days} day${days === 1 ? "" : "s"} of history so far. The graph fills in as days pass.`
-    : "Prices are saved once a day. Shops with odd prices are left out of both the line and the shading.") + scopeNote + enchNote;
+    : "Prices are saved once a day. Shops with odd prices are left out of both the line and the shading.") + scopeNote + enchNote + unkNote;
 }
 
 function drawChart(el, series) {
@@ -590,6 +680,22 @@ function onMarketScopeChange() {
 }
 nationEl.addEventListener("change", onMarketScopeChange);
 cityEl.addEventListener("change", onMarketScopeChange);
+
+document.getElementById("market-filter-open").onclick = () => openMarketFilters();
+marketFilterOverlay.querySelectorAll("[data-close-market-filters]").forEach(el => {
+  el.addEventListener("click", () => closeMarketFilters());
+});
+document.getElementById("market-save-filter-defaults").onclick = () => {
+  saveMarketFilterPrefs({ includeUnknown: includeUnknownMarket });
+  setMsg(msg, "Saved market filter default.", "ok");
+};
+mIncludeUnknown.addEventListener("change", async () => {
+  includeUnknownMarket = mIncludeUnknown.checked;
+  updateMarketFilterChrome();
+  await loadUnknownListings();
+  await recompute();
+  if (selected) renderDetail();
+});
 
 load();
 </script>
