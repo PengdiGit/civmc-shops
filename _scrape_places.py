@@ -270,7 +270,7 @@ def parse_if_states(wt: str):
     dead_status = re.compile(
         r"(?i)uninhabited|turned into|joined nation|national park|independent\b"
     )
-    # Independent in IF table means left IF (Withervale/Groveheart) — skip as IF cities
+    # Independent in IF table means left IF (Withervale/Groveheart) - skip as IF cities
     chunks = re.split(r"(?m)^\|-\s*$", table)
     for chunk in chunks:
         lines = []

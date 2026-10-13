@@ -110,7 +110,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=29"></script>
+<script src="../app.js?v=31"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let id = params.get("id");
@@ -415,7 +415,7 @@ async function load() {
   actionsEl.hidden = !act;
   const rep = document.getElementById("rep");
   if (rep) rep.onclick = async () => {
-    const r = await sendReport("user", p.id);
+    const r = await sendReport("user", p.id, PLAYER_REPORT_REASONS);
     if (r) setMsg(msg, r.text, r.kind);
   };
 

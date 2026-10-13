@@ -28,6 +28,7 @@
         <h1>Find a shop</h1>
         <p class="sub">Search by item, enchant, or shop name. Press <kbd>/</kbd> to focus search.</p>
       </div>
+      <div class="directory-ad-slot find-directory-ad" id="directory-ad-slot" hidden aria-label="Directory ad"></div>
       <div class="find-board-side">
         <button type="button" id="find-share" class="small" data-ico="share" title="Copy search link" aria-label="Share search">Share</button>
         <a class="btn-favourites" href="../favourites/">Favourites</a>
@@ -176,7 +177,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../items.js"></script>
-<script src="../app.js?v=30"></script>
+<script src="../app.js?v=31"></script>
 <script src="../place-picker.js"></script>
 <script>
 const q = document.getElementById("q");
@@ -1290,6 +1291,7 @@ syncModeUi();
     shopNameCache = (data || []).map(s => s.name).filter(Boolean);
   } catch (e) {}
   try { await loadEnchantCatalog(); } catch (e) {}
+  try { await loadDirectoryAdSlot(document.getElementById("directory-ad-slot"), "web"); } catch (e) {}
   const ps = new URLSearchParams(location.search);
   const defaults = loadFilterDefaults();
   // URL wins; otherwise restore saved defaults

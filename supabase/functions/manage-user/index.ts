@@ -1,7 +1,7 @@
 // Account-level moderation and roles.
 //   timeout / untimeout : mods, admins, head. Mods: users only. Admins: users + mods. Head: everyone but themselves.
 //   make_mod / remove_mod / make_admin / remove_admin : HEAD ADMIN ONLY
-//   impersonate : HEAD ADMIN ONLY — one-time token so the client can open a session as that user
+//   impersonate : HEAD ADMIN ONLY - one-time token so the client can open a session as that user
 //   update_account : admins. Login username, Discord, Minecraft, and an optional new password.
 //     Head can edit any account, including their own. Other admins can edit users, mods, and themselves.
 //     They cannot edit the head or other admins. The current password cannot be read back (Auth stores a hash).

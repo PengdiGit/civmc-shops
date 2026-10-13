@@ -19,7 +19,7 @@
   --gap: 12px;
   --font: 15px;
   --btn-on-accent: #12150f;
-  /* Atmosphere tokens — body.*-page overrides for per-page character */
+  /* Atmosphere tokens - body.*-page overrides for per-page character */
   --atm-a: var(--accent);
   --atm-b: var(--warn);
   --atm-c: var(--accent);
@@ -71,7 +71,7 @@ body {
 }
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
-  /* fade-in only — transform on main breaks sticky toolbars / confuses fixed chrome layout */
+  /* fade-in only - transform on main breaks sticky toolbars / confuses fixed chrome layout */
   main {
     animation: fade-in .35s ease both;
   }
@@ -179,7 +179,7 @@ nav a.navbtn { border: 1px solid var(--line); border-radius: 4px; padding: 4px 1
 nav a.navbtn:hover { border-color: var(--accent); }
 nav a.navbtn.primary { background: var(--accent); border-color: var(--accent); color: var(--btn-on-accent); font-weight: 600; }
 
-/* Discord CTA — blurple, immediately left of menu */
+/* Discord CTA - blurple, immediately left of menu */
 a.nav-discord-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   height: 36px; padding: 0 14px; border-radius: 8px; flex-shrink: 0;
@@ -477,7 +477,7 @@ kbd {
   background: var(--panel); border: 1px solid var(--warn); border-radius: var(--radius);
   padding: 10px 12px; margin-bottom: 14px; color: var(--text); font-size: .9rem;
 }
-/* Unverified account — in-flow under nav (not fixed; fixed chrome was overlapping Find) */
+/* Unverified account - in-flow under nav (not fixed; fixed chrome was overlapping Find) */
 .verify-banner {
   position: relative;
   z-index: 2;
@@ -506,7 +506,7 @@ a.primary:hover {
 }
 a.verify-banner-cta.small,
 a.primary.small { padding: 4px 12px; font-size: .85rem; }
-/* Head-admin impersonation — fixed so Exit is always reachable */
+/* Head-admin impersonation - fixed so Exit is always reachable */
 .impersonate-bar {
   /* Above nav drawer/backdrop so Exit stays reachable while the menu is open */
   position: fixed; top: 0; left: 0; right: 0; z-index: 110;
@@ -873,7 +873,7 @@ img.avatar {
   box-shadow: 2px 2px 0 rgba(0, 0, 0, .35);
 }
 .bundle-gui.compact { --gui-scale: 0.32; }
-/* Hit-areas only — PNG draws the slots. Beat global button/.empty chrome. */
+/* Hit-areas only - PNG draws the slots. Beat global button/.empty chrome. */
 .bundle-gui .bundle-slot,
 .bundle-gui .bundle-slot.empty,
 .bundle-gui .bundle-slot.filled,
@@ -1404,7 +1404,7 @@ body.mod-page::before {
   background-size: var(--atm-grid-size) var(--atm-grid-size);
   mask-image: linear-gradient(180deg, #000 0%, transparent 68%);
 }
-/* Do not set position on nav — it must stay position:fixed above. */
+/* Do not set position on nav - it must stay position:fixed above. */
 body.find-page > main,
 body.market-page > main,
 body.shop-page > main,
@@ -1505,7 +1505,7 @@ body.find-page > main {
 .find-board > * { position: relative; z-index: 1; }
 .find-board-top {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 430px) auto;
   gap: 20px;
   align-items: start;
   padding: 18px 20px 14px;
@@ -1837,7 +1837,7 @@ body.find-page > main {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* fade-in only — transform on .find-board breaks position:sticky for the search bar */
+  /* fade-in only - transform on .find-board breaks position:sticky for the search bar */
   .find-board {
     animation: fade-in .4s ease both;
   }
@@ -2092,7 +2092,7 @@ body.org-profile .profile-hero img.avatar.org-mark {
 .edit-panel[hidden] { display: none; }
 .cname { display: inline-flex; gap: 6px; align-items: center; }
 
-/* profile highlight colour — set --profile-highlight on .profile-page */
+/* profile highlight colour - set --profile-highlight on .profile-page */
 .profile-page .profile-hero,
 .profile-page .stat,
 .profile-page .edit-panel,
@@ -3825,3 +3825,31 @@ body.settings-page .settings-hero-copy { min-width: 0; flex: 1; }
 body.settings-page .settings-hero #save { flex-shrink: 0; }
 body.settings-page .settings-hero #save[hidden] { display: none !important; }
 body.admin-page #collapse-pending > [data-act="purge-unverified"] { margin: 2px 0 12px; }
+
+
+/* ---- directory ads ---- */
+.directory-ad-slot { position: relative; min-width: 240px; border: 1px solid color-mix(in srgb, var(--line) 75%, var(--accent)); background: color-mix(in srgb, var(--bg) 62%, transparent); overflow: hidden; align-self: stretch; }
+.find-directory-ad { grid-column: 2; justify-self: stretch; width: min(100%, 430px); }
+.directory-ad-canvas { position: relative; overflow: hidden; font-family: "Monocraft", ui-monospace, monospace; }
+.directory-ad-el { position: absolute; box-sizing: border-box; overflow: hidden; line-height: 1.15; white-space: pre-wrap; }
+.directory-ad-el-box { border: 1px solid var(--line); }
+.directory-ad-el-button { display: flex; align-items: center; justify-content: center; text-decoration: none; background: var(--accent); color: #11180d !important; border: 1px solid color-mix(in srgb, var(--accent) 72%, #fff); font-weight: 700; }
+.directory-ad-el-button.is-ghost { background: color-mix(in srgb, var(--bg) 55%, transparent); color: var(--text) !important; border-color: var(--line); }
+.directory-ad-el-button[aria-disabled="true"] { pointer-events: none; opacity: .8; }
+.directory-ad-el-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.directory-ad-admin-grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(280px, .8fr); gap: 18px; align-items: start; }
+.directory-ad-tabs, .directory-ad-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.directory-ad-editor-wrap { max-width: 100%; overflow: auto; padding: 10px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 70%, transparent); }
+.directory-ad-editor { position: relative; overflow: hidden; background: #1E211C; border: 1px solid color-mix(in srgb, var(--line) 70%, var(--accent)); image-rendering: pixelated; }
+.ad-edit-el { position: absolute; box-sizing: border-box; border: 1px dashed color-mix(in srgb, var(--line) 85%, #fff); cursor: move; overflow: hidden; font-family: "Monocraft", ui-monospace, monospace; font-size: 10px; line-height: 1.15; padding: 1px 2px; }
+.ad-edit-box { background: #242722; border-style: solid; }
+.ad-edit-button { background: var(--accent); color: #11180d !important; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+.ad-edit-image { background: repeating-linear-gradient(45deg, #20241f, #20241f 5px, #2e332b 5px, #2e332b 10px); color: var(--muted); }
+.ad-edit-el.selected { outline: 2px solid var(--accent); z-index: 5; }
+.ad-resize { position: absolute; right: 0; bottom: 0; width: 9px; height: 9px; background: var(--accent); cursor: nwse-resize; }
+.directory-ad-props { border: 1px solid var(--line); padding: 10px; background: color-mix(in srgb, var(--panel) 85%, var(--bg)); }
+.ad-prop-grid { display: grid; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 8px; }
+.ad-prop-grid label, .field-inline { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: .84rem; }
+.ad-prop-grid input, .ad-prop-grid select { width: 100%; }
+.directory-ad-preview { min-height: 110px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 70%, transparent); overflow: hidden; }
+@media (max-width: 860px) { .find-board-top { grid-template-columns: 1fr; } .find-directory-ad, .find-board-side { grid-column: 1; width: 100%; justify-self: stretch; } .directory-ad-admin-grid { grid-template-columns: 1fr; } }

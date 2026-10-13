@@ -214,7 +214,7 @@ async function finishMinecraft(code: string, redirectUri: string): Promise<McLin
   const secret = Deno.env.get("MICROSOFT_CLIENT_SECRET");
   if (!id || !secret) throw new Error("Microsoft OAuth is not configured yet.");
 
-  // Only Xbox scopes — mixing User.Read / openid here can break XboxLive.signin.
+  // Only Xbox scopes - mixing User.Read / openid here can break XboxLive.signin.
   const body = new URLSearchParams({
     client_id: id,
     client_secret: secret,

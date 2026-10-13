@@ -1,6 +1,6 @@
 // HEAD ADMIN ONLY.
 //   list   : every account + split queues (awaiting_links / ready_for_review)
-//   accept : set public verified badge (verified_at) — only when Discord+MC linked
+//   accept : set public verified badge (verified_at) - only when Discord+MC linked
 //   deny   : delete account and everything it made
 //   delete : delete ANY account except the head's own
 // Deploy: supabase functions deploy review-signup

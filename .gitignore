@@ -10,7 +10,7 @@ Thumbs.db
 .mig2.sql
 .mig3.sql
 
-# Local / agent-only — keep on disk, do not publish to GitHub Pages
+# Local / agent-only - keep on disk, do not publish to GitHub Pages
 HANDOFF_PROMPT.md
 PROJECT_CONTEXT.md
 IDEAS.md
