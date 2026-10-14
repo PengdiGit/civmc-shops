@@ -30,13 +30,20 @@ function embedUrlFor(requestUrl) {
 
   const path = url.pathname.replace(/\/+$/, "") || "/";
   if (path.endsWith("/shops") || path.includes("/shops/")) {
-    const slug = (path.match(/\/shops\/([^/]+)$/) || [])[1];
-    if (slug && /^\d+$/.test(slug)) embed.searchParams.set("shop", slug);
-    // Name slugs are resolved via the full page URL on the embed function
-    const id = url.searchParams.get("id");
-    if (id) embed.searchParams.set("shop", id);
-    const listing = url.searchParams.get("listing");
-    if (listing) embed.searchParams.set("listing", listing);
+    const listingPath = path.match(/\/shops\/([^/]+)\/listing\/(\d+)$/i);
+    if (listingPath) {
+      const slug = listingPath[1];
+      if (/^\d+$/.test(slug)) embed.searchParams.set("shop", slug);
+      embed.searchParams.set("listing", listingPath[2]);
+    } else {
+      const slug = (path.match(/\/shops\/([^/]+)$/) || [])[1];
+      if (slug && /^\d+$/.test(slug)) embed.searchParams.set("shop", slug);
+      // Name slugs are resolved via the full page URL on the embed function
+      const id = url.searchParams.get("id");
+      if (id) embed.searchParams.set("shop", id);
+      const listing = url.searchParams.get("listing");
+      if (listing) embed.searchParams.set("listing", listing);
+    }
   } else if (path.endsWith("/profile") || path.includes("/profile/")) {
     const slug = (path.match(/\/profile\/([^/]+)$/) || [])[1];
     if (slug && /^[0-9a-f-]{36}$/i.test(slug)) embed.searchParams.set("profile", slug);

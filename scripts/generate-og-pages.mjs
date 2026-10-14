@@ -1,7 +1,8 @@
 /**
  * Generate static Open Graph landing pages next to the SPA routes:
- *   /shops/{name-slug}/  → shop card then redirect to /shops/?id=
- *   /profile/{username}/ → profile card then redirect to /profile/?name=
+ *   /shops/{name-slug}/                  → shop card then redirect to /shops/?id=
+ *   /shops/{name-slug}/listing/{id}/     → listing card then redirect to /shops/?id=&listing=
+ *   /profile/{username}/                 → profile card then redirect to /profile/?name=
  *
  * Discord/Slack read the static HTML (no JS). Humans get redirected to the app.
  *
@@ -154,7 +155,19 @@ async function main() {
   }
   const slugById = assignShopSlugs(visible);
 
+  const listings = await sb(
+    "listings?select=id,shop_id,want_item,want_amount,want_unit,sell_item,sell_amount,sell_unit,in_stock,timed_out,enchants,notes&timed_out=eq.false&order=id&limit=5000",
+  );
+  const listingsByShop = new Map();
+  for (const l of listings || []) {
+    if (l == null || l.shop_id == null) continue;
+    const k = Number(l.shop_id);
+    if (!listingsByShop.has(k)) listingsByShop.set(k, []);
+    listingsByShop.get(k).push(l);
+  }
+
   let shopN = 0;
+  let listingN = 0;
   for (const s of visible) {
     const owner = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles;
     const name = stripMc(s.styled_name || s.name || "Shop") || "Shop";
@@ -182,6 +195,33 @@ async function main() {
       authorName: ownerName,
     }));
     shopN++;
+
+    const shopListings = listingsByShop.get(Number(s.id)) || [];
+    for (const l of shopListings) {
+      const want = [l.want_amount, l.want_unit, l.want_item].filter((x) => x != null && String(x).trim() !== "").join(" ");
+      const sell = [l.sell_amount, l.sell_unit, l.sell_item].filter((x) => x != null && String(x).trim() !== "").join(" ");
+      const trade = (want && sell) ? (want + " -> " + sell) : (sell || want || "Listing");
+      const lBits = [name];
+      if (ownerName) lBits.push("Owner: " + ownerName);
+      if (place) lBits.push(place);
+      if (l.in_stock === false) lBits.push("out of stock");
+      if (l.enchants) lBits.push(String(l.enchants).replace(/\s+/g, " ").slice(0, 80));
+      const lDesc = (trade + " | " + lBits.join(" | ")).slice(0, 300);
+      const lImage = itemImg(l.sell_item || s.icon_item || "chest");
+      const lUrl = SITE + "/shops/" + encodeURIComponent(slug) + "/listing/" + l.id + "/";
+      const lSpa = SITE + "/shops/?id=" + s.id + "&listing=" + l.id;
+      const lDir = join(dir, "listing", String(l.id));
+      await mkdir(lDir, { recursive: true });
+      await writeFile(join(lDir, "index.html"), pageHtml({
+        title: trade + " · " + name,
+        description: lDesc,
+        url: lUrl,
+        redirectUrl: lSpa,
+        image: lImage,
+        authorName: ownerName || name,
+      }));
+      listingN++;
+    }
   }
 
   const profiles = await sb(
@@ -234,7 +274,11 @@ async function main() {
     profN++;
   }
 
-  console.log("Generated OG landers: " + shopN + " shops → shops/{slug}/, " + profN + " profiles → profile/{username}/");
+  console.log(
+    "Generated OG landers: " + shopN + " shops → shops/{slug}/, " +
+    listingN + " listings → shops/{slug}/listing/{id}/, " +
+    profN + " profiles → profile/{username}/",
+  );
 }
 
 main().catch((e) => {

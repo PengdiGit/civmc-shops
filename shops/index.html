@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -13,7 +13,7 @@
 <meta property="og:url" content="https://civshops.pengworld.net/shops/">
 <meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/chest.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="../style.css?v=37">
+<link rel="stylesheet" href="../style.css?v=38">
 </head>
 <body class="shop-page">
 <nav id="nav"></nav>
@@ -52,7 +52,7 @@
           <span class="meta" id="lcount"></span>
         </div>
       </div>
-      <p class="meta shop-catalog-hint" style="margin:0 0 8px">Buy &rarr; sell. Out-of-stock rows stay visible but faded.</p>
+      <p class="meta shop-catalog-hint" style="margin:0 0 8px">Buy &rarr; sell. Click a row to focus it; the link icon copies that listing&rsquo;s URL. Out-of-stock rows stay visible but faded.</p>
       <div class="offers" id="offers"></div>
     </div>
   </div>
@@ -89,12 +89,24 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=42"></script>
+<script src="../app.js?v=43"></script>
 <script>
 const params = new URLSearchParams(location.search);
-// /shops/?id=1 · /shops/pfa-exchange-42/ · legacy /shops/pfa-exchange/ (disambiguate if needed)
+// /shops/?id=1 · /shops/pfa-exchange-42/ · /shops/pfa-exchange-42/listing/25/ · legacy slug
 let shopId = params.get("id");
 let shopSlugParam = (params.get("slug") || "").trim().toLowerCase() || null;
+{
+  const listingPath = location.pathname.match(/\/shops\/([^/]+)\/listing\/(\d+)\/?$/i);
+  if (listingPath) {
+    if (!params.get("listing")) params.set("listing", listingPath[2]);
+    const pathSlug = listingPath[1];
+    if (pathSlug && !/^\d+$/.test(pathSlug) && pathSlug !== "index.html") {
+      shopSlugParam = decodeURIComponent(pathSlug).toLowerCase();
+      const m = shopSlugParam.match(/-(\d+)$/);
+      if (m) shopId = m[1];
+    } else if (/^\d+$/.test(pathSlug)) shopId = pathSlug;
+  }
+}
 {
   const pathSlug = (location.pathname.match(/\/shops\/([^/]+)\/?$/) || [])[1];
   if (pathSlug) {
@@ -253,6 +265,7 @@ function paintListings(staff, isOwner) {
     const tip = tipDisplayForListing(l.id, tipByListing[String(l.id)] || [], me);
     const pinned = comparePins.some(p => String(p.listing.id) === String(l.id));
     let end = `<span class="action-cluster">`;
+    end += iconBtn("link", { title: "Copy listing link", attrs: `data-act="copy-listing" data-id="${l.id}"` });
     end += iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-act="compare" data-id="${l.id}"` });
     if (staff) end += iconBtn("clock", { cls: "btn-timeout", title: l.timed_out ? "Remove timeout" : "Timeout listing", attrs: `data-act="listing-timeout" data-id="${l.id}" data-to="${l.timed_out ? 0 : 1}"` });
     if (!isOwner) end += iconBtn("flag", { cls: "btn-report", title: "Report listing", attrs: `data-act="report" data-type="listing" data-id="${l.id}"` });
@@ -262,8 +275,9 @@ function paintListings(staff, isOwner) {
       big: true,
       stale: listingIsOut(l) || l.timed_out || stale,
       hl,
+      listingId: l.id,
       id: "listing-" + l.id,
-      cls: (listingIsOut(l) || l.timed_out ? "out" : "") + (hl ? " find-hl" : ""),
+      cls: "is-focusable" + (listingIsOut(l) || l.timed_out ? " out" : "") + (hl ? " find-hl" : ""),
       tags,
       meta: updatedHtml(l.updated_at) + (g ? ` \u00b7 <span class="meta">${esc(g)}</span>` : ""),
       btns: tipVotesHtml(l.id, tip.votes, tip.myVote),
@@ -271,6 +285,39 @@ function paintListings(staff, isOwner) {
     });
   });
   document.getElementById("offers").innerHTML = html;
+}
+
+async function focusListing(listingId, opts) {
+  const o = opts || {};
+  const id = listingId != null ? String(listingId) : "";
+  if (!id || !shop) return;
+  const hit = allListings.find(l => String(l.id) === id);
+  if (!hit) return;
+  hlListingId = id;
+  paintListings(isStaff(me), viewerOwnsShop());
+  try {
+    const peers = await loadShopSlugPeers();
+    const pretty = shopPath(shop, { listing: hlListingId }, peers);
+    if ((location.pathname + location.search) !== pretty) {
+      history.replaceState(null, "", pretty);
+    }
+    const shareUrl = listingShareUrl(shop, hlListingId, peers);
+    const trade = `${hit.want_amount} ${hit.want_item} -> ${hit.sell_amount} ${hit.sell_item}`;
+    setPageMeta({
+      title: trade + " · " + (shop.name || "Shop") + " - CivMC Shops",
+      description: (trade + " at " + (shop.name || "shop")).replace(/\s+/g, " ").slice(0, 180),
+      url: shareUrl,
+      image: itemImg(hit.sell_item || shop.icon_item || "chest")
+    });
+  } catch (e) {}
+  if (o.scroll !== false) {
+    const el = document.getElementById("listing-" + id);
+    if (el) {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+    }
+  }
+  if (o.msg) setMsg(msg, o.msg, "ok");
 }
 
 async function loadTips() {
@@ -626,7 +673,14 @@ document.querySelector("main").addEventListener("click", async e => {
     return;
   }
   const btn = e.target.closest("button[data-act]");
-  if (!btn) return;
+  if (!btn) {
+    // Click a listing row (not a control) -> focus it and update the shareable URL
+    const row = e.target.closest(".listing-row[data-listing]");
+    if (row && !e.target.closest("a, button, input, select, textarea, [data-bundle-peek]")) {
+      await focusListing(row.dataset.listing);
+    }
+    return;
+  }
   const act = btn.dataset.act;
   const on = btn.dataset.to === "1";
   let err = null;
@@ -634,6 +688,16 @@ document.querySelector("main").addEventListener("click", async e => {
   if (act === "report") {
     const r = await sendReport(btn.dataset.type, btn.dataset.id);
     if (r) setMsg(msg, r.text, r.kind);
+    return;
+  }
+  if (act === "copy-listing") {
+    const peers = await loadShopSlugPeers();
+    const shareUrl = shop
+      ? listingShareUrl(shop, btn.dataset.id, peers)
+      : "https://civshops.pengworld.net/shops/";
+    const ok = await copyText(shareUrl);
+    if (ok) await focusListing(btn.dataset.id, { scroll: false, msg: "Listing link copied." });
+    else setMsg(msg, "Couldn't copy. Use the address bar.", "err");
     return;
   }
   if (act === "compare") {
@@ -654,10 +718,12 @@ document.querySelector("main").addEventListener("click", async e => {
   if (act === "share") {
     const peers = await loadShopSlugPeers();
     const shareUrl = shop
-      ? shopShareUrl(shop, hlListingId ? { listing: hlListingId } : null, peers)
+      ? (hlListingId ? listingShareUrl(shop, hlListingId, peers) : shopShareUrl(shop, null, peers))
       : "https://civshops.pengworld.net/shops/";
     const ok = await copyText(shareUrl);
-    setMsg(msg, ok ? "Shop link copied." : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");
+    setMsg(msg, ok
+      ? (hlListingId ? "Listing link copied." : "Shop link copied.")
+      : "Couldn't copy. Use the address bar.", ok ? "ok" : "err");
     return;
   }
   if (act === "copy-coords") {
