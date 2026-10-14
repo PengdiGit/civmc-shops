@@ -764,10 +764,30 @@ function fillItemList() {
 // ------------------------------------------------------------ items, units, deals
 // item textures: the item "oak boat" is Minecraft_Items/oak_boat.png (folder name must match EXACTLY, GitHub Pages is case-sensitive)
 // Always resolve from the site root. Pretty URLs (/shops/{slug}/, /profile/{user}/) are two levels deep, so "../Minecraft_Items" would miss.
-const ITEM_IMG_ALIAS = { essence: "ender eye" }; // Civ slang → eyes of ender
+// Civ slang / compound spellings → Minecraft_Items file stem (spaces; turned into _ for the PNG).
+// Keep in sync with mod ItemIcons.stackFor aliases.
+const ITEM_IMG_ALIAS = {
+  essence: "ender eye",
+  player_essence: "ender eye",
+  slime: "slime ball",
+  slimeball: "slime ball",
+  slime_ball: "slime ball",
+  enderpearl: "ender pearl",
+  ender_pearl: "ender pearl",
+  sugarcane: "sugar cane",
+  sugar_cane: "sugar cane",
+  lapis: "lapis lazuli",
+  lapis_lazuli: "lapis lazuli",
+  grass: "grass block",
+  grass_block: "grass block",
+  empty_map: "map",
+  fossil: "prismarine shard",
+  fossils: "prismarine shard",
+};
 const itemImg = name => {
   const key = norm(name || "");
-  const file = ITEM_IMG_ALIAS[key] || key;
+  // Also match aliases keyed with underscores (DB sometimes stores slime_ball).
+  const file = ITEM_IMG_ALIAS[key] || ITEM_IMG_ALIAS[key.replace(/ /g, "_")] || key;
   const filePart = encodeURIComponent(file.replace(/ /g, "_")) + ".png";
   const path = siteBase() + "/Minecraft_Items/" + filePart;
   try {
