@@ -1018,9 +1018,10 @@ function marketEnchantModesForItem(itemName) {
       ...swordMax, { name: "knockback", level: 2 }
     ], noMend));
   } else if (kind === "pickaxe") {
+    // Max tool book = Eff V + Unb III + Silk|Fortune (no Mending; silk/fortune exclusive).
     const tools = [{ name: "efficiency", level: 5 }, { name: "unbreaking", level: 3 }];
-    modes.push(makeEnchantMode("silk", "Silk Touch", [...tools, { name: "silk touch", level: 1 }], [...noMend, "fortune"]));
-    modes.push(makeEnchantMode("fortune", "Fortune", [...tools, { name: "fortune", level: 3 }], [...noMend, "silk touch"]));
+    modes.push(makeEnchantMode("silk", "Max + Silk Touch", [...tools, { name: "silk touch", level: 1 }], [...noMend, "fortune"]));
+    modes.push(makeEnchantMode("fortune", "Max + Fortune", [...tools, { name: "fortune", level: 3 }], [...noMend, "silk touch"]));
     const debris = [{ name: "efficiency", level: 3 }, { name: "unbreaking", level: 3 }];
     modes.push(makeEnchantMode("debris", "Debris miner", debris, [...noMend, "fortune", "silk touch"]));
     modes.push(makeEnchantMode("debris_silk", "Debris + Silk", [...debris, { name: "silk touch", level: 1 }], [...noMend, "fortune"]));
@@ -1028,16 +1029,16 @@ function marketEnchantModesForItem(itemName) {
   } else if (kind === "shovel") {
     const tools = [{ name: "efficiency", level: 5 }, { name: "unbreaking", level: 3 }];
     modes.push(makeEnchantMode("max", "Max (no silk/fortune)", tools, [...noMend, "silk touch", "fortune"]));
-    modes.push(makeEnchantMode("silk", "Silk Touch", [...tools, { name: "silk touch", level: 1 }], [...noMend, "fortune"]));
-    modes.push(makeEnchantMode("fortune", "Fortune", [...tools, { name: "fortune", level: 3 }], [...noMend, "silk touch"]));
+    modes.push(makeEnchantMode("silk", "Max + Silk Touch", [...tools, { name: "silk touch", level: 1 }], [...noMend, "fortune"]));
+    modes.push(makeEnchantMode("fortune", "Max + Fortune", [...tools, { name: "fortune", level: 3 }], [...noMend, "silk touch"]));
   } else if (kind === "hoe") {
     modes.push(makeEnchantMode("fortune", "Max + Fortune", [
       { name: "efficiency", level: 5 }, { name: "unbreaking", level: 3 }, { name: "fortune", level: 3 }
     ], noMend));
   } else if (kind === "axe") {
     const tools = [{ name: "efficiency", level: 5 }, { name: "unbreaking", level: 3 }];
-    modes.push(makeEnchantMode("silk", "Silk Touch", [...tools, { name: "silk touch", level: 1 }], [...noMend, "fortune"]));
-    modes.push(makeEnchantMode("fortune", "Fortune", [...tools, { name: "fortune", level: 3 }], [...noMend, "silk touch"]));
+    modes.push(makeEnchantMode("silk", "Max + Silk Touch", [...tools, { name: "silk touch", level: 1 }], [...noMend, "fortune"]));
+    modes.push(makeEnchantMode("fortune", "Max + Fortune", [...tools, { name: "fortune", level: 3 }], [...noMend, "silk touch"]));
   } else if (kind === "bow") {
     modes.push(makeEnchantMode("max", "Max enchants", [
       { name: "power", level: 5 }, { name: "unbreaking", level: 3 },
@@ -1045,18 +1046,18 @@ function marketEnchantModesForItem(itemName) {
     ], noMend));
   } else if (kind === "crossbow") {
     const base = [{ name: "quick charge", level: 3 }, { name: "unbreaking", level: 3 }];
-    modes.push(makeEnchantMode("multishot", "Multishot", [...base, { name: "multishot", level: 1 }], [...noMend, "piercing"]));
-    modes.push(makeEnchantMode("piercing", "Piercing", [...base, { name: "piercing", level: 4 }], [...noMend, "multishot"]));
+    modes.push(makeEnchantMode("multishot", "Max + Multishot", [...base, { name: "multishot", level: 1 }], [...noMend, "piercing"]));
+    modes.push(makeEnchantMode("piercing", "Max + Piercing", [...base, { name: "piercing", level: 4 }], [...noMend, "multishot"]));
   } else if (kind === "trident") {
     const base = [{ name: "impaling", level: 5 }, { name: "unbreaking", level: 3 }];
-    modes.push(makeEnchantMode("loyalty", "Loyalty", [
+    modes.push(makeEnchantMode("loyalty", "Max + Loyalty", [
       ...base, { name: "loyalty", level: 3 }, { name: "channeling", level: 1 }
     ], [...noMend, "riptide"]));
-    modes.push(makeEnchantMode("riptide", "Riptide", [...base, { name: "riptide", level: 3 }], [...noMend, "loyalty", "channeling"]));
+    modes.push(makeEnchantMode("riptide", "Max + Riptide", [...base, { name: "riptide", level: 3 }], [...noMend, "loyalty", "channeling"]));
   } else if (kind === "mace") {
     const base = [{ name: "unbreaking", level: 3 }, { name: "wind burst", level: 3 }];
-    modes.push(makeEnchantMode("density", "Density", [...base, { name: "density", level: 5 }], [...noMend, "breach"]));
-    modes.push(makeEnchantMode("breach", "Breach", [...base, { name: "breach", level: 4 }], [...noMend, "density"]));
+    modes.push(makeEnchantMode("density", "Max + Density", [...base, { name: "density", level: 5 }], [...noMend, "breach"]));
+    modes.push(makeEnchantMode("breach", "Max + Breach", [...base, { name: "breach", level: 4 }], [...noMend, "density"]));
   } else if (kind === "elytra" || kind === "shield") {
     modes.push(makeEnchantMode("max", "Max enchants", [{ name: "unbreaking", level: 3 }], noMend));
   } else if (kind === "fishing_rod") {

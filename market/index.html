@@ -110,7 +110,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=45"></script>
+<script src="../app.js?v=46"></script>
 <script>
 const msg = document.getElementById("msg");
 const unitSel = document.getElementById("unit");
@@ -132,8 +132,8 @@ let includeUnknownMarket = false;
 const marketFilterOverlay = document.getElementById("market-filter-overlay");
 const marketFilterBadge = document.getElementById("market-filter-badge");
 const mIncludeUnknown = document.getElementById("m-include-unknown");
-let enchantModeId = "plain"; // URL ?enchant=… for enchantable items
-let enchantModes = [];       // modes for selected item
+let enchantModeIds = ["plain"]; // multi-select; URL ?enchant=id or id1,id2
+let enchantModes = [];          // modes for selected item
 
 const k = () => Number(unitSel.value);
 const unitWord = () => k() === 64 ? "stack" : "item";
@@ -222,19 +222,46 @@ function syncMarketScopeUrl() {
   else u.searchParams.delete("nation");
   if (city) u.searchParams.set("city", city);
   else u.searchParams.delete("city");
-  if (selected && enchantModes.length && enchantModeId) u.searchParams.set("enchant", enchantModeId);
-  else if (!selected) u.searchParams.delete("enchant");
+  if (selected && enchantModes.length && enchantModeIds.length) {
+    u.searchParams.set("enchant", enchantModeIds.join(","));
+  } else if (!selected) u.searchParams.delete("enchant");
   if (selected) u.searchParams.set("item", selected);
   window.history.replaceState(null, "", u.pathname + u.search + u.hash);
 }
 
-function currentEnchantMode() {
-  return enchantModes.find(m => m.id === enchantModeId) || enchantModes[0] || null;
+function parseEnchantModeParam(raw) {
+  const ids = String(raw || "").split(",").map(s => s.trim()).filter(Boolean);
+  return ids.length ? ids : ["plain"];
 }
 
-/** Listings for the selected item that match the active enchant mode (and are live). */
+function selectedEnchantModes() {
+  const sel = enchantModes.filter(m => enchantModeIds.includes(m.id));
+  if (sel.length) return sel;
+  return enchantModes[0] ? [enchantModes[0]] : [];
+}
+
+function selectedEnchantLabel() {
+  return selectedEnchantModes().map(m => m.label).join(" · ") || "plain";
+}
+
+function toggleEnchantMode(id) {
+  if (!id || !enchantModes.length) return;
+  if (id === "plain") {
+    enchantModeIds = ["plain"];
+    return;
+  }
+  const withoutPlain = enchantModeIds.filter(x => x !== "plain");
+  if (withoutPlain.includes(id)) {
+    enchantModeIds = withoutPlain.filter(x => x !== id);
+  } else {
+    enchantModeIds = [...withoutPlain, id];
+  }
+  if (!enchantModeIds.length) enchantModeIds = ["plain"];
+}
+
+/** Listings for the selected item that match any selected enchant mode (OR). */
 function itemListingsForMode(item) {
-  const mode = currentEnchantMode();
+  const modes = selectedEnchantModes();
   const { nation, city } = marketPlaceFilter();
   const shopOk = {};
   (allShops || []).forEach(s => {
@@ -247,7 +274,9 @@ function itemListingsForMode(item) {
     if (!(l.in_stock && !l.timed_out && shopOk[String(l.shop_id)])) return false;
     if (isBundleItem(l.sell_item) || isBundleItem(l.want_item)) return false;
     if (l.sell_item !== item && l.want_item !== item) return false;
-    if (enchantModes.length && mode && !listingMatchesEnchantMode(l, mode)) return false;
+    if (enchantModes.length && modes.length) {
+      if (!modes.some(mode => listingMatchesEnchantMode(l, mode))) return false;
+    }
     return true;
   });
 }
@@ -272,13 +301,11 @@ function paintEnchantModes() {
   }
   box.hidden = false;
   box.innerHTML = '<span class="meta">Enchants</span>' + enchantModes.map(m =>
-    `<button type="button" data-enchant-mode="${esc(m.id)}" class="${m.id === enchantModeId ? "on" : ""}">${esc(m.label)}</button>`
+    `<button type="button" data-enchant-mode="${esc(m.id)}" class="${enchantModeIds.includes(m.id) ? "on" : ""}">${esc(m.label)}</button>`
   ).join("");
 }
 
-function enchantFindQuery() {
-  // Find page uses substring enchant filter; map modes to useful needles
-  const id = enchantModeId;
+function enchantFindQueryForId(id) {
   if (!id || id === "plain") return { enchant: "", hasEnchants: false };
   if (id === "silk" || id === "debris_silk") return { enchant: "silk touch", hasEnchants: true };
   if (id === "fortune" || id === "debris_fortune") return { enchant: "fortune", hasEnchants: true };
@@ -293,6 +320,23 @@ function enchantFindQuery() {
   return { enchant: "", hasEnchants: true };
 }
 
+function enchantFindQuery() {
+  // Find page: comma AND needles; plain → unenchanted_only
+  const ids = enchantModeIds.length ? enchantModeIds : ["plain"];
+  if (ids.length === 1 && ids[0] === "plain") {
+    return { enchant: "", hasEnchants: false, unenchantedOnly: true };
+  }
+  const needles = [];
+  let hasEnchants = false;
+  ids.forEach(id => {
+    if (id === "plain") return;
+    const ef = enchantFindQueryForId(id);
+    if (ef.hasEnchants) hasEnchants = true;
+    if (ef.enchant && !needles.includes(ef.enchant)) needles.push(ef.enchant);
+  });
+  return { enchant: needles.join(", "), hasEnchants, unenchantedOnly: false };
+}
+
 function findHref(mode, item) {
   const q = new URLSearchParams();
   q.set("mode", mode);
@@ -304,7 +348,7 @@ function findHref(mode, item) {
     const ef = enchantFindQuery();
     if (ef.enchant) q.set("enchant", ef.enchant);
     if (ef.hasEnchants) q.set("has_enchants", "1");
-    else if (enchantModeId === "plain") { /* unenchanted: Find has no "no enchants" flag */ }
+    if (ef.unenchantedOnly) q.set("unenchanted_only", "1");
   }
   return "../home/?" + q.toString();
 }
@@ -482,14 +526,16 @@ const total = i => ((byItem[i].sell || {}).n || 0) + ((byItem[i].buy || {}).n ||
 async function openItem(item, opts) {
   selected = item;
   enchantModes = typeof marketEnchantModesForItem === "function" ? marketEnchantModesForItem(item) : [];
-  const prefer = (opts && opts.enchant) || new URLSearchParams(location.search).get("enchant") || "plain";
-  enchantModeId = enchantModes.some(m => m.id === prefer) ? prefer : (enchantModes[0] ? enchantModes[0].id : "plain");
+  const preferRaw = (opts && opts.enchant) || new URLSearchParams(location.search).get("enchant") || "plain";
+  const preferIds = parseEnchantModeParam(preferRaw);
+  const valid = preferIds.filter(id => enchantModes.some(m => m.id === id));
+  enchantModeIds = valid.length ? valid : (enchantModes[0] ? [enchantModes[0].id] : ["plain"]);
   renderList();
   const d = document.getElementById("detail");
   d.hidden = false;
   document.getElementById("d-icon").innerHTML = itemIcon(item, true);
   document.getElementById("d-name").textContent = item;
-  const enchantLabel = enchantModeId && enchantModeId !== "plain" ? enchantModeId : "";
+  const enchantLabel = enchantModeIds.filter(id => id && id !== "plain").join(",") || "";
   const title = (enchantLabel ? item + " (" + enchantLabel + ")" : item) + " - Market - CivShops";
   setPageMeta({
     title,
@@ -524,9 +570,8 @@ function renderItemListings(item) {
   if (!box) return;
   const rows = itemListingsForMode(item);
   if (!enchantModes.length) { box.hidden = true; box.innerHTML = ""; return; }
-  const mode = currentEnchantMode();
-  const label = mode ? mode.label : "";
-  // Compact rate chips: up to 12 live offers matching this enchant mode
+  const label = selectedEnchantLabel();
+  // Compact rate chips: up to 12 live offers matching selected enchant mode(s)
   const chips = rows.slice(0, 12).map(l => {
     const selling = l.sell_item === item;
     const rate = dealRate(l, !selling);
@@ -566,7 +611,7 @@ function renderDetail() {
     ? ` Live rates above are for ${scopeBits.join(" \u00b7 ")} only; history chart is still server-wide.`
     : "";
   const enchNote = enchantModes.length
-    ? ` Live rates and listing chips use the “${(currentEnchantMode() || {}).label || enchantModeId}” enchant filter; history is all enchants.`
+    ? ` Live rates and listing chips use the “${selectedEnchantLabel()}” enchant filter; history is all enchants.`
     : "";
   const unkNote = includeUnknownMarket
     ? " Live table includes unknown listings; history chart is still shop listings only."
@@ -640,13 +685,13 @@ document.getElementById("ranges").addEventListener("click", e => { const b = e.t
 document.getElementById("d-enchant-modes").addEventListener("click", e => {
   const b = e.target.closest("[data-enchant-mode]");
   if (!b) return;
-  enchantModeId = b.dataset.enchantMode;
+  toggleEnchantMode(b.dataset.enchantMode);
   syncMarketScopeUrl();
   renderDetail();
 });
 document.getElementById("d-share").onclick = async () => {
   if (!selected) return;
-  const enchant = enchantModeId && enchantModeId !== "plain" ? enchantModeId : undefined;
+  const enchant = enchantModeIds.filter(id => id && id !== "plain").join(",") || undefined;
   const ok = await copyText(embedHref({ item: selected, enchant }));
   setMsg(msg, ok ? "Market link copied." : "Couldn't copy.", ok ? "ok" : "err");
 };
@@ -654,7 +699,7 @@ document.getElementById("d-close").onclick = () => {
   document.getElementById("detail").hidden = true;
   selected = null;
   enchantModes = [];
-  enchantModeId = "plain";
+  enchantModeIds = ["plain"];
   const box = document.getElementById("d-listings");
   if (box) { box.hidden = true; box.innerHTML = ""; }
   document.getElementById("d-enchant-modes").hidden = true;
