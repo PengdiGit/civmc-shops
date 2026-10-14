@@ -686,6 +686,11 @@ img.avatar {
 .trade .arrow { color: var(--dim); font-size: .95rem; flex: 0 0 auto; }
 .trade-side { min-width: 0; flex: 0 1 auto; }
 .trade > .inline-actions { margin-left: auto; }
+.listing-row[data-href],
+.listing-row.is-focusable,
+.listing-row[data-listing] {
+  cursor: pointer;
+}
 .listing-row, .offer {
   background:
     linear-gradient(160deg,

@@ -303,36 +303,49 @@ async function loadShopSlugPeers() {
   shopSlugPeerCache = rows;
   return shopSlugPeerCache;
 }
-/** Site-relative shop path: /shops/pfa-exchange/ */
+/**
+ * Site-relative shop path: /shops/pfa-exchange-1/
+ * With a listing id: /shops/pfa-exchange-1/listing/25/ (static OG lander + deep link).
+ */
 function shopPath(shop, search, peers) {
   if (!shop || shop.id == null) return pageHref("shops");
-  let path = siteBase() + "/shops/" + encodeURIComponent(shopSlug(shop, peers)) + "/";
-  if (search != null && search !== "") {
-    if (typeof search === "string") path += search.startsWith("?") ? search : "?" + search;
-    else {
-      const ps = search instanceof URLSearchParams ? search : new URLSearchParams(search);
-      // Never put id in query when using slug path - listing/q/invite still ok
-      ps.delete("id");
-      const str = ps.toString();
-      if (str) path += "?" + str;
-    }
+  const slug = encodeURIComponent(shopSlug(shop, peers));
+  const base = siteBase() + "/shops/" + slug + "/";
+  if (search == null || search === "") return base;
+  if (typeof search === "string") {
+    return base + (search.startsWith("?") ? search : "?" + search);
   }
-  return path;
+  const ps = search instanceof URLSearchParams ? new URLSearchParams(search) : new URLSearchParams(search);
+  // Never put id in query when using slug path
+  ps.delete("id");
+  const listing = ps.get("listing");
+  if (listing) {
+    ps.delete("listing");
+    let path = siteBase() + "/shops/" + slug + "/listing/" + encodeURIComponent(String(listing)) + "/";
+    const str = ps.toString();
+    if (str) path += "?" + str;
+    return path;
+  }
+  const str = ps.toString();
+  return str ? base + "?" + str : base;
 }
 function shopShareUrl(shop, search, peers) {
   if (!shop || shop.id == null) return SITE_PUBLIC + "/shops/";
-  let url = SITE_PUBLIC + "/shops/" + encodeURIComponent(shopSlug(shop, peers)) + "/";
-  if (search && typeof search === "object") {
-    const ps = new URLSearchParams(search);
-    ps.delete("id");
-    const str = ps.toString();
-    if (str) url += "?" + str;
+  // Build from shopPath so listing deep links stay in sync (path form for OG landers).
+  const rel = shopPath(shop, search, peers);
+  if (rel.startsWith("http://") || rel.startsWith("https://")) return rel;
+  return SITE_PUBLIC + (rel.startsWith("/") ? rel : "/" + rel);
+}
+/** Absolute listing share URL used by copy-link buttons + mod. */
+function listingShareUrl(shop, listingId, peers) {
+  if (!shop || shop.id == null || listingId == null || listingId === "") {
+    return shopShareUrl(shop, null, peers);
   }
-  return url;
+  return shopShareUrl(shop, { listing: listingId }, peers);
 }
 /**
  * Shareable URL on civshops.pengworld.net.
- * Shops: /shops/{name-slug}/ · Profiles: /profile/?name={username}
+ * Shops: /shops/{name-slug}/ · Listings: /shops/{name-slug}/listing/{id}/ · Profiles: /profile/?name=
  * params: { shop, shopName, listing, profile, name, username, item, enchant, q, mode }
  */
 function embedHref(params) {
@@ -343,7 +356,9 @@ function embedHref(params) {
   if (p.shopName || (p.shop != null && p.shop !== "" && isNaN(Number(p.shop)))) {
     const slug = shopSlugBase(p.shopName || p.shop) || String(p.shop);
     let url = SITE_PUBLIC + "/shops/" + encodeURIComponent(slug) + "/";
-    if (p.listing != null && p.listing !== "") url += "?listing=" + encodeURIComponent(String(p.listing));
+    if (p.listing != null && p.listing !== "") {
+      url += "listing/" + encodeURIComponent(String(p.listing)) + "/";
+    }
     return url;
   }
   if (p.shop != null && p.shop !== "") {
@@ -356,7 +371,9 @@ function embedHref(params) {
     }
     const slug = shopSlugBase(p.shopName || p.shop) || String(p.shop);
     let url = SITE_PUBLIC + "/shops/" + encodeURIComponent(slug) + "/";
-    if (p.listing != null && p.listing !== "") url += "?listing=" + encodeURIComponent(String(p.listing));
+    if (p.listing != null && p.listing !== "") {
+      url += "listing/" + encodeURIComponent(String(p.listing)) + "/";
+    }
     return url;
   }
   const uname = String(p.username || p.name || "").trim().toLowerCase();

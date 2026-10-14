@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -16,7 +16,7 @@
 <meta name="twitter:title" content="CivMC Shops">
 <meta name="twitter:description" content="Find CivMC shops, compare diamond prices, and browse the live market.">
 <meta name="twitter:image" content="https://civshops.pengworld.net/Minecraft_Items/chest.png">
-<link rel="stylesheet" href="../style.css?v=37">
+<link rel="stylesheet" href="../style.css?v=38">
 </head>
 <body class="find-page">
 <nav id="nav"></nav>
@@ -50,7 +50,7 @@
           <option value="enchant">Enchants</option>
         </select>
         <input type="search" id="q" list="items" placeholder="diamond" autocomplete="off">
-        <input type="search" id="enchant-pick" class="find-enchant-pick" placeholder="Search enchants…" autocomplete="off" hidden aria-label="Search enchantments">
+        <input type="search" id="enchant-pick" class="find-enchant-pick" placeholder="Search enchantsâ€¦" autocomplete="off" hidden aria-label="Search enchantments">
         <button class="primary" id="go">Search</button>
         <span class="find-sort">
           <span class="meta">Sort</span>
@@ -160,7 +160,7 @@
         <p class="meta" id="fg-enchant-hint" style="margin:0 0 6px">Prefer the Enchants mode in the search bar for named enchant lookup.</p>
         <div class="find-filter-toggles" style="flex-direction:column;align-items:stretch;gap:8px">
           <label class="find-filter-check" id="fg-enchant-contains"><span class="find-filter-check-label">Contains</span>
-            <input type="search" id="f-enchant" placeholder="protection, silk touch…" maxlength="60" style="width:min(100%,220px)"></label>
+            <input type="search" id="f-enchant" placeholder="protection, silk touchâ€¦" maxlength="60" style="width:min(100%,220px)"></label>
           <label class="find-filter-check"><input type="checkbox" id="f-has-enchants"> Enchanted only</label>
         </div>
       </div>
@@ -177,7 +177,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../items.js"></script>
-<script src="../app.js?v=42"></script>
+<script src="../app.js?v=43"></script>
 <script src="../place-picker.js"></script>
 <script>
 const q = document.getElementById("q");
@@ -347,7 +347,7 @@ function syncModeUi() {
   if (enchantWrap) enchantWrap.hidden = !enchantMode;
   enchantPick.hidden = !enchantMode;
   if (enchantMode) {
-    enchantPick.placeholder = "Search enchants…";
+    enchantPick.placeholder = "Search enchantsâ€¦";
     enchantPick.title = "Type to filter enchant names, then pick one";
     if (q.value && !enchantPick.value) enchantPick.value = q.value;
   } else {
@@ -1042,7 +1042,7 @@ function paintItemResults(data) {
     results.innerHTML = emptyState("Nobody matching those filters has it listed. Clear filters or try another item.", null, null);
     return;
   }
-  let note = "Click a row to open the shop. The columns icon pins a deal to compare.";
+  let note = "Click a row to open the listing. The link icon copies a share URL; columns pins a deal to compare.";
   if (sortSel.value === "close" && !h) note = "Enter your X and Z to sort by distance.";
   sortListings(rows, sortSel.value, h);
   setMsg(msg, note);
@@ -1064,20 +1064,34 @@ function paintItemResults(data) {
     const place = placeHtml(s);
     const href = unknown
       ? "../unknown/?id=" + l.id
-      : "../shops/?id=" + l.shop_id + "&listing=" + l.id + (qTerm ? "&q=" + encodeURIComponent(qTerm) : "");
+      : shopPath(s, Object.assign({ listing: l.id }, qTerm ? { q: qTerm } : {}));
     const who = unknown ? "Unknown \u00b7 Unclaimed" : shopName(s);
+    const copyBtn = unknown ? "" : iconBtn("link", { title: "Copy listing link", attrs: `data-copy-listing="${l.id}"` });
+    const cmpBtn = unknown ? "" : iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` });
     return tradeRow(l, {
       buying,
       stale,
       href,
+      listingId: l.id,
       tags,
       meta: `${who}${place ? " \u00b7 " + place : ""} \u00b7 ${coordsHtml(s.x, s.z, unknown ? { approx: true } : null)}${sortSel.value === "close" ? distText(s, h) : ""} \u00b7 ${updatedHtml(l.updated_at)}`,
-      btns: unknown ? "" : iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` })
+      btns: copyBtn + cmpBtn
     });
   }).join("");
 }
 
-results.addEventListener("click", e => {
+results.addEventListener("click", async e => {
+  const copy = e.target.closest("[data-copy-listing]");
+  if (copy) {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = Number(copy.dataset.copyListing);
+    const l = lastItemRows.find(x => x.id === id);
+    if (!l || !l.shops || l.is_unknown) return;
+    const ok = await copyText(listingShareUrl(l.shops, l.id));
+    setMsg(msg, ok ? "Listing link copied." : "Couldn't copy.", ok ? "ok" : "err");
+    return;
+  }
   const b = e.target.closest("[data-compare]");
   if (!b) return;
   e.preventDefault();
