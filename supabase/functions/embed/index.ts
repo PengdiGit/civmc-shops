@@ -31,14 +31,14 @@ const stillOut = (row: { timed_out?: boolean | null; timed_out_until?: string | 
 type Embed = { title: string; description: string; url: string; image: string; authorName?: string; authorUrl?: string };
 
 function pageHtml(e: Embed) {
-  const title = e.title || "CivMC Shops";
-  const desc = e.description || "Find CivMC shops, compare diamond prices, and browse the live market.";
+  const title = e.title || "CivShops";
+  const desc = e.description || "Find shops on CivMC, compare diamond prices, and browse the live market on CivShops.";
   const url = e.url || SITE + "/home/";
   const image = e.image || itemImg("chest");
   const oembed = Deno.env.get("SUPABASE_URL")!.replace(/\/$/, "") + "/functions/v1/embed?format=oembed&url=" + encodeURIComponent(url);
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${THEME}">
-<meta property="og:type" content="website"><meta property="og:site_name" content="CivMC Shops">
+<meta property="og:type" content="website"><meta property="og:site_name" content="CivShops">
 <meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${esc(url)}"><meta property="og:image" content="${esc(image)}">
 <meta name="twitter:card" content="summary"><meta name="twitter:title" content="${esc(title)}">
@@ -82,8 +82,8 @@ function parseTarget(url: URL) {
 }
 
 const defaultEmbed = (): Embed => ({
-  title: "CivMC Shops",
-  description: "Find CivMC shops, compare diamond prices, and browse the live market.",
+  title: "CivShops",
+  description: "Find shops on CivMC, compare diamond prices, and browse the live market on CivShops.",
   url: SITE + "/home/",
   image: itemImg("chest"),
 });
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
   const respond = (e: Embed, status = 200) => {
     if (wantOembed) {
       const body: Record<string, unknown> = {
-        version: "1.0", type: "link", title: e.title, provider_name: "CivMC Shops",
+        version: "1.0", type: "link", title: e.title, provider_name: "CivShops",
         provider_url: SITE + "/", thumbnail_url: e.image, thumbnail_width: 128, thumbnail_height: 128,
       };
       if (e.authorName) body.author_name = e.authorName;
@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
       if (hit) id = Number(hit.id);
     }
   }
-  if (!Number.isFinite(id)) return respond({ ...defaultEmbed(), title: "Shop not found · CivMC Shops" }, 404);
+  if (!Number.isFinite(id)) return respond({ ...defaultEmbed(), title: "Shop not found · CivShops" }, 404);
 
   const { data: s } = await admin
     .from("shops")
@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
     | null
     | undefined;
   if (!s || s.archived || s.is_open === false || stillOut(s) || stillOut(owner || null)) {
-    return respond({ ...defaultEmbed(), title: "Shop not found · CivMC Shops", description: "That shop doesn't exist or isn't available.", url: SITE + "/home/" }, 404);
+    return respond({ ...defaultEmbed(), title: "Shop not found · CivShops", description: "That shop doesn't exist or isn't available.", url: SITE + "/home/" }, 404);
   }
 
   const name = stripMc(s.styled_name || s.name || "Shop") || "Shop";
@@ -163,7 +163,7 @@ Deno.serve(async (req) => {
   if (nList) bits.push(nList + " listing" + (nList === 1 ? "" : "s"));
 
   let desc = stripMc(s.description || "").replace(/\s+/g, " ").slice(0, 180);
-  if (!desc) desc = bits.join(" · ") || "CivMC shop on CivMC Shops.";
+  if (!desc) desc = bits.join(" · ") || "Shop listing on CivShops.";
   else if (bits.length) desc = desc + " · " + bits.join(" · ");
 
   let title = name;

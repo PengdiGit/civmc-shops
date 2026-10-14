@@ -77,11 +77,11 @@ function pageHtml({ title, description, url, image, authorName, redirectUrl }) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} · CivMC Shops</title>
+<title>${esc(title)} · CivShops</title>
 <meta name="description" content="${esc(description)}">
 <meta name="theme-color" content="${THEME}">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="CivMC Shops">
+<meta property="og:site_name" content="CivShops">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(url)}">
@@ -178,7 +178,7 @@ async function main() {
     if (place) bits.push(place);
     if (s.x != null && s.z != null) bits.push(s.x + ", " + s.z);
     let desc = stripMc(s.description || "").replace(/\s+/g, " ").slice(0, 180);
-    if (!desc) desc = bits.join(" | ") || "CivMC shop on CivMC Shops.";
+    if (!desc) desc = bits.join(" | ") || "Shop listing on CivShops.";
     else if (bits.length) desc = desc + " | " + bits.join(" | ");
     const image = s.icon_path ? storageUrl(s.icon_path) : itemImg(s.icon_item || "chest");
     const slug = slugById.get(s.id) || ("shop-" + s.id);
@@ -250,7 +250,7 @@ async function main() {
     }
     if (p.verified_at) bits.push("verified");
     let desc = stripMc(p.bio || "").replace(/\s+/g, " ").slice(0, 180);
-    if (!desc) desc = bits.join(" | ") || (p.is_nation ? "Nation account on CivMC Shops." : (p.is_business ? "Business account on CivMC Shops." : "CivMC trader on CivMC Shops."));
+    if (!desc) desc = bits.join(" | ") || (p.is_nation ? "Nation account on CivShops." : (p.is_business ? "Business account on CivShops." : "CivMC trader on CivShops."));
     else if (bits.length) desc = desc + " | " + bits.slice(0, 3).join(" | ");
     const image = p.avatar_path
       ? storageUrl(p.avatar_path)

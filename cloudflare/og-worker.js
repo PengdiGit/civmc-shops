@@ -1,5 +1,5 @@
 /**
- * CivMC Shops - Discord/Slack Open Graph proxy
+ * CivShops - Discord/Slack Open Graph proxy
  *
  * Humans: pass through to GitHub Pages.
  * Crawlers: call the Supabase embed function so previews show shop name, icon, description, owner.

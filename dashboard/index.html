@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>My shops - CivMC Shops</title>
+<title>My shops - CivShops</title>
 <link rel="stylesheet" href="../style.css?v=38">
 </head>
 <body class="dash-page">
@@ -71,7 +71,7 @@
 <script src="../item-picker.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=44"></script>
+<script src="../app.js?v=45"></script>
 <script>
 let me = null;
 let shopsData = {};                 // shop id -> shop (with listings), from the last load
@@ -339,7 +339,7 @@ function panelHtml(s) {
     <div class="dash-auto-stock" style="margin-top:10px">
       <label class="find-filter-check" style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" class="p-auto-stock" ${s.auto_stock_enabled !== false ? "checked" : ""}>
-        Auto stock updates (CivMC Shop Scan mod)
+        Auto stock updates (CivShops Mod)
       </label>
       <p class="meta" style="margin:4px 0 0">When enabled, trades near your shop X/Z update listing stock from the mod. Set shop coordinates below.</p>
     </div>` : ""}
