@@ -53,11 +53,11 @@ function PageHtml($title, $description, $url, $image, $authorName, $redirectUrl)
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>$(Esc $title) · CivMC Shops</title>
+<title>$(Esc $title) · CivShops</title>
 <meta name="description" content="$(Esc $description)">
 <meta name="theme-color" content="$Theme">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="CivMC Shops">
+<meta property="og:site_name" content="CivShops">
 <meta property="og:title" content="$(Esc $title)">
 <meta property="og:description" content="$(Esc $description)">
 <meta property="og:url" content="$(Esc $url)">
@@ -137,7 +137,7 @@ foreach ($s in $visible) {
   if ($null -ne $s.x -and $null -ne $s.z) { $bits += "$($s.x), $($s.z)" }
   $desc = (StripMc $s.description) -replace "\s+", " "
   if ($desc.Length -gt 180) { $desc = $desc.Substring(0, 180) }
-  if (-not $desc) { $desc = if ($bits.Count) { $bits -join " | " } else { "CivMC shop on CivMC Shops." } }
+  if (-not $desc) { $desc = if ($bits.Count) { $bits -join " | " } else { "Shop listing on CivShops." } }
   elseif ($bits.Count) { $desc = "$desc | $($bits -join ' | ')" }
   $image = if ($s.icon_path) { StorageUrl $s.icon_path } else { ItemImg $(if ($s.icon_item) { $s.icon_item } else { "chest" }) }
   $base = ShopSlugBase $s.name
@@ -173,7 +173,7 @@ foreach ($p in $profiles) {
   if ($p.verified_at) { $bits += "verified" }
   $desc = (StripMc $p.bio) -replace "\s+", " "
   if ($desc.Length -gt 180) { $desc = $desc.Substring(0, 180) }
-  if (-not $desc) { $desc = if ($bits.Count) { $bits -join " | " } else { "CivMC trader on CivMC Shops." } }
+  if (-not $desc) { $desc = if ($bits.Count) { $bits -join " | " } else { "CivMC trader on CivShops." } }
   elseif ($bits.Count) { $desc = "$desc | $(($bits | Select-Object -First 3) -join ' | ')" }
   $image = if ($p.avatar_path) { StorageUrl $p.avatar_path } else { "https://minotar.net/avatar/$([uri]::EscapeDataString($(if ($mc) { $mc } else { 'steve' })))/128" }
   $loginKey = $login.Trim().ToLower()

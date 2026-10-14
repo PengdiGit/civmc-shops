@@ -394,7 +394,7 @@ Deno.serve(async (req) => {
       if (provider === "discord") {
         const d = await finishDiscord(code, redirectUri);
         const { data: taken } = await admin.from("profiles").select("id").eq("discord_id", d.discord_id).neq("id", user.id).maybeSingle();
-        if (taken) return json({ error: "That Discord account is already linked to another CivMC Shops account." }, 400);
+        if (taken) return json({ error: "That Discord account is already linked to another CivShops account." }, 400);
         const { error } = await admin.from("profiles").update({
           discord_id: d.discord_id,
           discord_username: d.discord_username,
@@ -407,7 +407,7 @@ Deno.serve(async (req) => {
       if (provider === "minecraft") {
         const m = await finishMinecraft(code, redirectUri);
         const { data: takenMs } = await admin.from("profiles").select("id").eq("microsoft_id", m.microsoft_id).neq("id", user.id).maybeSingle();
-        if (takenMs) return json({ error: "That Microsoft account is already linked to another CivMC Shops account." }, 400);
+        if (takenMs) return json({ error: "That Microsoft account is already linked to another CivShops account." }, 400);
 
         if (m.mode === "soft") {
           const { error } = await admin.from("profiles").update({
@@ -424,7 +424,7 @@ Deno.serve(async (req) => {
         }
 
         const { data: takenMc } = await admin.from("profiles").select("id").eq("mc_uuid", m.mc_uuid).neq("id", user.id).maybeSingle();
-        if (takenMc) return json({ error: "That Minecraft account is already linked to another CivMC Shops account." }, 400);
+        if (takenMc) return json({ error: "That Minecraft account is already linked to another CivShops account." }, 400);
 
         let civinfo_known: boolean | null = null;
         try {
@@ -468,7 +468,7 @@ Deno.serve(async (req) => {
     if (!looked) return json({ error: "That Minecraft Java username was not found. Check spelling." }, 400);
 
     const { data: takenMc } = await admin.from("profiles").select("id").eq("mc_uuid", looked.uuid).neq("id", user.id).maybeSingle();
-    if (takenMc) return json({ error: "That Minecraft account is already linked to another CivMC Shops account." }, 400);
+    if (takenMc) return json({ error: "That Minecraft account is already linked to another CivShops account." }, 400);
 
     let civinfo_known: boolean | null = null;
     try {

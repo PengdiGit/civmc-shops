@@ -1,20 +1,20 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CivMC Shops</title>
-<meta name="description" content="Find CivMC shops, compare diamond prices, and browse the live market.">
+<title>CivShops</title>
+<meta name="description" content="Find shops on CivMC, compare diamond prices, and browse the live market on CivShops.">
 <meta name="theme-color" content="#7fb35a">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="CivMC Shops">
-<meta property="og:title" content="CivMC Shops">
-<meta property="og:description" content="Find CivMC shops, compare diamond prices, and browse the live market.">
+<meta property="og:site_name" content="CivShops">
+<meta property="og:title" content="CivShops">
+<meta property="og:description" content="Find shops on CivMC, compare diamond prices, and browse the live market on CivShops.">
 <meta property="og:url" content="https://civshops.pengworld.net/home/">
 <meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/chest.png">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="CivMC Shops">
-<meta name="twitter:description" content="Find CivMC shops, compare diamond prices, and browse the live market.">
+<meta name="twitter:title" content="CivShops">
+<meta name="twitter:description" content="Find shops on CivMC, compare diamond prices, and browse the live market on CivShops.">
 <meta name="twitter:image" content="https://civshops.pengworld.net/Minecraft_Items/chest.png">
 <link rel="stylesheet" href="../style.css?v=38">
 </head>
@@ -177,7 +177,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../items.js"></script>
-<script src="../app.js?v=44"></script>
+<script src="../app.js?v=45"></script>
 <script src="../place-picker.js"></script>
 <script>
 const q = document.getElementById("q");
@@ -984,10 +984,10 @@ async function ensureTipCounts(shops) {
 
 async function showShops(term) {
   heading.textContent = term ? 'Shops matching "' + term + '"' : "All shops";
-  const title = (term ? term + " shops" : "Find a shop") + " - CivMC Shops";
+  const title = (term ? term + " shops" : "Find a shop") + " - CivShops";
   setPageMeta({
     title,
-    description: term ? "Shops matching \"" + term + "\" on CivMC Shops." : "Search CivMC shops by item, enchant, or name.",
+    description: term ? "Shops matching \"" + term + "\" on CivShops." : "Search CivShops by item, enchant, or name.",
     url: absPageHref("home", term ? { q: term, mode: "shop" } : {}),
     image: itemImg("chest")
   });
@@ -1146,16 +1146,16 @@ async function showItems(term) {
   let title;
   if (enchantMode) {
     heading.textContent = 'Listings with enchant "' + term + '"';
-    title = term + " enchants - CivMC Shops";
+    title = term + " enchants - CivShops";
   } else {
     heading.textContent = (mode.value === "sell" ? "Shops selling " : "Shops buying ") + term;
-    title = (mode.value === "sell" ? "Selling " : "Buying ") + term + " - CivMC Shops";
+    title = (mode.value === "sell" ? "Selling " : "Buying ") + term + " - CivShops";
   }
   setPageMeta({
     title,
     description: enchantMode
-      ? "Listings with enchant \"" + term + "\" on CivMC Shops."
-      : ((mode.value === "sell" ? "Shops selling " : "Shops buying ") + term + " on CivMC Shops."),
+      ? "Listings with enchant \"" + term + "\" on CivShops."
+      : ((mode.value === "sell" ? "Shops selling " : "Shops buying ") + term + " on CivShops."),
     url: absPageHref("home", { q: term, mode: mode.value }),
     image: enchantMode ? itemImg("enchanted book") : itemImg(term)
   });

@@ -432,7 +432,7 @@ function setPageMeta(opts) {
     ensure("name", "twitter:image", o.image);
   }
   ensure("property", "og:type", "website");
-  ensure("property", "og:site_name", "CivMC Shops");
+  ensure("property", "og:site_name", "CivShops");
   ensure("name", "twitter:card", "summary");
   ensure("name", "theme-color", "#7fb35a");
 }

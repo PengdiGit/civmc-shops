@@ -1,15 +1,15 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Shop - CivMC Shops</title>
-<meta name="description" content="CivMC shop page - listings, reviews, and location.">
+<title>Shop - CivShops</title>
+<meta name="description" content="Shop page on CivShops — listings, reviews, and location.">
 <meta name="theme-color" content="#7fb35a">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="CivMC Shops">
-<meta property="og:title" content="Shop - CivMC Shops">
-<meta property="og:description" content="CivMC shop page - listings, reviews, and location.">
+<meta property="og:site_name" content="CivShops">
+<meta property="og:title" content="Shop - CivShops">
+<meta property="og:description" content="Shop page on CivShops — listings, reviews, and location.">
 <meta property="og:url" content="https://civshops.pengworld.net/shops/">
 <meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/chest.png">
 <meta name="twitter:card" content="summary">
@@ -89,7 +89,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=44"></script>
+<script src="../app.js?v=45"></script>
 <script>
 const params = new URLSearchParams(location.search);
 // /shops/?id=1 · /shops/pfa-exchange-42/ · /shops/pfa-exchange-42/listing/25/ · legacy slug
@@ -304,7 +304,7 @@ async function focusListing(listingId, opts) {
     const shareUrl = listingShareUrl(shop, hlListingId, peers);
     const trade = `${hit.want_amount} ${hit.want_item} -> ${hit.sell_amount} ${hit.sell_item}`;
     setPageMeta({
-      title: trade + " · " + (shop.name || "Shop") + " - CivMC Shops",
+      title: trade + " · " + (shop.name || "Shop") + " - CivShops",
       description: (trade + " at " + (shop.name || "shop")).replace(/\s+/g, " ").slice(0, 180),
       url: shareUrl,
       image: itemImg(hit.sell_item || shop.icon_item || "chest")
@@ -419,7 +419,7 @@ async function load() {
     return;
   }
   shop = s;
-  document.title = s.name + " - CivMC Shops";
+  document.title = s.name + " - CivShops";
   const peers = await loadShopSlugPeers();
   // Pretty share URL in the address bar: /shops/pfa-exchange/
   try {
@@ -434,8 +434,8 @@ async function load() {
   const placeBits = [placePlain, s.x != null && s.z != null ? s.x + ", " + s.z : ""].filter(Boolean).join(" · ");
   const shareUrl = shopShareUrl(s, null, peers);
   setPageMeta({
-    title: s.name + " - CivMC Shops",
-    description: (stripCodes(s.description || "") || placeBits || "CivMC shop").replace(/\s+/g, " ").slice(0, 180),
+    title: s.name + " - CivShops",
+    description: (stripCodes(s.description || "") || placeBits || "Shop on CivShops").replace(/\s+/g, " ").slice(0, 180),
     url: shareUrl,
     image: s.icon_path ? publicUrl(s.icon_path) : itemImg(s.icon_item || "chest")
   });

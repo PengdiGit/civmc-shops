@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Unknown listing - CivMC Shops</title>
-<meta name="description" content="Crowd-scanned exchange not yet claimed on CivMC Shops.">
+<title>Unknown listing - CivShops</title>
+<meta name="description" content="Crowd-scanned exchange not yet claimed on CivShops.">
 <meta name="theme-color" content="#7fb35a">
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="../style.css?v=38">
@@ -32,7 +32,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../items.js"></script>
-<script src="../app.js?v=44"></script>
+<script src="../app.js?v=45"></script>
 <script>
 const msg = document.getElementById("msg");
 const body = document.getElementById("body");
@@ -70,8 +70,8 @@ const body = document.getElementById("body");
   document.getElementById("badges").innerHTML =
     '<span class="tag warn">unknown</span> <span class="tag">unclaimed</span> ' + stockHtml(u);
   setPageMeta({
-    title: "Unknown: " + u.sell_item + " - CivMC Shops",
-    description: "Unclaimed crowd-scanned exchange on CivMC Shops.",
+    title: "Unknown: " + u.sell_item + " - CivShops",
+    description: "Unclaimed crowd-scanned exchange on CivShops.",
     url: absPageHref("unknown", { id: String(u.id) }),
     image: itemImg(u.sell_item)
   });
@@ -89,7 +89,7 @@ const body = document.getElementById("body");
     </div>
     <div class="panel" style="margin-top:16px;padding:14px">
       <p class="meta" style="margin:0 0 8px">First seen ${updatedHtml(u.created_at)} \u00b7 Last scan ${updatedHtml(u.updated_at)}</p>
-      <p style="margin:0 0 8px">This exchange was found in-game by the CivMC Shop Scan mod but is not linked to a claimed shop on the site.</p>
+      <p style="margin:0 0 8px">This exchange was found in-game by the CivShops Mod but is not linked to a claimed shop on the site.</p>
       <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
         <button type="button" class="small ico-label" id="report-unk">${uiIcon("flag")} Report this scan</button>
         <a class="small ico-label" href="${esc(mapUrl(u.x, u.z))}" target="_blank" rel="noopener">${uiIcon("map")} Open map</a>

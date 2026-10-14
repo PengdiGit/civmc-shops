@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Profile - CivMC Shops</title>
-<meta name="description" content="CivMC trader profile on CivMC Shops.">
+<title>Profile - CivShops</title>
+<meta name="description" content="CivMC trader profile on CivShops.">
 <meta name="theme-color" content="#7fb35a">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="CivMC Shops">
-<meta property="og:title" content="Profile - CivMC Shops">
-<meta property="og:description" content="CivMC trader profile on CivMC Shops.">
+<meta property="og:site_name" content="CivShops">
+<meta property="og:title" content="Profile - CivShops">
+<meta property="og:description" content="CivMC trader profile on CivShops.">
 <meta property="og:url" content="https://civshops.pengworld.net/profile/">
 <meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/player_head.png">
 <meta name="twitter:card" content="summary">
@@ -110,7 +110,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=44"></script>
+<script src="../app.js?v=45"></script>
 <script>
 const params = new URLSearchParams(location.search);
 let id = params.get("id");
@@ -323,7 +323,7 @@ async function load() {
   own = myId === p.id;
 
   const primary = profileDisplayName(p);
-  document.title = primary + " - CivMC Shops";
+  document.title = primary + " - CivShops";
   const prettyPath = profilePath(p, p.id);
   try {
     if ((location.pathname + location.search) !== prettyPath) {
@@ -345,14 +345,14 @@ async function load() {
   kicker.textContent = p.is_nation ? "Nation" : (p.is_business ? "Business" : "");
   const fallbackDesc = p.is_nation
     ? ("Nation account" + (nationName ? " · " + nationName : ""))
-    : (p.is_business ? "Business account on CivMC Shops" : "CivMC trader");
+    : (p.is_business ? "Business account on CivShops" : "CivMC trader");
   setPageMeta({
-    title: display + (org ? (p.is_nation ? " · Nation" : " · Business") : "") + " - CivMC Shops",
+    title: display + (org ? (p.is_nation ? " · Nation" : " · Business") : "") + " - CivShops",
     description: (stripCodes(p.bio || "") || [!org && p.mc_username && ("MC: " + p.mc_username), !org && p.discord_username && ("Discord: " + p.discord_username)].filter(Boolean).join(" · ") || fallbackDesc).replace(/\s+/g, " ").slice(0, 180),
     url: shareUrl,
     image: orgMark || avatarUrl(p, 128)
   });
-  document.title = display + (org ? (p.is_nation ? " · Nation" : " · Business") : "") + " - CivMC Shops";
+  document.title = display + (org ? (p.is_nation ? " · Nation" : " · Business") : "") + " - CivShops";
   document.getElementById("name").textContent = display;
   document.getElementById("avatar").innerHTML = orgMark
     ? `<img class="avatar org-mark" width="128" height="128" src="${esc(orgMark)}" alt="">`

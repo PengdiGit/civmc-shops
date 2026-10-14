@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Market - CivMC Shops</title>
-<meta name="description" content="Live diamond market rates across CivMC shops.">
+<title>Market - CivShops</title>
+<meta name="description" content="Live diamond market rates across CivShops.">
 <meta name="theme-color" content="#7fb35a">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="CivMC Shops">
-<meta property="og:title" content="Market - CivMC Shops">
-<meta property="og:description" content="Live diamond market rates across CivMC shops.">
+<meta property="og:site_name" content="CivShops">
+<meta property="og:title" content="Market - CivShops">
+<meta property="og:description" content="Live diamond market rates across CivShops.">
 <meta property="og:url" content="https://civshops.pengworld.net/market/">
 <meta property="og:image" content="https://civshops.pengworld.net/Minecraft_Items/diamond.png">
 <meta name="twitter:card" content="summary">
@@ -110,7 +110,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=44"></script>
+<script src="../app.js?v=45"></script>
 <script>
 const msg = document.getElementById("msg");
 const unitSel = document.getElementById("unit");
@@ -490,10 +490,10 @@ async function openItem(item, opts) {
   document.getElementById("d-icon").innerHTML = itemIcon(item, true);
   document.getElementById("d-name").textContent = item;
   const enchantLabel = enchantModeId && enchantModeId !== "plain" ? enchantModeId : "";
-  const title = (enchantLabel ? item + " (" + enchantLabel + ")" : item) + " - Market - CivMC Shops";
+  const title = (enchantLabel ? item + " (" + enchantLabel + ")" : item) + " - Market - CivShops";
   setPageMeta({
     title,
-    description: "Live diamond market rates for " + item + " on CivMC Shops.",
+    description: "Live diamond market rates for " + item + " on CivShops.",
     url: absPageHref("market", { item, ...(enchantLabel ? { enchant: enchantLabel } : {}) }),
     image: itemImg(item)
   });
@@ -663,8 +663,8 @@ document.getElementById("d-close").onclick = () => {
   u.searchParams.delete("enchant");
   window.history.replaceState(null, "", u.pathname + u.search + u.hash);
   setPageMeta({
-    title: "Market - CivMC Shops",
-    description: "Live diamond market rates across CivMC shops.",
+    title: "Market - CivShops",
+    description: "Live diamond market rates across CivShops.",
     url: absPageHref("market"),
     image: itemImg("diamond")
   });
