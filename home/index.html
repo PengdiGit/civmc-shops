@@ -160,8 +160,9 @@
         <p class="meta" id="fg-enchant-hint" style="margin:0 0 6px">Prefer the Enchants mode in the search bar for named enchant lookup.</p>
         <div class="find-filter-toggles" style="flex-direction:column;align-items:stretch;gap:8px">
           <label class="find-filter-check" id="fg-enchant-contains"><span class="find-filter-check-label">Contains</span>
-            <input type="search" id="f-enchant" placeholder="protection, silk touchâ€¦" maxlength="60" style="width:min(100%,220px)"></label>
+            <input type="search" id="f-enchant" placeholder="protection, silk touch…" maxlength="80" style="width:min(100%,220px)" title="Comma-separated = must include all"></label>
           <label class="find-filter-check"><input type="checkbox" id="f-has-enchants"> Enchanted only</label>
+          <label class="find-filter-check"><input type="checkbox" id="f-unenchanted"> Unenchanted only</label>
         </div>
       </div>
     </div>
@@ -177,7 +178,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../items.js"></script>
-<script src="../app.js?v=45"></script>
+<script src="../app.js?v=46"></script>
 <script src="../place-picker.js"></script>
 <script>
 const q = document.getElementById("q");
@@ -208,6 +209,7 @@ const fMaxRate = document.getElementById("f-max-rate");
 const fUnit = document.getElementById("f-unit");
 const fEnchant = document.getElementById("f-enchant");
 const fHasEnchants = document.getElementById("f-has-enchants");
+const fUnenchanted = document.getElementById("f-unenchanted");
 const fExcludeUnknown = document.getElementById("f-exclude-unknown");
 const resultCountEl = document.getElementById("result-count");
 const findBoard = document.querySelector(".find-board");
@@ -222,10 +224,25 @@ let hasDirectionsOnly = false;
 let minDealRate = null; // null = any
 let maxDealRate = null;
 let unitFilter = ""; // "" | each | ci | cs
-let enchantFilter = ""; // substring match on listings.enchants (sell/want filters)
+let enchantFilter = ""; // comma-separated AND needles on listings.enchants (sell/want)
 let hasEnchantsOnly = false;
+let unenchantedOnly = false;
 let excludeUnknown = false;
 let findMe = null; // { session, profile } when logged in
+
+/** Prefer commas for multiple enchants; a single token may be a multi-word name. */
+function enchantNeedlesFrom(raw) {
+  const t = String(raw || "").trim();
+  if (!t) return [];
+  if (t.includes(",")) return t.split(",").map(s => norm(s)).filter(Boolean);
+  return [norm(t)];
+}
+function parseEnchantList(raw) {
+  return String(raw || "").split(",").map(s => s.trim()).filter(Boolean);
+}
+function joinEnchantList(parts) {
+  return (parts || []).map(s => String(s || "").trim()).filter(Boolean).join(", ");
+}
 
 function unknownListingsUi() {
   return typeof UNKNOWN_LISTINGS_UI !== "undefined" && !!UNKNOWN_LISTINGS_UI &&
@@ -327,17 +344,18 @@ function renderEnchantChips() {
     return;
   }
   enchantChipsEl.hidden = false;
-  const selected = norm(enchantPick.value);
-  const needle = selected;
+  const selectedSet = new Set(parseEnchantList(enchantPick.value).map(norm));
+  const raw = enchantPick.value || "";
+  const typeNeedle = raw.includes(",") ? norm(raw.split(",").pop()) : norm(raw);
   const catalog = (typeof filterEnchantSuggestions === "function")
-    ? filterEnchantSuggestions(needle, 28)
+    ? filterEnchantSuggestions(typeNeedle, 28)
     : (typeof COMMON_MC_ENCHANTS !== "undefined" ? COMMON_MC_ENCHANTS.slice(0, 28) : []);
   if (!catalog.length) {
     enchantChipsEl.innerHTML = `<span class="meta">No enchant matches</span>`;
     return;
   }
   enchantChipsEl.innerHTML = catalog.map(name =>
-    `<button type="button" data-enchant-pick="${esc(name)}" class="${selected && norm(name) === selected ? "on" : ""}">${esc(name)}</button>`
+    `<button type="button" data-enchant-pick="${esc(name)}" class="${selectedSet.has(norm(name)) ? "on" : ""}">${esc(name)}</button>`
   ).join("");
 }
 function syncModeUi() {
@@ -347,8 +365,8 @@ function syncModeUi() {
   if (enchantWrap) enchantWrap.hidden = !enchantMode;
   enchantPick.hidden = !enchantMode;
   if (enchantMode) {
-    enchantPick.placeholder = "Search enchantsâ€¦";
-    enchantPick.title = "Type to filter enchant names, then pick one";
+    enchantPick.placeholder = "Search enchants…";
+    enchantPick.title = "Type to filter, click chips to multi-select (AND)";
     if (q.value && !enchantPick.value) enchantPick.value = q.value;
   } else {
     q.placeholder = mode.value === "shop" ? "shop name" : "diamond";
@@ -364,7 +382,7 @@ function defaultFindFilters() {
     trusted: false, minRating: 0,
     inStock: true, updatedWeek: false, hasLocation: false, directions: false,
     minRate: null, maxRate: null, unit: "",
-    enchant: "", hasEnchants: false, excludeUnknown: false
+    enchant: "", hasEnchants: false, unenchantedOnly: false, excludeUnknown: false
   };
 }
 function loadFilterDefaults() {
@@ -387,6 +405,7 @@ function loadFilterDefaults() {
       unit: ["each", "ci", "cs"].includes(o.unit) ? o.unit : "",
       enchant: typeof o.enchant === "string" ? o.enchant : "",
       hasEnchants: !!o.hasEnchants,
+      unenchantedOnly: !!o.unenchantedOnly,
       excludeUnknown: !!o.excludeUnknown
     };
   } catch (e) {
@@ -409,6 +428,7 @@ function saveFilterDefaults() {
       unit: unitFilter || "",
       enchant: enchantFilter || "",
       hasEnchants: !!hasEnchantsOnly,
+      unenchantedOnly: !!unenchantedOnly,
       excludeUnknown: !!excludeUnknown
     }));
   } catch (e) {}
@@ -426,11 +446,12 @@ function syncFilterControls() {
   fUnit.value = unitFilter || "";
   fEnchant.value = enchantFilter || "";
   fHasEnchants.checked = !!hasEnchantsOnly;
+  if (fUnenchanted) fUnenchanted.checked = !!unenchantedOnly;
   const itemMode = isItemMode();
   const sellWant = mode.value === "sell" || mode.value === "want";
   document.getElementById("fg-deal").hidden = !itemMode;
   document.getElementById("fg-unit").hidden = !itemMode;
-  // Enchants mode owns named enchant search - keep only "Enchanted only" for sell/want
+  // Enchants mode owns named enchant search - keep enchanted/unenchanted toggles for sell/want
   document.getElementById("fg-enchant").hidden = !sellWant;
   const containsRow = document.getElementById("fg-enchant-contains");
   const enchantHint = document.getElementById("fg-enchant-hint");
@@ -451,6 +472,7 @@ function activeFilterCount() {
     + (listingMode && unitFilter ? 1 : 0)
     + (sellWant && enchantFilter ? 1 : 0)
     + (sellWant && hasEnchantsOnly ? 1 : 0)
+    + (sellWant && unenchantedOnly ? 1 : 0)
     + (unknownListingsUi() && listingMode && excludeUnknown ? 1 : 0);
 }
 function updateFilterChrome() {
@@ -478,6 +500,7 @@ function updateFilterChrome() {
   if (isItemMode() && unitFilter) bits.push("Unit: " + (unitFilter === "each" ? "each" : unitFilter.toUpperCase()));
   if ((mode.value === "sell" || mode.value === "want") && enchantFilter) bits.push("Enchant: " + enchantFilter);
   if ((mode.value === "sell" || mode.value === "want") && hasEnchantsOnly) bits.push("Enchanted only");
+  if ((mode.value === "sell" || mode.value === "want") && unenchantedOnly) bits.push("Unenchanted only");
   if (unknownListingsUi() && isItemMode() && excludeUnknown) bits.push("No unknowns");
   if (bits.length) {
     activeFiltersEl.hidden = false;
@@ -562,6 +585,7 @@ function syncUrl() {
     if (unitFilter) sp.set("unit", unitFilter);
     if ((mode.value === "sell" || mode.value === "want") && enchantFilter) sp.set("enchant", enchantFilter);
     if ((mode.value === "sell" || mode.value === "want") && hasEnchantsOnly) sp.set("has_enchants", "1");
+    if ((mode.value === "sell" || mode.value === "want") && unenchantedOnly) sp.set("unenchanted_only", "1");
     if (unknownListingsUi() && excludeUnknown) sp.set("no_unknown", "1");
   }
   const qs = sp.toString();
@@ -654,8 +678,9 @@ function applyFindFilters(rows, shopOf, kind) {
       if (sellWant) {
         const ench = String(r.enchants || "").toLowerCase();
         if (hasEnchantsOnly && !ench.trim()) return false;
+        if (unenchantedOnly && ench.trim()) return false;
         if (enchantFilter) {
-          const needles = enchantFilter.toLowerCase().split(/\s+/).filter(Boolean);
+          const needles = enchantNeedlesFrom(enchantFilter);
           if (!needles.every(w => ench.includes(w))) return false;
         }
       }
@@ -726,7 +751,20 @@ fEnchant.addEventListener("change", () => { enchantFilter = norm(fEnchant.value)
 fEnchant.addEventListener("keydown", e => {
   if (e.key === "Enter") { e.preventDefault(); enchantFilter = norm(fEnchant.value); reapplyFindFilters(); }
 });
-fHasEnchants.addEventListener("change", () => { hasEnchantsOnly = fHasEnchants.checked; reapplyFindFilters(); });
+fHasEnchants.addEventListener("change", () => {
+  hasEnchantsOnly = fHasEnchants.checked;
+  if (hasEnchantsOnly) unenchantedOnly = false;
+  syncFilterControls();
+  reapplyFindFilters();
+});
+if (fUnenchanted) {
+  fUnenchanted.addEventListener("change", () => {
+    unenchantedOnly = fUnenchanted.checked;
+    if (unenchantedOnly) hasEnchantsOnly = false;
+    syncFilterControls();
+    reapplyFindFilters();
+  });
+}
 fExcludeUnknown.addEventListener("change", () => {
   excludeUnknown = fExcludeUnknown.checked;
   reapplyFindFilters({ refetchItems: true });
@@ -750,6 +788,7 @@ document.getElementById("clear-filters").addEventListener("click", () => {
   unitFilter = "";
   enchantFilter = "";
   hasEnchantsOnly = false;
+  unenchantedOnly = false;
   excludeUnknown = false;
   reapplyFindFilters({ refetchItems: true });
 });
@@ -785,7 +824,13 @@ document.getElementById("recent-searches").addEventListener("click", e => {
 enchantChipsEl.addEventListener("click", e => {
   const b = e.target.closest("[data-enchant-pick]");
   if (!b) return;
-  setSearchTerm(b.dataset.enchantPick || "");
+  const name = b.dataset.enchantPick || "";
+  const cur = parseEnchantList(enchantPick.value);
+  const n = norm(name);
+  const idx = cur.findIndex(x => norm(x) === n);
+  if (idx >= 0) cur.splice(idx, 1);
+  else cur.push(name);
+  setSearchTerm(joinEnchantList(cur));
   renderEnchantChips();
   search(false);
 });
@@ -1143,9 +1188,13 @@ function mapUnknownListing(u) {
 
 async function showItems(term) {
   const enchantMode = isEnchantMode();
+  const enchantNeedles = enchantMode ? enchantNeedlesFrom(term) : [];
+  const apiEnchantTerm = enchantNeedles[0] || term;
   let title;
   if (enchantMode) {
-    heading.textContent = 'Listings with enchant "' + term + '"';
+    heading.textContent = enchantNeedles.length > 1
+      ? 'Listings with enchants "' + enchantNeedles.join('" + "') + '"'
+      : 'Listings with enchant "' + term + '"';
     title = term + " enchants - CivShops";
   } else {
     heading.textContent = (mode.value === "sell" ? "Shops selling " : "Shops buying ") + term;
@@ -1167,7 +1216,9 @@ async function showItems(term) {
   renderRecentChips();
   setFindCompact(true);
 
-  const safeTerm = String(term).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
+  const safeTerm = String(enchantMode ? apiEnchantTerm : term).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
+  const filterNeedles = !enchantMode && enchantFilter ? enchantNeedlesFrom(enchantFilter) : [];
+  const safeEnchApi = filterNeedles[0] ? String(filterNeedles[0]).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim() : "";
   let query = sb
     .from("listings")
     .select("*, shops(id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business, is_nation), reviews(rating, traded, timed_out, created_at))")
@@ -1181,9 +1232,8 @@ async function showItems(term) {
     query = query.or(`${col}.ilike.%${safeTerm}%,enchants.ilike.%${safeTerm}%`);
   }
   if (inStockOnly) query = query.eq("in_stock", true);
-  if (!enchantMode && enchantFilter) {
-    const safeEnch = String(enchantFilter).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
-    if (safeEnch) query = query.ilike("enchants", "%" + safeEnch + "%");
+  if (!enchantMode && safeEnchApi) {
+    query = query.ilike("enchants", "%" + safeEnchApi + "%");
   }
   const { data: all, error } = await query;
 
@@ -1192,6 +1242,12 @@ async function showItems(term) {
     const sh = l.shops;
     return sh && !l.timed_out && shopListedPublicly(sh, sh.profiles);
   });
+  if (enchantMode && enchantNeedles.length > 1) {
+    data = data.filter(l => {
+      const ench = String(l.enchants || "").toLowerCase();
+      return enchantNeedles.every(n => ench.includes(n));
+    });
+  }
 
   if (unknownListingsUi() && !excludeUnknown) {
     try {
@@ -1206,13 +1262,21 @@ async function showItems(term) {
         uq = uq.or(`${col}.ilike.%${safeTerm}%,enchants.ilike.%${safeTerm}%`);
       }
       // Unknowns are discoveries - show even when out of stock (common for /cti punches).
-      if (!enchantMode && enchantFilter) {
-        const safeEnch = String(enchantFilter).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
-        if (safeEnch) uq = uq.ilike("enchants", "%" + safeEnch + "%");
+      if (!enchantMode && safeEnchApi) {
+        uq = uq.ilike("enchants", "%" + safeEnchApi + "%");
       }
       const { data: unknowns, error: unkErr } = await uq;
       if (unkErr) console.warn("unknown_listings find", unkErr);
-      else data = data.concat((unknowns || []).map(mapUnknownListing));
+      else {
+        let unkRows = (unknowns || []).map(mapUnknownListing);
+        if (enchantMode && enchantNeedles.length > 1) {
+          unkRows = unkRows.filter(l => {
+            const ench = String(l.enchants || "").toLowerCase();
+            return enchantNeedles.every(n => ench.includes(n));
+          });
+        }
+        data = data.concat(unkRows);
+      }
     } catch (e) { console.warn("unknown_listings find", e); }
   }
 
@@ -1333,8 +1397,10 @@ syncModeUi();
   unitFilter = ps.has("unit")
     ? (["each", "ci", "cs"].includes(ps.get("unit")) ? ps.get("unit") : "")
     : (defaults.unit || "");
-  enchantFilter = ps.has("enchant") ? norm(ps.get("enchant") || "") : norm(defaults.enchant || "");
+  enchantFilter = ps.has("enchant") ? String(ps.get("enchant") || "").trim() : String(defaults.enchant || "").trim();
   hasEnchantsOnly = ps.has("has_enchants") ? ps.get("has_enchants") === "1" : !!defaults.hasEnchants;
+  unenchantedOnly = ps.has("unenchanted_only") ? ps.get("unenchanted_only") === "1" : !!defaults.unenchantedOnly;
+  if (hasEnchantsOnly && unenchantedOnly) unenchantedOnly = false;
   updateFilterChrome();
   const hasCmp = /#cmp=/.test(location.hash);
   const hasStoredCmp = loadCompareSpecs().length > 0;
