@@ -177,7 +177,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
 <script src="../items.js"></script>
-<script src="../app.js?v=43"></script>
+<script src="../app.js?v=44"></script>
 <script src="../place-picker.js"></script>
 <script>
 const q = document.getElementById("q");
@@ -1053,6 +1053,8 @@ function paintItemResults(data) {
   results.className = "offers";
   results.innerHTML = rows.map(l => {
     const s = l.shops;
+    // Find embeds often omit shops.id - keep shop_id so deep links resolve
+    const shopRef = s ? Object.assign({}, s, { id: s.id != null ? s.id : l.shop_id }) : null;
     const unknown = !!l.is_unknown;
     const stale = daysAgo(l.updated_at) >= STALE_DAYS;
     let tags = stockHtml(l);
@@ -1064,7 +1066,7 @@ function paintItemResults(data) {
     const place = placeHtml(s);
     const href = unknown
       ? "../unknown/?id=" + l.id
-      : shopPath(s, Object.assign({ listing: l.id }, qTerm ? { q: qTerm } : {}));
+      : shopPath(shopRef, Object.assign({ listing: l.id }, qTerm ? { q: qTerm } : {}));
     const who = unknown ? "Unknown \u00b7 Unclaimed" : shopName(s);
     const copyBtn = unknown ? "" : iconBtn("link", { title: "Copy listing link", attrs: `data-copy-listing="${l.id}"` });
     const cmpBtn = unknown ? "" : iconBtn("columns", { primary: pinned, title: pinned ? "Unpin from compare" : "Compare", attrs: `data-compare="${l.id}"` });
@@ -1088,7 +1090,8 @@ results.addEventListener("click", async e => {
     const id = Number(copy.dataset.copyListing);
     const l = lastItemRows.find(x => x.id === id);
     if (!l || !l.shops || l.is_unknown) return;
-    const ok = await copyText(listingShareUrl(l.shops, l.id));
+    const shopRef = Object.assign({}, l.shops, { id: l.shops.id != null ? l.shops.id : l.shop_id });
+    const ok = await copyText(listingShareUrl(shopRef, l.id));
     setMsg(msg, ok ? "Listing link copied." : "Couldn't copy.", ok ? "ok" : "err");
     return;
   }
@@ -1167,7 +1170,7 @@ async function showItems(term) {
   const safeTerm = String(term).replace(/[%*,()]/g, " ").replace(/\s+/g, " ").trim();
   let query = sb
     .from("listings")
-    .select("*, shops(owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business, is_nation), reviews(rating, traded, timed_out, created_at))")
+    .select("*, shops(id, owner_id, name, styled_name, icon_item, icon_path, city, nation, hours, find_note, transit_note, x, z, timed_out, archived, is_open, sale_name, sale_percent, sale_label, sale_starts_at, sale_ends_at, sale_active, profiles!shops_owner_id_fkey(username, mc_username, discord_username, avatar_path, timed_out, is_business, is_nation), reviews(rating, traded, timed_out, created_at))")
     .order("updated_at", { ascending: false })
     .limit(200);
   if (enchantMode) {
