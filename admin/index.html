@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Admin - CivShops</title>
-<link rel="stylesheet" href="../style.css?v=38">
+<link rel="stylesheet" href="../style.css?v=39">
 </head>
 <body class="admin-page">
 <nav id="nav"></nav>
@@ -49,6 +49,23 @@
       </div>
       <div class="collapse-body" id="collapse-ready">
         <div class="mod-stack" id="ready"></div>
+      </div>
+    </section>
+    <section class="mod-section mod-section--pending collapse-section admin-collapse" data-collapse="deletion" aria-labelledby="admin-deletion-h">
+      <div class="mod-section-head">
+        <h2 id="admin-deletion-h">
+          <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="collapse-deletion">
+            <span class="collapse-chevron" aria-hidden="true"></span>
+            <span class="mod-section-head-text">
+              <span class="mod-section-title">Deletion requests</span>
+              <span class="meta">Users who asked to remove their account and data from Settings. Accept deletes everything; Deny leaves the account and lets them request again.</span>
+            </span>
+          </button>
+        </h2>
+      </div>
+      <div class="collapse-body" id="collapse-deletion">
+        <div class="msg" id="deletionmsg"></div>
+        <div class="mod-stack" id="deletion-requests"></div>
       </div>
     </section>
   </div>
@@ -312,7 +329,7 @@
 <script src="../config.js"></script>
 <script src="../places.js"></script>
 <script src="../place-picker.js"></script>
-<script src="../app.js?v=45"></script>
+<script src="../app.js?v=46"></script>
 <script src="../directory-ads-admin.js?v=37"></script>
 <script>
 const msg = document.getElementById("msg");
@@ -325,6 +342,7 @@ let viewUsers = [];
 let shopRows = [];
 let listingRows = [];
 let unknownRows = [];
+let deletionRows = [];
 let scanPlayerRows = [];
 let scanPlayerTotal = 0;
 let aliasPreviewRows = [];
@@ -683,11 +701,39 @@ function paintUnknowns(hitFn) {
   }).join("");
 }
 
+function paintDeletionRequests() {
+  const box = document.getElementById("deletion-requests");
+  const deletionmsg = document.getElementById("deletionmsg");
+  if (!box || !me || !me.is_head) return;
+  if (!deletionRows.length) {
+    box.innerHTML = '<p class="meta">No pending deletion requests.</p>';
+    return;
+  }
+  box.innerHTML = deletionRows.map(row => {
+    const p = row.profiles || {};
+    const name = userName(p) || row.username || "unknown";
+    const mc = p.mc_username || row.mc_username || "-";
+    const dc = p.discord_username || "-";
+    return `<div class="card admin-card">
+      <div class="top">
+        <div><b>${esc(name)}</b>
+          <span class="meta">MC ${esc(mc)} \u00b7 Discord: ${esc(dc)} \u00b7 requested ${fmtDate(row.created_at)}</span></div>
+        <div class="inline-actions">
+          <button class="small primary" data-act="deletion-accept" data-id="${row.id}">Accept</button>
+          <button class="small btn-report" data-act="deletion-deny" data-id="${row.id}">Deny</button>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+  if (deletionmsg) setMsg(deletionmsg, "");
+}
+
 async function render() {
   if (me.is_head) {
-    const [r, unk] = await Promise.all([
+    const [r, unk, del] = await Promise.all([
       callFn("review-signup", { action: "list" }),
-      callFn("manage-unknown", { action: "list" })
+      callFn("manage-unknown", { action: "list" }),
+      callFn("account-deletion", { action: "list" })
     ]);
     if (!r.ok) { setMsg(usermsg, r.message, "err"); }
     else {
@@ -700,6 +746,14 @@ async function render() {
     } else {
       setMsg(unknownmsg, "");
       unknownRows = unk.data.unknowns || [];
+    }
+    const deletionmsg = document.getElementById("deletionmsg");
+    if (!del.ok) {
+      setMsg(deletionmsg, del.message, "err");
+      deletionRows = [];
+    } else {
+      setMsg(deletionmsg, "");
+      deletionRows = del.data.requests || [];
     }
 
     const awaiting = (r.ok && r.data.awaiting_links) || accounts.filter(a =>
@@ -727,6 +781,7 @@ async function render() {
       || '<p class="meta">No accounts waiting to link.</p>';
     document.getElementById("ready").innerHTML = ready.map(a => queueCard(a, { accept: true })).join("")
       || '<p class="meta">No linked accounts waiting for the verified badge.</p>';
+    paintDeletionRequests();
   } else {
     const { data: users } = await sb.from("profiles").select("*").order("username");
     viewUsers = users || [];
@@ -998,6 +1053,32 @@ document.querySelector("main").addEventListener("click", async e => {
     r = await startImpersonation(btn.dataset.id);
     if (!r.ok) { setMsg(usermsg, r.message, "err"); return; }
     location.href = "../home/";
+    return;
+  }
+  if (act === "deletion-accept" || act === "deletion-deny") {
+    const row = deletionRows.find(x => String(x.id) === String(btn.dataset.id));
+    const p = row && row.profiles;
+    const name = (p && userName(p)) || (row && row.username) || "this account";
+    const deletionmsg = document.getElementById("deletionmsg");
+    if (act === "deletion-accept") {
+      if (!await confirmModal({
+        title: "Accept deletion request",
+        body: "Permanently delete " + name + " and EVERYTHING they made (shops, listings, comments, reviews, uploads)? This can't be undone.",
+        confirmLabel: "Delete account",
+        danger: true
+      })) return;
+      r = await callFn("account-deletion", { action: "accept", request_id: btn.dataset.id });
+    } else {
+      if (!await confirmModal({
+        title: "Deny deletion request",
+        body: "Deny " + name + "'s deletion request? Their account stays. They can submit another request later.",
+        confirmLabel: "Deny request"
+      })) return;
+      r = await callFn("account-deletion", { action: "deny", request_id: btn.dataset.id });
+    }
+    if (!r.ok) { setMsg(deletionmsg, r.message, "err"); return; }
+    setMsg(deletionmsg, act === "deletion-accept" ? "Account deleted." : "Request denied.", "ok");
+    render();
     return;
   }
   if (act === "delete-account") {
