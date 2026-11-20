@@ -3764,6 +3764,12 @@ body.market-page .page-hero .market-scope-note { margin: 0; max-width: 62ch; }
 }
 .owner-alert-body { flex: 1; min-width: 180px; font-size: .9rem; }
 .settings-panel { max-width: 560px; }
+.settings-panel.settings-danger {
+  border-color: color-mix(in srgb, var(--bad) 35%, var(--line));
+  background: color-mix(in srgb, var(--bad) 6%, var(--panel));
+}
+.settings-panel.settings-danger h2 { color: var(--bad); }
+.settings-panel.settings-danger #request-delete { margin-top: 8px; }
 .settings-toggle {
   display: flex; align-items: center; gap: 10px;
   margin: 12px 0 4px; font-weight: 600; cursor: pointer;

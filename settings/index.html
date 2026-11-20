@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Settings - CivShops</title>
-<link rel="stylesheet" href="../style.css?v=38">
+<link rel="stylesheet" href="../style.css?v=39">
 </head>
 <body class="settings-page">
 <nav id="nav"></nav>
@@ -13,7 +13,7 @@
     <div class="settings-hero-copy">
       <span class="page-eyebrow">Account</span>
       <h1>Settings</h1>
-      <p class="sub">Theme, password, and owner alerts.</p>
+      <p class="sub">Theme, password, owner alerts, and account deletion.</p>
     </div>
     <button type="button" class="primary" id="save" hidden>Save settings</button>
   </header>
@@ -48,14 +48,24 @@
     </label>
     <p class="meta" id="alerts-hint"></p>
   </div>
+
+  <div class="panel settings-panel settings-danger" id="delete-panel" hidden>
+    <h2 style="margin-top:0">Account and data</h2>
+    <p class="meta" style="margin-top:0">Request permanent removal of your account, shops, listings, comments, reviews, and uploads. An admin reviews the request before anything is deleted.</p>
+    <p class="meta" id="delete-status"></p>
+    <div class="msg" id="deletemsg"></div>
+    <button type="button" class="btn-report" id="request-delete">Request account and data deletion</button>
+  </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="../config.js"></script>
-<script src="../app.js?v=45"></script>
+<script src="../app.js?v=46"></script>
 <script>
 const msg = document.getElementById("msg");
+const deletemsg = document.getElementById("deletemsg");
 let me = null;
+let deletionRequest = null;
 
 function syncThemeUi() {
   const t = getTheme();
@@ -72,6 +82,41 @@ document.querySelector(".theme-picker").addEventListener("click", e => {
   setMsg(msg, "Theme updated.", "ok");
 });
 
+function paintDeletionStatus() {
+  const status = document.getElementById("delete-status");
+  const btn = document.getElementById("request-delete");
+  if (!status || !btn) return;
+  if (me && me.is_head) {
+    status.textContent = "The head admin account can't be deleted through this form.";
+    btn.hidden = true;
+    return;
+  }
+  btn.hidden = false;
+  if (deletionRequest && deletionRequest.status === "pending") {
+    status.textContent = "Your deletion request is pending admin review. You can keep using the site until it is accepted or denied.";
+    btn.disabled = true;
+    btn.textContent = "Deletion request pending";
+  } else if (deletionRequest && deletionRequest.status === "denied") {
+    status.textContent = "Your last deletion request was denied. You can submit a new one.";
+    btn.disabled = false;
+    btn.textContent = "Request account and data deletion";
+  } else {
+    status.textContent = "";
+    btn.disabled = false;
+    btn.textContent = "Request account and data deletion";
+  }
+}
+
+async function refreshDeletionStatus() {
+  const r = await callFn("account-deletion", { action: "mine" });
+  if (!r.ok) {
+    setMsg(deletemsg, r.message, "err");
+    return;
+  }
+  deletionRequest = r.data.request || null;
+  paintDeletionStatus();
+}
+
 async function load() {
   syncThemeUi();
   const ctx = await requireLogin();
@@ -79,12 +124,14 @@ async function load() {
   me = ctx.profile;
   document.getElementById("pw-panel").hidden = false;
   document.getElementById("panel").hidden = false;
+  document.getElementById("delete-panel").hidden = false;
   document.getElementById("save").hidden = false;
   const on = alertsEnabled(me);
   document.getElementById("alerts-enabled").checked = on;
   document.getElementById("alerts-hint").textContent = on
     ? "Alerts are on. You'll see them at the top of My shops."
     : "Alerts are off. Nothing will be flagged on My shops.";
+  await refreshDeletionStatus();
 }
 
 document.getElementById("alerts-enabled").addEventListener("change", () => {
@@ -110,6 +157,31 @@ document.getElementById("savepw").onclick = async () => {
   await sb.from("profiles").update({ must_change_password: false }).eq("id", me.id);
   document.getElementById("pw").value = "";
   setMsg(msg, "Password changed.", "ok");
+};
+
+document.getElementById("request-delete").onclick = async () => {
+  if (me && me.is_head) {
+    setMsg(deletemsg, "The head admin account can't request deletion here.", "err");
+    return;
+  }
+  if (!await confirmModal({
+    title: "Request account and data deletion",
+    body: "This asks an admin to permanently delete your account and everything tied to it (shops, listings, comments, reviews, uploads). You keep access until they accept. Continue?",
+    confirmLabel: "Request deletion",
+    danger: true
+  })) return;
+  const btn = document.getElementById("request-delete");
+  btn.disabled = true;
+  setMsg(deletemsg, "Sending request...");
+  const r = await callFn("account-deletion", { action: "request" });
+  if (!r.ok) {
+    setMsg(deletemsg, r.message, "err");
+    paintDeletionStatus();
+    return;
+  }
+  deletionRequest = r.data.request || { status: "pending" };
+  setMsg(deletemsg, "Deletion request sent. An admin will review it.", "ok");
+  paintDeletionStatus();
 };
 
 load();
